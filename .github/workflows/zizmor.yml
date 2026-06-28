@@ -33,19 +33,22 @@ jobs:
 
       # First-party reusable workflows are intentionally referenced @main (so a
       # central change propagates instantly); only require a ref-pin for them,
-      # while every third-party action must still be hash-pinned.
+      # while every third-party action must still be hash-pinned. Written as an
+      # auto-discovered .github/zizmor.yml (ephemeral, not committed); skipped if
+      # the repo already ships its own zizmor config.
       - name: Write zizmor policy
         run: |
-          cat > "${RUNNER_TEMP}/zizmor.yml" <<'EOF'
-          rules:
-            unpinned-uses:
-              config:
-                policies:
-                  "rknightion/*": ref-pin
-                  "*": hash-pin
-          EOF
+          if [ ! -e .github/zizmor.yml ]; then
+            mkdir -p .github
+            {
+              echo 'rules:'
+              echo '  unpinned-uses:'
+              echo '    config:'
+              echo '      policies:'
+              echo '        "rknightion/*": ref-pin'
+              echo '        "*": hash-pin'
+            } > .github/zizmor.yml
+          fi
 
       - name: Run zizmor
         uses: zizmorcore/zizmor-action@192e21d79ab29983730a13d1382995c2307fbcaa # v0.5.7
-        with:
-          config: ${{ runner.temp }}/zizmor.yml
