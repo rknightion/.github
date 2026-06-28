@@ -1,0 +1,35 @@
+name: actionlint (reusable)
+
+# Reusable correctness linter for GitHub Actions workflow YAML (expression types,
+# wrong inputs, embedded shell via ShellCheck). Complements zizmor (security) and
+# CodeQL's `actions` language (dataflow). Non-gating: reports problems, does not
+# upload SARIF. actionlint is pinned to a tagged release of its installer script.
+
+on:
+  workflow_call: {}
+
+permissions: {}
+
+jobs:
+  actionlint:
+    name: Run actionlint
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Harden the runner (audit egress)
+        uses: step-security/harden-runner@9af89fc71515a100421586dfdb3dc9c984fbf411 # v2.19.4
+        with:
+          egress-policy: audit
+
+      - name: Checkout repository
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          persist-credentials: false
+
+      - name: Run actionlint
+        env:
+          ACTIONLINT_VERSION: 1.7.12
+        run: |
+          bash <(curl -fsSL "https://raw.githubusercontent.com/rhysd/actionlint/v${ACTIONLINT_VERSION}/scripts/download-actionlint.bash") "${ACTIONLINT_VERSION}"
+          ./actionlint -color

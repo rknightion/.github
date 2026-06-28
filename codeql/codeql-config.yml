@@ -1,0 +1,29 @@
+name: "rknightion standard CodeQL config"
+
+# Run the built-in default queries plus the security-extended suite: broader
+# security coverage than `default` while staying security-focused (avoids the
+# code-quality noise of `security-and-quality`). Tune individual noisy rules
+# below rather than switching whole suites.
+queries:
+  - uses: security-extended
+
+# Fleet-wide noise reduction.
+query-filters:
+  - exclude:
+      tags contain: experimental
+
+# NOTE: paths-ignore only affects interpreted languages and compiled languages
+# analyzed with build-mode: none (i.e. NOT go/swift autobuild). Harmless there.
+paths-ignore:
+  - '**/node_modules'
+  - '**/vendor'
+  - '**/third_party'
+  - '**/dist'
+  - '**/build'
+  - '**/*.min.js'
+  - '**/*.test.*'
+  - '**/*.spec.*'
+  - 'test'
+  - 'tests'
+  - 'docs'
+  - 'examples'
