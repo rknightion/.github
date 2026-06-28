@@ -11,6 +11,10 @@ permissions: {}
 jobs:
   zizmor:
     name: Run zizmor
+    # SARIF upload needs security-events: write, which GitHub does not grant to
+    # pull_request runs from forks (the upload would 403 and fail the job). Run
+    # on push + same-repo PRs only; fork PRs are re-scanned after merge on push.
+    if: ${{ github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository }}
     runs-on: ubuntu-latest
     permissions:
       security-events: write
@@ -27,5 +31,21 @@ jobs:
         with:
           persist-credentials: false
 
+      # First-party reusable workflows are intentionally referenced @main (so a
+      # central change propagates instantly); only require a ref-pin for them,
+      # while every third-party action must still be hash-pinned.
+      - name: Write zizmor policy
+        run: |
+          cat > "${RUNNER_TEMP}/zizmor.yml" <<'EOF'
+          rules:
+            unpinned-uses:
+              config:
+                policies:
+                  "rknightion/*": ref-pin
+                  "*": hash-pin
+          EOF
+
       - name: Run zizmor
         uses: zizmorcore/zizmor-action@192e21d79ab29983730a13d1382995c2307fbcaa # v0.5.7
+        with:
+          config: ${{ runner.temp }}/zizmor.yml

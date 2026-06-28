@@ -29,5 +29,8 @@ jobs:
       - name: Dependency review
         uses: actions/dependency-review-action@a1d282b36b6f3519aa1f3fc636f609c47dddb294 # v5.0.0
         with:
-          comment-summary-in-pr: on-failure
+          # Posting a PR comment needs pull-requests: write, which fork PRs don't
+          # get — skip the comment for fork PRs so the review still runs (and
+          # still fails on high-severity) without erroring on the comment call.
+          comment-summary-in-pr: ${{ (github.event.pull_request.head.repo.full_name == github.repository) && 'on-failure' || 'never' }}
           fail-on-severity: high
