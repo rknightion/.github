@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.3.1](https://github.com/rknightion/.github/compare/v1.3.0...v1.3.1) (2026-06-29)
+
+
+### Bug Fixes
+
+* **container-publish:** set GH_REPO on release-asset uploads ([4284c03](https://github.com/rknightion/.github/commit/4284c03e49b249f11bfc700ce0a4eded1fa7997a))
+
 ## [1.3.0](https://github.com/rknightion/.github/compare/v1.2.0...v1.3.0) (2026-06-29)
 
 
