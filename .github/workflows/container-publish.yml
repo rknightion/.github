@@ -302,6 +302,7 @@ jobs:
         if: inputs.sbom && inputs.release-tag != ''
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_REPO: ${{ github.repository }} # this job has no checkout; gh would else try git and fail
           RELEASE_TAG: ${{ inputs.release-tag }}
           IMAGE: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
         run: |
@@ -413,6 +414,7 @@ jobs:
         if: inputs.release-tag != ''
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_REPO: ${{ github.repository }} # explicit repo: no git context to infer from
           RELEASE_TAG: ${{ inputs.release-tag }}
           PKG: ${{ steps.chart.outputs.pkg }}
         run: gh release upload "${RELEASE_TAG}" "${PKG}" --clobber
