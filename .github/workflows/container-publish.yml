@@ -338,6 +338,16 @@ jobs:
           ACTOR: ${{ github.actor }}
         run: echo "${GHCR_TOKEN}" | helm registry login ghcr.io -u "${ACTOR}" --password-stdin
 
+      # cosign reads docker's credential store (~/.docker/config.json), NOT helm's,
+      # so a docker login is required for it to push the chart signature.
+      - name: Log in to GHCR (docker, for cosign)
+        if: inputs.sign
+        uses: docker/login-action@650006c6eb7dba73a995cc03b0b2d7f5ca915bee # v4.2.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
       - name: Package and push chart
         id: chart
         env:
