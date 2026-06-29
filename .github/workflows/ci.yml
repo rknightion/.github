@@ -24,4 +24,5 @@ jobs:
     permissions:
       contents: read
       security-events: write # upload SARIF
+      actions: read # match the reusable's declared job permissions (else startup_failure)
     uses: ./.github/workflows/zizmor.yml
