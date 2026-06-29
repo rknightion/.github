@@ -1,0 +1,27 @@
+# Self-CI: dogfood our own reusable security checks against this repo's workflows.
+# Runs on PRs (so Renovate's action-bump PRs get a green gate before automerge) and on
+# pushes to main. Calls the local reusables by ./ path so they always test the current ref.
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request: {}
+
+permissions: {}
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
+
+jobs:
+  actionlint:
+    permissions:
+      contents: read
+    uses: ./.github/workflows/actionlint.yml
+
+  zizmor:
+    permissions:
+      contents: read
+      security-events: write # upload SARIF
+    uses: ./.github/workflows/zizmor.yml

@@ -1,0 +1,30 @@
+# Release automation for the shared-workflows repo itself. On every push to main,
+# release-please maintains a "release PR" that, from the Conventional Commits since the
+# last release, computes the next semver, updates CHANGELOG.md + the manifest, and on
+# merge tags vX.Y.Z + creates the GitHub Release. Consumers pin these reusables to the
+# release SHA (# vX.Y.Z) and Renovate bumps them when a new release lands.
+#
+# Opened under a PAT (not GITHUB_TOKEN) so the bot-authored release PR runs CI (and can
+# be automerged) instead of being parked at "action_required".
+name: release-please
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+
+jobs:
+  release-please:
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write # create the release commit, tag, and GitHub Release
+      pull-requests: write # open/update the release PR
+    steps:
+      - uses: googleapis/release-please-action@45996ed1f6d02564a971a2fa1b5860e934307cf7 # v5.0.0
+        with:
+          token: ${{ secrets.RELEASE_PLEASE_TOKEN }}
+          config-file: release-please-config.json
+          manifest-file: .release-please-manifest.json

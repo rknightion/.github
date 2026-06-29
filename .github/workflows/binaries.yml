@@ -1,0 +1,103 @@
+# Shared reusable: build + publish release BINARIES via GoReleaser.
+#
+# Companion to container-publish.yml (which owns the image + Helm chart). This builds
+# the cross-compiled binaries, checksums, archive SBOMs and (optionally) cosign blob
+# signatures, and uploads them to the GitHub Release that release-please already created
+# for the tag. It is OPT-IN: only repos that ship a .goreleaser.{yml,yaml} call it, from
+# their release-please `publish` path, gated on release_created.
+#
+# What gets built/signed/SBOM'd is driven by the repo's own .goreleaser config — this
+# workflow only provides the toolchain (Go, optionally cosign) and runs `goreleaser`.
+# `images` are expected to be handled by container-publish.yml, so binary-only repos pass
+# goreleaser-args: "release --clean --skip=docker" (or simply omit dockers: from config).
+name: binaries (reusable)
+
+on:
+  workflow_call:
+    inputs:
+      release-tag:
+        description: "The vX.Y.Z tag to build and attach assets to (release-please tag_name)."
+        required: true
+        type: string
+      go-version:
+        description: "Explicit Go version for setup-go. Takes precedence over go-version-file."
+        required: false
+        type: string
+        default: ""
+      go-version-file:
+        description: "Path to the file setup-go reads the Go version from (ignored if go-version set)."
+        required: false
+        type: string
+        default: "go.mod"
+      goreleaser-version:
+        description: "GoReleaser version (Renovate-maintained at the caller default)."
+        required: false
+        type: string
+        default: "v2.16.0"
+      goreleaser-args:
+        description: "Args passed to goreleaser. Default builds+publishes; pass --skip=docker for binary-only."
+        required: false
+        type: string
+        default: "release --clean"
+      install-cosign:
+        description: "Install cosign so the config's signs:/docker_signs: blocks can keyless-sign."
+        required: false
+        type: boolean
+        default: false
+      cosign-version:
+        description: "cosign release to install when install-cosign is true."
+        required: false
+        type: string
+        default: "v3.0.6"
+      pre-cmd:
+        description: "Optional shell run before goreleaser (e.g. install syft/go-licenses, generate notices)."
+        required: false
+        type: string
+        default: ""
+
+permissions:
+  contents: read
+
+jobs:
+  goreleaser:
+    name: goreleaser (binaries)
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write # upload binaries/checksums/SBOMs to the GitHub Release
+      id-token: write # keyless cosign blob/image signing via GitHub OIDC
+      packages: write # in case the config pushes anything to GHCR
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          ref: ${{ inputs.release-tag }} # build the exact commit release-please tagged
+          fetch-depth: 0 # full history for the changelog/version
+          persist-credentials: false
+
+      - uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6.5.0
+        with:
+          go-version: ${{ inputs.go-version }}
+          go-version-file: ${{ inputs.go-version == '' && inputs.go-version-file || '' }}
+          cache: false
+
+      - name: Install cosign
+        if: ${{ inputs.install-cosign }}
+        uses: sigstore/cosign-installer@6f9f17788090df1f26f669e9d70d6ae9567deba6 # v4.1.2
+        with:
+          cosign-release: ${{ inputs.cosign-version }}
+
+      # Optional pre-release step (tool installs, third-party notices, etc.). Passed via
+      # env — never interpolate inputs directly into run: (zizmor template-injection).
+      - name: Pre-release setup
+        if: ${{ inputs.pre-cmd != '' }}
+        env:
+          PRE_CMD: ${{ inputs.pre-cmd }}
+        run: bash -c "$PRE_CMD"
+
+      - name: Run GoReleaser
+        uses: goreleaser/goreleaser-action@f06c13b6b1a9625abc9e6e439d9c05a8f2190e94 # v7.2.3
+        with:
+          distribution: goreleaser
+          version: ${{ inputs.goreleaser-version }}
+          args: ${{ inputs.goreleaser-args }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
