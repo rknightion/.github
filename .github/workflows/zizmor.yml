@@ -31,11 +31,12 @@ jobs:
         with:
           persist-credentials: false
 
-      # First-party reusable workflows are intentionally referenced @main (so a
-      # central change propagates instantly); only require a ref-pin for them,
-      # while every third-party action must still be hash-pinned. Written as an
-      # auto-discovered .github/zizmor.yml (ephemeral, not committed); skipped if
-      # the repo already ships its own zizmor config.
+      # EVERY uses: must be hash-pinned — first-party rknightion reusables included.
+      # As of v1.0.0 the fleet pins these reusables to a release SHA (with a # vX.Y.Z
+      # comment) and Renovate maintains the bump, so floating @main is no longer used;
+      # requiring hash-pin here makes that self-enforcing (a reintroduced @main fails
+      # CI). Written as an auto-discovered .github/zizmor.yml (ephemeral, not committed);
+      # skipped if the repo already ships its own zizmor config.
       - name: Write zizmor policy
         run: |
           if [ ! -e .github/zizmor.yml ]; then
@@ -45,7 +46,6 @@ jobs:
               echo '  unpinned-uses:'
               echo '    config:'
               echo '      policies:'
-              echo '        "rknightion/*": ref-pin'
               echo '        "*": hash-pin'
             } > .github/zizmor.yml
           fi
