@@ -105,6 +105,13 @@ jobs:
           ref: ${{ inputs.release-tag || github.ref }}
           persist-credentials: false
 
+      - name: Compute VERSION build-arg
+        env:
+          RELEASE_TAG: ${{ inputs.release-tag }}
+        run: |
+          if [ -n "${RELEASE_TAG}" ]; then v="${RELEASE_TAG#v}"; else v="$(git rev-parse --short HEAD)"; fi
+          echo "COMPUTED_VERSION=${v}" >> "$GITHUB_ENV"
+
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@d7f5e7f509e45cec5c76c4d5afdd7de93d0b3df5 # v4.1.0
 
@@ -145,7 +152,9 @@ jobs:
             type=gha,scope=${{ env.PLATFORM_PAIR }},mode=max
           provenance: false
           sbom: false
-          build-args: ${{ inputs.build-args }}
+          build-args: |
+            ${{ inputs.build-args }}
+            VERSION=${{ env.COMPUTED_VERSION }}
 
       - name: Export digest
         if: github.event_name != 'merge_group'
