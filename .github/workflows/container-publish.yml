@@ -1,0 +1,374 @@
+name: Container publish (reusable)
+
+# Reusable container build/publish for the rknightion fleet. ONE pipeline for both
+# edge (push to main) and release (release-please workflow_call) — docker/metadata-action
+# decides the tags. Uniform behaviour for every repo regardless of language:
+#   * per-arch NATIVE runners (amd64 + arm64), push-by-digest, manifest-list merge
+#     (no QEMU — emulated arm64 mis-resolves native wheels/libs)
+#   * cosign keyless signing + build-provenance attestation on the merged index
+#   * SBOM (SPDX + CycloneDX) via syft; attached to the GitHub Release on a release
+#   * optional Helm chart publish (OCI) — release version or main snapshot
+#   * Trivy scan -> caller Security tab
+# Callers trigger on push:main (edge) + release-please workflow_call (release) +
+# workflow_dispatch + merge_group (build-only gate). Concurrency cancels superseded
+# EDGE builds but never a release publish.
+
+on:
+  workflow_call:
+    inputs:
+      release-tag:
+        description: "Release tag (vX.Y.Z) when invoked by release-please; empty for edge builds"
+        type: string
+        default: ""
+      dockerfile:
+        description: "Path to the Dockerfile"
+        type: string
+        default: "Dockerfile"
+      context:
+        description: "Build context"
+        type: string
+        default: "."
+      build-args:
+        description: "Newline-separated build args"
+        type: string
+        default: ""
+      helm-chart-path:
+        description: "Path to a Helm chart dir to publish (empty = skip)"
+        type: string
+        default: ""
+      charts-repo:
+        description: "OCI repo for Helm charts (default ghcr.io/<owner>/charts)"
+        type: string
+        default: ""
+      sbom:
+        description: "Generate SBOM (SPDX + CycloneDX)"
+        type: boolean
+        default: true
+      sign:
+        description: "Cosign keyless sign the image (and chart)"
+        type: boolean
+        default: true
+      trivy:
+        description: "Run Trivy scan and upload SARIF"
+        type: boolean
+        default: true
+      dockerhub-login:
+        description: "Log in to Docker Hub for base-image pulls (needs DOCKERHUB_* secrets)"
+        type: boolean
+        default: false
+    secrets:
+      DOCKERHUB_USERNAME:
+        required: false
+      DOCKERHUB_TOKEN:
+        required: false
+
+permissions: {}
+
+concurrency:
+  # Cancel superseded EDGE builds (no release tag); NEVER cancel a release publish.
+  group: container-publish-${{ github.workflow }}-${{ github.ref }}-${{ inputs.release-tag }}
+  cancel-in-progress: ${{ inputs.release-tag == '' }}
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository }}
+
+jobs:
+  build:
+    name: build (${{ matrix.platform }})
+    runs-on: ${{ matrix.runner }}
+    permissions:
+      contents: read
+      packages: write
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: linux/amd64
+            runner: ubuntu-24.04
+          - platform: linux/arm64
+            runner: ubuntu-24.04-arm
+    steps:
+      - name: Harden the runner (audit egress)
+        uses: step-security/harden-runner@9af89fc71515a100421586dfdb3dc9c984fbf411 # v2.19.4
+        with:
+          egress-policy: audit
+
+      - name: Prepare platform pair
+        env:
+          PLATFORM: ${{ matrix.platform }}
+        run: echo "PLATFORM_PAIR=${PLATFORM//\//-}" >> "$GITHUB_ENV"
+
+      - name: Checkout repository
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          ref: ${{ inputs.release-tag || github.ref }}
+          persist-credentials: false
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@d7f5e7f509e45cec5c76c4d5afdd7de93d0b3df5 # v4.1.0
+
+      - name: Extract Docker metadata (labels)
+        id: meta
+        uses: docker/metadata-action@80c7e94dd9b9319bd5eb7a0e0fe9291e23a2a2e9 # v6.1.0
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+
+      - name: Log in to GHCR
+        uses: docker/login-action@650006c6eb7dba73a995cc03b0b2d7f5ca915bee # v4.2.0
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Log in to Docker Hub (base-image pulls)
+        if: inputs.dockerhub-login
+        uses: docker/login-action@650006c6eb7dba73a995cc03b0b2d7f5ca915bee # v4.2.0
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Build and push by digest
+        id: build
+        uses: docker/build-push-action@f9f3042f7e2789586610d6e8b85c8f03e5195baf # v7.2.0
+        with:
+          context: ${{ inputs.context }}
+          file: ${{ inputs.context }}/${{ inputs.dockerfile }}
+          platforms: ${{ matrix.platform }}
+          labels: ${{ steps.meta.outputs.labels }}
+          outputs: ${{ github.event_name != 'merge_group' && format('type=image,name={0}/{1},push-by-digest=true,name-canonical=true,push=true', env.REGISTRY, env.IMAGE_NAME) || 'type=cacheonly' }}
+          cache-from: |
+            type=registry,ref=${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:buildcache-${{ env.PLATFORM_PAIR }}
+            type=gha,scope=${{ env.PLATFORM_PAIR }}
+          cache-to: |
+            type=registry,ref=${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:buildcache-${{ env.PLATFORM_PAIR }},mode=max
+            type=gha,scope=${{ env.PLATFORM_PAIR }},mode=max
+          provenance: false
+          sbom: false
+          build-args: ${{ inputs.build-args }}
+
+      - name: Export digest
+        if: github.event_name != 'merge_group'
+        env:
+          BUILD_DIGEST: ${{ steps.build.outputs.digest }}
+        run: |
+          mkdir -p "${{ runner.temp }}/digests"
+          touch "${{ runner.temp }}/digests/${BUILD_DIGEST#sha256:}"
+
+      - name: Upload digest
+        if: github.event_name != 'merge_group'
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: digests-${{ env.PLATFORM_PAIR }}
+          path: ${{ runner.temp }}/digests/*
+          if-no-files-found: error
+          retention-days: 1
+
+  merge:
+    name: merge + sign + sbom
+    runs-on: ubuntu-24.04
+    needs: build
+    if: github.event_name != 'merge_group'
+    permissions:
+      contents: write        # gh release upload (SBOMs on a release)
+      packages: write
+      id-token: write         # cosign keyless + provenance attestation
+      attestations: write
+      security-events: write  # Trivy SARIF
+    outputs:
+      digest: ${{ steps.digest.outputs.digest }}
+      version: ${{ steps.meta.outputs.version }}
+    steps:
+      - name: Harden the runner (audit egress)
+        uses: step-security/harden-runner@9af89fc71515a100421586dfdb3dc9c984fbf411 # v2.19.4
+        with:
+          egress-policy: audit
+
+      - name: Download digests
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          path: ${{ runner.temp }}/digests
+          pattern: digests-*
+          merge-multiple: true
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@d7f5e7f509e45cec5c76c4d5afdd7de93d0b3df5 # v4.1.0
+
+      - name: Install cosign
+        if: inputs.sign
+        uses: sigstore/cosign-installer@6f9f17788090df1f26f669e9d70d6ae9567deba6 # v4.1.2
+
+      - name: Install Syft
+        if: inputs.sbom
+        uses: anchore/sbom-action/download-syft@e22c389904149dbc22b58101806040fa8d37a610 # v0.24.0
+
+      - name: Extract Docker metadata (tags)
+        id: meta
+        uses: docker/metadata-action@80c7e94dd9b9319bd5eb7a0e0fe9291e23a2a2e9 # v6.1.0
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          tags: |
+            type=ref,event=branch
+            type=sha,prefix={{branch}}-,enable={{is_default_branch}}
+            type=semver,pattern={{version}},value=${{ inputs.release-tag }},enable=${{ inputs.release-tag != '' }}
+            type=semver,pattern={{major}}.{{minor}},value=${{ inputs.release-tag }},enable=${{ inputs.release-tag != '' }}
+            type=semver,pattern={{major}},value=${{ inputs.release-tag }},enable=${{ inputs.release-tag != '' }}
+            type=raw,value=latest,enable=${{ inputs.release-tag != '' && !contains(inputs.release-tag, '-') }}
+
+      - name: Log in to GHCR
+        uses: docker/login-action@650006c6eb7dba73a995cc03b0b2d7f5ca915bee # v4.2.0
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Create manifest list and push
+        working-directory: ${{ runner.temp }}/digests
+        env:
+          REGISTRY: ${{ env.REGISTRY }}
+          IMAGE_NAME: ${{ env.IMAGE_NAME }}
+        run: |
+          # shellcheck disable=SC2046  # intentional word-splitting of -t flags and digest refs
+          docker buildx imagetools create \
+            $(jq -cr '.tags | map("-t " + .) | join(" ")' <<< "$DOCKER_METADATA_OUTPUT_JSON") \
+            $(printf "${REGISTRY}/${IMAGE_NAME}@sha256:%s " *)
+
+      - name: Inspect image and capture digest
+        id: digest
+        env:
+          REGISTRY: ${{ env.REGISTRY }}
+          IMAGE_NAME: ${{ env.IMAGE_NAME }}
+          VERSION: ${{ steps.meta.outputs.version }}
+        run: |
+          digest=$(docker buildx imagetools inspect \
+            "${REGISTRY}/${IMAGE_NAME}:${VERSION}" \
+            --format '{{json .Manifest.Digest}}' | tr -d '"')
+          echo "digest=${digest}" >> "$GITHUB_OUTPUT"
+
+      - name: Sign the published image
+        if: inputs.sign
+        env:
+          TAGS: ${{ steps.meta.outputs.tags }}
+          DIGEST: ${{ steps.digest.outputs.digest }}
+        run: echo "${TAGS}" | xargs -I {} cosign sign --yes "{}@${DIGEST}"
+
+      - name: Generate build-provenance attestation
+        uses: actions/attest-build-provenance@0f67c3f4856b2e3261c31976d6725780e5e4c373 # v4.1.1
+        with:
+          subject-name: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          subject-digest: ${{ steps.digest.outputs.digest }}
+          push-to-registry: true
+
+      - name: Generate SBOM (SPDX + CycloneDX)
+        if: inputs.sbom
+        env:
+          IMAGE: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          DIGEST: ${{ steps.digest.outputs.digest }}
+        run: |
+          name="${IMAGE##*/}"
+          syft "${IMAGE}@${DIGEST}" --output "spdx-json=${name}.spdx.json"
+          syft "${IMAGE}@${DIGEST}" --output "cyclonedx-json=${name}.cdx.json"
+
+      - name: Attach SBOMs to the release
+        if: inputs.sbom && inputs.release-tag != ''
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RELEASE_TAG: ${{ inputs.release-tag }}
+          IMAGE: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+        run: |
+          name="${IMAGE##*/}"
+          gh release upload "${RELEASE_TAG}" "${name}.spdx.json" "${name}.cdx.json" --clobber
+
+      - name: Run Trivy vulnerability scanner
+        if: inputs.trivy
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+        with:
+          image-ref: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}@${{ steps.digest.outputs.digest }}
+          format: sarif
+          output: trivy-results.sarif
+          severity: CRITICAL,HIGH
+
+      - name: Upload Trivy SARIF
+        if: inputs.trivy
+        uses: github/codeql-action/upload-sarif@8aad20d150bbac5944a9f9d289da16a4b0d87c1e # v4.36.2
+        with:
+          sarif_file: trivy-results.sarif
+          category: trivy-image
+
+  helm:
+    name: helm publish
+    runs-on: ubuntu-24.04
+    needs: merge
+    if: github.event_name != 'merge_group' && inputs.helm-chart-path != ''
+    permissions:
+      contents: write   # attach chart .tgz to the release
+      packages: write
+      id-token: write   # cosign sign the chart
+    steps:
+      - name: Harden the runner (audit egress)
+        uses: step-security/harden-runner@9af89fc71515a100421586dfdb3dc9c984fbf411 # v2.19.4
+        with:
+          egress-policy: audit
+
+      - name: Checkout repository
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          ref: ${{ inputs.release-tag || github.ref }}
+          persist-credentials: false
+
+      - name: Set up Helm
+        uses: azure/setup-helm@9bc31f4ebc9c6b171d7bfbaa5d006ae7abdb4310 # v5.0.1
+
+      - name: Install cosign
+        if: inputs.sign
+        uses: sigstore/cosign-installer@6f9f17788090df1f26f669e9d70d6ae9567deba6 # v4.1.2
+
+      - name: Log in to GHCR (Helm)
+        env:
+          GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          ACTOR: ${{ github.actor }}
+        run: echo "${GHCR_TOKEN}" | helm registry login ghcr.io -u "${ACTOR}" --password-stdin
+
+      - name: Package and push chart
+        id: chart
+        env:
+          CHART_PATH: ${{ inputs.helm-chart-path }}
+          RELEASE_TAG: ${{ inputs.release-tag }}
+          CHARTS_REPO: ${{ inputs.charts-repo }}
+          IMAGE_DIGEST: ${{ needs.merge.outputs.digest }}
+          SHORT_SHA: ${{ github.sha }}
+        run: |
+          repo="${CHARTS_REPO:-ghcr.io/${GITHUB_REPOSITORY_OWNER}/charts}"
+          if [ -n "${RELEASE_TAG}" ]; then
+            version="${RELEASE_TAG#v}"
+            appversion="${RELEASE_TAG#v}"
+          else
+            # ArgoCD-sortable main snapshot: 0.0.0-main.<shortsha>
+            version="0.0.0-main.${SHORT_SHA:0:12}"
+            appversion="main"
+          fi
+          helm package "${CHART_PATH}" --version "${version}" --app-version "${appversion}" --destination /tmp/helm
+          pkg=$(ls /tmp/helm/*.tgz)
+          echo "pkg=${pkg}" >> "$GITHUB_OUTPUT"
+          echo "version=${version}" >> "$GITHUB_OUTPUT"
+          push_out=$(helm push "${pkg}" "oci://${repo}" 2>&1)
+          echo "${push_out}"
+          digest=$(echo "${push_out}" | awk '/Digest:/ {print $2}')
+          echo "chart_digest=${digest}" >> "$GITHUB_OUTPUT"
+          chart_name=$(helm show chart "${CHART_PATH}" | awk '/^name:/ {print $2}')
+          echo "oci_ref=${repo}/${chart_name}" >> "$GITHUB_OUTPUT"
+
+      - name: Sign the chart
+        if: inputs.sign && steps.chart.outputs.chart_digest != ''
+        env:
+          OCI_REF: ${{ steps.chart.outputs.oci_ref }}
+          CHART_DIGEST: ${{ steps.chart.outputs.chart_digest }}
+        run: cosign sign --yes "${OCI_REF}@${CHART_DIGEST}"
+
+      - name: Attach chart to the release
+        if: inputs.release-tag != ''
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RELEASE_TAG: ${{ inputs.release-tag }}
+          PKG: ${{ steps.chart.outputs.pkg }}
+        run: gh release upload "${RELEASE_TAG}" "${PKG}" --clobber
