@@ -352,9 +352,13 @@ jobs:
             version="${RELEASE_TAG#v}"
             appversion="${RELEASE_TAG#v}"
           else
-            # ArgoCD-sortable main snapshot: 0.0.0-main.<shortsha>
-            version="0.0.0-main.${SHORT_SHA:0:12}"
-            appversion="main"
+            # ArgoCD time-sortable main snapshot: 0.0.0-main.t<unix-ts>.<shortsha>.
+            # The 't' prefix keeps the prerelease identifier alphanumeric so it sorts
+            # ABOVE legacy 0.0.0-main.<sha> tags; the fixed-width unix ts makes lexical
+            # order == chronological, so a semver-range targetRevision resolves newest.
+            short="${SHORT_SHA:0:12}"
+            version="0.0.0-main.t$(date +%s).${short}"
+            appversion="main-${short}"
           fi
           helm package "${CHART_PATH}" --version "${version}" --app-version "${appversion}" --destination /tmp/helm
           pkg=$(ls /tmp/helm/*.tgz)
