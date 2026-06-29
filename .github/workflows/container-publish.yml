@@ -56,10 +56,18 @@ on:
         description: "Log in to Docker Hub for base-image pulls (needs DOCKERHUB_* secrets)"
         type: boolean
         default: false
+      otel-tracing:
+        description: "Inject BuildKit OTEL build tracing (needs OTEL_EXPORTER_OTLP_* secrets)"
+        type: boolean
+        default: false
     secrets:
       DOCKERHUB_USERNAME:
         required: false
       DOCKERHUB_TOKEN:
+        required: false
+      OTEL_EXPORTER_OTLP_ENDPOINT:
+        required: false
+      OTEL_EXPORTER_OTLP_HEADERS:
         required: false
 
 permissions: {}
@@ -114,6 +122,16 @@ jobs:
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@d7f5e7f509e45cec5c76c4d5afdd7de93d0b3df5 # v4.1.0
+        with:
+          # Opt-in BuildKit OTEL build tracing. When otel-tracing is off the values are
+          # empty (no endpoint => exporter is inert), matching the proven per-repo pattern.
+          driver-opts: |
+            env.OTEL_EXPORTER_OTLP_ENDPOINT=${{ inputs.otel-tracing && secrets.OTEL_EXPORTER_OTLP_ENDPOINT || '' }}
+            env.OTEL_EXPORTER_OTLP_HEADERS=${{ inputs.otel-tracing && secrets.OTEL_EXPORTER_OTLP_HEADERS || '' }}
+            env.OTEL_TRACES_EXPORTER=${{ inputs.otel-tracing && 'otlp' || '' }}
+            env.OTEL_EXPORTER_OTLP_PROTOCOL=${{ inputs.otel-tracing && 'http/protobuf' || '' }}
+            env.OTEL_SERVICE_NAME=${{ inputs.otel-tracing && format('{0}-build', github.event.repository.name) || '' }}
+            "env.OTEL_RESOURCE_ATTRIBUTES=ci.pipeline=${{ github.workflow }},ci.run_id=${{ github.run_id }},ci.ref=${{ github.ref_name }}"
 
       - name: Extract Docker metadata (labels)
         id: meta
