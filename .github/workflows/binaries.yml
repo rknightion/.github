@@ -30,9 +30,10 @@ on:
         type: string
         default: "go.mod"
       goreleaser-version:
-        description: "GoReleaser version (Renovate-maintained at the caller default)."
+        description: "GoReleaser version (Renovate-maintained via the customManager in renovate.json)."
         required: false
         type: string
+        # renovate: datasource=github-releases depName=goreleaser/goreleaser
         default: "v2.16.0"
       goreleaser-args:
         description: "Args passed to goreleaser. Default builds+publishes; pass --skip=docker for binary-only."

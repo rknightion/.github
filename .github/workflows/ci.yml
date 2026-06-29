@@ -26,3 +26,15 @@ jobs:
       security-events: write # upload SARIF
       actions: read # match the reusable's declared job permissions (else startup_failure)
     uses: ./.github/workflows/zizmor.yml
+
+  # CodeQL's `actions` language analyses our workflows themselves (dataflow), complementing
+  # actionlint (correctness) + zizmor (policy). Permissions mirror the reusable's analyze job.
+  codeql:
+    permissions:
+      security-events: write
+      packages: read
+      actions: read
+      contents: read
+    uses: ./.github/workflows/codeql.yml
+    with:
+      languages: '[{"language":"actions","build-mode":"none"}]'

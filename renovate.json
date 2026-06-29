@@ -23,5 +23,15 @@
       "matchManagers": ["github-actions"],
       "pinDigests": true
     }
+  ],
+  "customManagers": [
+    {
+      "customType": "regex",
+      "description": "Track the GoReleaser CLI version pinned as the binaries.yml goreleaser-version input default.",
+      "managerFilePatterns": ["/^\\.github/workflows/binaries\\.yml$/"],
+      "matchStrings": [
+        "# renovate: datasource=(?<datasource>\\S+) depName=(?<depName>\\S+)\\s+default:\\s*\"(?<currentValue>[^\"]+)\""
+      ]
+    }
   ]
 }
