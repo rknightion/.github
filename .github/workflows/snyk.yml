@@ -33,10 +33,18 @@ on:
 
 permissions: {}
 
+# Cancel a superseded run on the same ref (rapid pushes) to free runners. Unique group
+# prefix per reusable so a caller invoking several reusables doesn't put them in one
+# group where they'd cancel each other.
+concurrency:
+  group: snyk-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   snyk:
     name: snyk monitor
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     permissions:
       contents: read
       packages: read

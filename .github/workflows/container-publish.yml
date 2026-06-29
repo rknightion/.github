@@ -85,6 +85,7 @@ jobs:
   build:
     name: build (${{ matrix.platform }})
     runs-on: ${{ matrix.runner }}
+    timeout-minutes: 30
     permissions:
       contents: read
       packages: write
@@ -194,6 +195,7 @@ jobs:
   merge:
     name: merge + sign + sbom
     runs-on: ubuntu-24.04
+    timeout-minutes: 20
     needs: build
     if: github.event_name != 'merge_group'
     permissions:
@@ -325,6 +327,7 @@ jobs:
   helm:
     name: helm publish
     runs-on: ubuntu-24.04
+    timeout-minutes: 15
     needs: merge
     if: github.event_name != 'merge_group' && inputs.helm-chart-path != ''
     permissions:

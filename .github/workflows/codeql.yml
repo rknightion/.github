@@ -15,6 +15,13 @@ on:
 
 permissions: {}
 
+# Cancel a superseded scan on the same ref (rapid pushes / PR updates) to free runners.
+# Unique group prefix per reusable so a caller invoking several reusables doesn't put
+# them in one group where they'd cancel each other.
+concurrency:
+  group: codeql-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   analyze:
     name: Analyze (${{ matrix.language }})

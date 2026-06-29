@@ -59,10 +59,17 @@ on:
 permissions:
   contents: read
 
+# Serialize per release tag but NEVER cancel — a half-built/half-uploaded release is
+# worse than a slow one. (Mirrors container-publish: cancel edge, never a release.)
+concurrency:
+  group: binaries-${{ github.workflow }}-${{ github.ref }}-${{ inputs.release-tag }}
+  cancel-in-progress: false
+
 jobs:
   goreleaser:
     name: goreleaser (binaries)
     runs-on: ubuntu-24.04
+    timeout-minutes: 30
     permissions:
       contents: write # upload binaries/checksums/SBOMs to the GitHub Release
       id-token: write # keyless cosign blob/image signing via GitHub OIDC

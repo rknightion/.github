@@ -8,6 +8,13 @@ on:
 
 permissions: {}
 
+# Cancel a superseded run on the same ref (rapid pushes / PR updates) to free runners.
+# Unique group prefix per reusable so a caller invoking several reusables doesn't put
+# them in one group where they'd cancel each other.
+concurrency:
+  group: zizmor-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   zizmor:
     name: Run zizmor
@@ -16,6 +23,7 @@ jobs:
     # on push + same-repo PRs only; fork PRs are re-scanned after merge on push.
     if: ${{ github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository }}
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     permissions:
       security-events: write
       contents: read

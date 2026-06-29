@@ -11,10 +11,18 @@ on:
 
 permissions: {}
 
+# Cancel a superseded run on the same ref (rapid pushes / PR updates) to free runners.
+# Unique group prefix per reusable so a caller invoking several reusables doesn't put
+# them in one group where they'd cancel each other.
+concurrency:
+  group: docker-security-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   hadolint:
     name: hadolint
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     permissions:
       contents: read
       security-events: write
@@ -44,6 +52,7 @@ jobs:
   trivy:
     name: trivy
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     permissions:
       contents: read
       security-events: write

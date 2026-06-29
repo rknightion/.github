@@ -8,10 +8,18 @@ on:
 
 permissions: {}
 
+# Cancel a superseded run on the same ref (PR updates) to free runners. Unique group
+# prefix per reusable so a caller invoking several reusables doesn't put them in one
+# group where they'd cancel each other.
+concurrency:
+  group: dependency-review-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   dependency-review:
     name: Dependency review
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     permissions:
       contents: read
       pull-requests: write
