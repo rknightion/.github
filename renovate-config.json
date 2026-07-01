@@ -1,0 +1,46 @@
+{
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "description": "Canonical Renovate standard for rknightion + m7kni repos. Consume with { \"extends\": [\"github>rknightion/.github:renovate-config\"] } and add only genuinely repo-specific rules on top. Central policy: hash-pin every Action to an immutable SHA, treat those SHAs as immutable (never chase a re-pointed tag), 2-day supply-chain cooldown, automerge non-majors on green CI, majors get a review PR.",
+  "extends": [
+    "config:recommended",
+    ":dependencyDashboard",
+    "docker:pinDigests",
+    "helpers:pinGitHubActionDigests"
+  ],
+  "timezone": "Europe/London",
+  "semanticCommits": "enabled",
+  "semanticCommitType": "chore",
+  "semanticCommitScope": "deps",
+  "labels": ["dependencies"],
+  "prConcurrentLimit": 5,
+  "prHourlyLimit": 0,
+  "automerge": true,
+  "platformAutomerge": true,
+  "automergeStrategy": "squash",
+  "internalChecksAsSuccess": true,
+  "minimumReleaseAge": "2 days",
+  "osvVulnerabilityAlerts": true,
+  "vulnerabilityAlerts": {
+    "labels": ["security"],
+    "minimumReleaseAge": null,
+    "schedule": ["at any time"]
+  },
+  "packageRules": [
+    {
+      "description": "Treat pinned Action SHAs as immutable: never chase a re-pointed tag (digest-only update). The SHA changes only when the version does, blocking silent tag-mutation / supply-chain swaps under automerge. Docker digests are unaffected.",
+      "matchManagers": ["github-actions"],
+      "matchUpdateTypes": ["digest"],
+      "enabled": false
+    },
+    {
+      "description": "Major bumps get a PR for manual review — never auto-merged. A repo with strong CI/test coverage can re-enable major automerge in its own config.",
+      "matchUpdateTypes": ["major"],
+      "automerge": false
+    },
+    {
+      "description": "Never automerge release-please PRs - manual review required.",
+      "matchFileNames": [".release-please-*.json"],
+      "automerge": false
+    }
+  ]
+}

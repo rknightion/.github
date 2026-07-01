@@ -1,29 +1,7 @@
 {
   "$schema": "https://docs.renovatebot.com/renovate-schema.json",
-  "extends": [
-    "config:recommended",
-    ":dependencyDashboard",
-    "helpers:pinGitHubActionDigests"
-  ],
-  "timezone": "Europe/London",
-  "prConcurrentLimit": 5,
-  "prHourlyLimit": 0,
-  "semanticCommits": "enabled",
-  "semanticCommitType": "chore",
-  "semanticCommitScope": "deps",
-  "labels": ["dependencies"],
-  "description": "Shared reusable-workflows repo. Renovate keeps the third-party action SHA pins current; chore(deps) keeps bumps out of the release-please CHANGELOG. All bumps automerge once the self-CI (actionlint + zizmor) gate is green, so the reusables stay patched hands-off.",
-  "automerge": true,
-  "platformAutomerge": true,
-  "automergeStrategy": "squash",
-  "internalChecksAsSuccess": true,
-  "packageRules": [
-    {
-      "description": "Pin all GitHub Action refs to an immutable SHA (with a # vX.Y.Z comment), matching the zizmor hash-pin policy these reusables enforce.",
-      "matchManagers": ["github-actions"],
-      "pinDigests": true
-    }
-  ],
+  "extends": ["github>rknightion/.github:renovate-config"],
+  "description": "Shared reusable-workflows repo. Inherits the canonical rknightion/m7kni Renovate standard (renovate-config.json in this repo): hash-pinned Actions treated as immutable SHAs, 2-day cooldown, non-major automerge on green self-CI. Only the repo-specific GoReleaser-version tracker lives here.",
   "customManagers": [
     {
       "customType": "regex",
