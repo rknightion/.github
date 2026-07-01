@@ -1,7 +1,6 @@
 {
   "$schema": "https://docs.renovatebot.com/renovate-schema.json",
-  "extends": ["github>rknightion/.github:renovate-config"],
-  "description": "Shared reusable-workflows repo. Inherits the canonical rknightion/m7kni Renovate standard (renovate-config.json in this repo): hash-pinned Actions treated as immutable SHAs, 2-day cooldown, non-major automerge on green self-CI. Only the repo-specific GoReleaser-version tracker lives here.",
+  "description": "Fleet policy (SHA pinning, immutable Action digests, cooldown, automerge) is inherited from the self-hosted Renovate admin config (rknightion/renovate-config config.js) via autodiscover. Only the repo-specific GoReleaser-version tracker lives here.",
   "customManagers": [
     {
       "customType": "regex",
