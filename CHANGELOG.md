@@ -1,5 +1,20 @@
 # Changelog
 
+## [1.4.0](https://github.com/rknightion/.github/compare/v1.3.1...v1.4.0) (2026-07-03)
+
+
+### Features
+
+* add reusable OpenSSF Scorecard workflow ([8537db9](https://github.com/rknightion/.github/commit/8537db9ace5d83b3cf0f6b4c75f0cf2e72450c1a))
+
+
+### Build & CI
+
+* remove notify-maintainer-on-new-issue workflow ([0202d96](https://github.com/rknightion/.github/commit/0202d96e978bd709c594b1aa2ea1ca174e86ee0b))
+* **renovate:** add canonical shared preset, treat Action SHAs as immutable ([7201765](https://github.com/rknightion/.github/commit/720176561c4eb865fb7a8609b33aee1471deb2e5))
+* **renovate:** consolidate on self-hosted config.js, drop redundant preset ([01f9654](https://github.com/rknightion/.github/commit/01f9654e966f58996174b9a96277d216efb4750b))
+* **renovate:** slim repo config to GoReleaser tracker only ([d8904fb](https://github.com/rknightion/.github/commit/d8904fb499e427e2e1154412c099768d94ea0440))
+
 ## [1.3.1](https://github.com/rknightion/.github/compare/v1.3.0...v1.3.1) (2026-06-29)
 
 
