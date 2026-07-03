@@ -15,6 +15,7 @@ SHA-pinned and kept current by Renovate (`helpers:pinGitHubActionDigests`).
 | `actionlint.yml` | GitHub Actions workflow correctness lint (non-gating). |
 | `dependency-review.yml` | PR dependency review; fails on newly introduced high-severity vulns. |
 | `docker-security.yml` | hadolint (Dockerfile lint) + Trivy fs scan (vuln/misconfig/secret), both SARIF, non-gating. |
+| `scorecard.yml` | OpenSSF Scorecard supply-chain analysis (SARIF → Security tab) + publishes to the OpenSSF API for the [scorecard.dev](https://scorecard.dev) badge. No PAT needed — the fleet uses Repository Rulesets, readable with the default token. |
 
 ### Example caller
 
@@ -35,6 +36,28 @@ jobs:
     uses: rknightion/.github/.github/workflows/codeql.yml@main
     with:
       languages: '[{"language":"python","build-mode":"none"},{"language":"actions","build-mode":"none"}]'
+```
+
+### Example caller — Scorecard
+
+```yaml
+name: Scorecard
+on:
+  push: { branches: [main] }
+  schedule: [{ cron: '28 6 * * 4' }]
+permissions: {}
+jobs:
+  scorecard:
+    permissions:
+      security-events: write
+      id-token: write
+    uses: rknightion/.github/.github/workflows/scorecard.yml@main
+```
+
+Add the badge to the repo README:
+
+```markdown
+[![OpenSSF Scorecard](https://api.scorecard.dev/projects/github.com/rknightion/<repo>/badge)](https://scorecard.dev/viewer/?uri=github.com/rknightion/<repo>)
 ```
 
 ## Shared CodeQL config (`codeql/codeql-config.yml`)

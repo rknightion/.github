@@ -1,0 +1,62 @@
+name: Scorecard (reusable)
+
+# Reusable OpenSSF Scorecard supply-chain analysis for the rknightion fleet. Runs in
+# the caller's context, so the score reflects the caller repo. Findings upload to the
+# caller repo's Security tab as SARIF and (publish_results) to the OpenSSF API, which
+# powers the scorecard.dev badge.
+#
+# No PAT is required: the fleet enforces branch policy via Repository Rulesets, which
+# Scorecard reads with the default GITHUB_TOKEN. A repo_token PAT is only needed for
+# legacy *classic* Branch Protection, which the fleet does not use.
+
+on:
+  workflow_call: {}
+
+permissions: {}
+
+# Cancel a superseded run on the same ref (rapid pushes) to free runners. Unique group
+# prefix per reusable so a caller invoking several reusables doesn't put them in one
+# group where they'd cancel each other.
+concurrency:
+  group: scorecard-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  analysis:
+    name: Scorecard analysis
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      security-events: write # upload the SARIF results to the Security tab
+      id-token: write # OIDC token used to publish results + badge to the OpenSSF API
+    steps:
+      - name: Harden the runner (audit egress)
+        uses: step-security/harden-runner@9af89fc71515a100421586dfdb3dc9c984fbf411 # v2.19.4
+        with:
+          egress-policy: audit
+
+      - name: Checkout repository
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          persist-credentials: false
+
+      - name: Run Scorecard analysis
+        uses: ossf/scorecard-action@4eaacf0543bb3f2c246792bd56e8cdeffafb205a # v2.4.3
+        with:
+          results_file: results.sarif
+          results_format: sarif
+          # publish_results powers the scorecard.dev badge and is only honoured from the
+          # default branch, which is the only place callers trigger this (push + schedule).
+          publish_results: true
+
+      - name: Upload SARIF artifact
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: scorecard-sarif
+          path: results.sarif
+          retention-days: 5
+
+      - name: Upload SARIF to code scanning
+        uses: github/codeql-action/upload-sarif@8aad20d150bbac5944a9f9d289da16a4b0d87c1e # v4.36.2
+        with:
+          sarif_file: results.sarif
