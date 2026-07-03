@@ -1,6 +1,14 @@
 {
   "$schema": "https://docs.renovatebot.com/renovate-schema.json",
   "description": "Fleet policy (SHA pinning, immutable Action digests, cooldown, automerge) is inherited from the self-hosted Renovate admin config (rknightion/renovate-config config.js) via autodiscover. Only the repo-specific GoReleaser-version tracker lives here.",
+  "packageRules": [
+    {
+      "description": "This is a shared-workflows hub: consumers pin the reusables to release SHAs and pick up bumps only when a new release lands. So dependency updates here must cut a release. Renovate's default `chore(deps)` maps to a hidden changelog section, and release-please treats an all-hidden commit set as non-releasing, so those merges never open the release PR. Commit them as `build(deps)` instead - a non-hidden, releasable type (Build & CI section) - so each bump proactively updates the release PR and is visible in the changelog. Repo-scoped on purpose; app repos keep the fleet `chore` default.",
+      "matchManagers": ["github-actions", "custom.regex"],
+      "semanticCommitType": "build",
+      "semanticCommitScope": "deps"
+    }
+  ],
   "customManagers": [
     {
       "customType": "regex",
