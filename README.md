@@ -1,5 +1,7 @@
 # rknightion/.github
 
+[![OpenSSF Scorecard](https://api.scorecard.dev/projects/github.com/rknightion/.github/badge)](https://scorecard.dev/viewer/?uri=github.com/rknightion/.github)
+
 Shared GitHub configuration for the rknightion open-source repos.
 
 ## Reusable workflows (`.github/workflows/`)
