@@ -17,7 +17,7 @@
         { "type": "build", "section": "Build & CI" },
         { "type": "docs", "section": "Documentation" },
         { "type": "test", "section": "Testing", "hidden": true },
-        { "type": "chore", "section": "Miscellaneous", "hidden": true },
+        { "type": "chore", "section": "Miscellaneous" },
         { "type": "style", "section": "Styles", "hidden": true }
       ]
     }
