@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.4.2](https://github.com/rknightion/.github/compare/v1.4.1...v1.4.2) (2026-07-04)
+
+
+### Build & CI
+
+* **deps:** update docker/login-action action to v4.4.0 ([#16](https://github.com/rknightion/.github/issues/16)) ([eadda13](https://github.com/rknightion/.github/commit/eadda137ec5a015e700f716c31bc13948c0e69e3))
+
 ## [1.4.1](https://github.com/rknightion/.github/compare/v1.4.0...v1.4.1) (2026-07-03)
 
 
