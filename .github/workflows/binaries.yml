@@ -34,7 +34,7 @@ on:
         required: false
         type: string
         # renovate: datasource=github-releases depName=goreleaser/goreleaser
-        default: "v2.16.0"
+        default: "v2.17.0"
       goreleaser-args:
         description: "Args passed to goreleaser. Default builds+publishes; pass --skip=docker for binary-only."
         required: false
