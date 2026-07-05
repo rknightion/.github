@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.4.3](https://github.com/rknightion/.github/compare/v1.4.2...v1.4.3) (2026-07-05)
+
+
+### Build & CI
+
+* **deps:** update dependency goreleaser/goreleaser to v2.17.0 ([#18](https://github.com/rknightion/.github/issues/18)) ([b17fbf3](https://github.com/rknightion/.github/commit/b17fbf3e97365fda331e93404f82cd051ec0b235))
+
 ## [1.4.2](https://github.com/rknightion/.github/compare/v1.4.1...v1.4.2) (2026-07-04)
 
 
