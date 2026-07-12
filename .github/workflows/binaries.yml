@@ -55,6 +55,11 @@ on:
         required: false
         type: string
         default: ""
+      attest-provenance:
+        description: "Attest SLSA build provenance for the released artifacts and attach it to the Release."
+        required: false
+        type: boolean
+        default: true
 
 permissions:
   contents: read
@@ -74,6 +79,7 @@ jobs:
       contents: write # upload binaries/checksums/SBOMs to the GitHub Release
       id-token: write # keyless cosign blob/image signing via GitHub OIDC
       packages: write # in case the config pushes anything to GHCR
+      attestations: write # SLSA build provenance for the released artifacts
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
@@ -109,3 +115,45 @@ jobs:
           args: ${{ inputs.goreleaser-args }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      # Locate the checksums file GoReleaser wrote. Attesting the CHECKSUMS rather than each
+      # archive covers every listed artifact in one attestation, and keeps this agnostic to the
+      # repo's archive naming. Config-dependent, so a repo without a checksum: block just skips.
+      - name: Locate checksums
+        if: ${{ inputs.attest-provenance }}
+        id: checksums
+        run: |
+          set -euo pipefail
+          file=$(find dist -maxdepth 1 -type f \( -name '*SHA256SUMS*' -o -name '*checksums*' \) | head -1)
+          if [ -z "$file" ]; then
+            echo "No checksums file in dist/ — skipping provenance." >&2
+            echo "path=" >> "$GITHUB_OUTPUT"
+          else
+            echo "path=$file" >> "$GITHUB_OUTPUT"
+          fi
+
+      # SLSA build provenance over every artifact named in the checksums file. This records the
+      # attestation with GitHub (verifiable via `gh attestation verify`), and the bundle is then
+      # attached to the Release below so it is fetchable without the API — which is also what
+      # OpenSSF Scorecard's Signed-Releases check reads (it looks for a .intoto.jsonl asset).
+      - name: Attest build provenance
+        if: ${{ inputs.attest-provenance && steps.checksums.outputs.path != '' }}
+        id: attest
+        uses: actions/attest-build-provenance@0f67c3f4856b2e3261c31976d6725780e5e4c373 # v4.1.1
+        with:
+          subject-checksums: ${{ steps.checksums.outputs.path }}
+
+      - name: Attach provenance to the Release
+        if: ${{ inputs.attest-provenance && steps.attest.outputs.bundle-path != '' }}
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RELEASE_TAG: ${{ inputs.release-tag }}
+          BUNDLE_PATH: ${{ steps.attest.outputs.bundle-path }}
+          CHECKSUMS_PATH: ${{ steps.checksums.outputs.path }}
+        run: |
+          set -euo pipefail
+          # Name the asset after the subject it attests, with the .intoto.jsonl extension that
+          # identifies a DSSE-wrapped in-toto provenance statement.
+          asset="$(basename "$CHECKSUMS_PATH").intoto.jsonl"
+          cp "$BUNDLE_PATH" "$asset"
+          gh release upload "$RELEASE_TAG" "$asset" --clobber --repo "$GITHUB_REPOSITORY"
