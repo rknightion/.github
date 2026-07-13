@@ -119,12 +119,17 @@ jobs:
       # Locate the checksums file GoReleaser wrote. Attesting the CHECKSUMS rather than each
       # archive covers every listed artifact in one attestation, and keeps this agnostic to the
       # repo's archive naming. Config-dependent, so a repo without a checksum: block just skips.
+      # Cosign writes signature bundles NEXT TO the checksums file (X_SHA256SUMS.sigstore.json,
+      # .sig, .pem) that also match these globs, and find's ordering is unspecified — exclude
+      # them and sort, or the attest step gets handed a signature bundle ("Invalid digest").
       - name: Locate checksums
         if: ${{ inputs.attest-provenance }}
         id: checksums
         run: |
           set -euo pipefail
-          file=$(find dist -maxdepth 1 -type f \( -name '*SHA256SUMS*' -o -name '*checksums*' \) | head -1)
+          file=$(find dist -maxdepth 1 -type f \( -name '*SHA256SUMS*' -o -name '*checksums*' \) \
+            ! -name '*.sigstore.json' ! -name '*.sig' ! -name '*.pem' ! -name '*.intoto.jsonl' \
+            | sort | head -1)
           if [ -z "$file" ]; then
             echo "No checksums file in dist/ — skipping provenance." >&2
             echo "path=" >> "$GITHUB_OUTPUT"
