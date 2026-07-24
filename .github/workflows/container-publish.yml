@@ -384,12 +384,21 @@ jobs:
             version="${RELEASE_TAG#v}"
             appversion="${RELEASE_TAG#v}"
           else
-            # ArgoCD time-sortable main snapshot: 0.0.0-main.t<unix-ts>.<shortsha>.
-            # The 't' prefix keeps the prerelease identifier alphanumeric so it sorts
-            # ABOVE legacy 0.0.0-main.<sha> tags; the fixed-width unix ts makes lexical
-            # order == chronological, so a semver-range targetRevision resolves newest.
+            # ArgoCD time-sortable main snapshot: 0.0.0-main.t<unix-ts>.g<shortsha>.
+            # BOTH identifiers carry a letter prefix, and both prefixes are load-bearing.
+            # A dot-separated semver prerelease identifier made only of digits is a
+            # NUMERIC identifier, and numeric identifiers may not have a leading zero --
+            # so a commit whose first 12 hex chars happen to be all decimal digits
+            # starting with 0 (about 1 in 1,800) produces an invalid version and helm
+            # refuses to package it: "version segment starts with 0". The 'g' is the
+            # git-describe convention and keeps the sha identifier alphanumeric always.
+            # The 't' does the same for the timestamp and sorts it ABOVE legacy
+            # 0.0.0-main.<sha> tags; the fixed-width unix ts makes lexical order ==
+            # chronological, so a semver-range targetRevision resolves newest. Ordering
+            # is unaffected by the 'g': the ts field precedes the sha field and decides
+            # every comparison between two distinct publishes.
             short="${SHORT_SHA:0:12}"
-            version="0.0.0-main.t$(date +%s).${short}"
+            version="0.0.0-main.t$(date +%s).g${short}"
             appversion="main-${short}"
           fi
           helm package "${CHART_PATH}" --version "${version}" --app-version "${appversion}" --destination /tmp/helm
