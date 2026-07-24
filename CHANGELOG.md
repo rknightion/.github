@@ -1,5 +1,33 @@
 # Changelog
 
+## [1.5.0](https://github.com/rknightion/.github/compare/v1.4.3...v1.5.0) (2026-07-24)
+
+
+### Features
+
+* **binaries:** attest SLSA build provenance and attach it to the release ([7aa955c](https://github.com/rknightion/.github/commit/7aa955ca8134be9eac7bbd009317f35d6216bef5))
+
+
+### Bug Fixes
+
+* **binaries:** don't hand the attest step a cosign signature bundle ([d1c590b](https://github.com/rknightion/.github/commit/d1c590b295b9d7f2535fadc7bc5e74f2eddbd512))
+* **container-publish:** keep the main chart version valid for every commit SHA ([3b135db](https://github.com/rknightion/.github/commit/3b135db545112f769452d13b8e2e4a3188d039de)), closes [#32](https://github.com/rknightion/.github/issues/32)
+
+
+### Build & CI
+
+* **deps:** update actions/checkout action to v7.0.1 ([#26](https://github.com/rknightion/.github/issues/26)) ([91fdca5](https://github.com/rknightion/.github/commit/91fdca5f9f7ec370807c2cd7f0d914623fa6c0d1))
+* **deps:** update actions/setup-go action to v7 ([#24](https://github.com/rknightion/.github/issues/24)) ([a1949e4](https://github.com/rknightion/.github/commit/a1949e42e5d09687c429cc23b130dec20db91645))
+* **deps:** update docker/login-action action to v4.5.0 ([#29](https://github.com/rknightion/.github/issues/29)) ([0c46bc4](https://github.com/rknightion/.github/commit/0c46bc4352a58ff4a607ed82c33525ba15731245))
+* **deps:** update github/codeql-action action to v4.37.0 ([#22](https://github.com/rknightion/.github/issues/22)) ([49927d2](https://github.com/rknightion/.github/commit/49927d22cf1d85babc79e8cdf1f5751c884e9213))
+* **deps:** update github/codeql-action action to v4.37.1 ([#25](https://github.com/rknightion/.github/issues/25)) ([7cd15a6](https://github.com/rknightion/.github/commit/7cd15a685736425653baf9e4afc242afd7655bb6))
+* **deps:** update github/codeql-action action to v4.37.2 ([#27](https://github.com/rknightion/.github/issues/27)) ([1c6fb0f](https://github.com/rknightion/.github/commit/1c6fb0f44b9bd6aad4647615072a67ef9c79c285))
+* **deps:** update github/codeql-action action to v4.37.3 ([#28](https://github.com/rknightion/.github/issues/28)) ([bfed06b](https://github.com/rknightion/.github/commit/bfed06b1e5f6c9f0209f55b1474b71ba18048782))
+* **deps:** update ossf/scorecard-action action to v2.4.4 ([#30](https://github.com/rknightion/.github/issues/30)) ([aff0ef6](https://github.com/rknightion/.github/commit/aff0ef69ce57f276035976bacd3e0ed7b5fb58aa))
+* **deps:** update step-security/harden-runner action to v2.20.0 ([#20](https://github.com/rknightion/.github/issues/20)) ([a4e935f](https://github.com/rknightion/.github/commit/a4e935fa402f95d270b039acabf19d8ee843f1f9))
+* **deps:** update zizmorcore/zizmor-action action to v0.6.0 ([#23](https://github.com/rknightion/.github/issues/23)) ([828d5ef](https://github.com/rknightion/.github/commit/828d5ef270500e44d2681c0a9164f43aed178bb7))
+* **deps:** update zizmorcore/zizmor-action action to v0.6.1 ([#31](https://github.com/rknightion/.github/issues/31)) ([2a0565b](https://github.com/rknightion/.github/commit/2a0565b425a8779518d38006876153de5dcad20e))
+
 ## [1.4.3](https://github.com/rknightion/.github/compare/v1.4.2...v1.4.3) (2026-07-05)
 
 
