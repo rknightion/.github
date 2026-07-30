@@ -1,5 +1,15 @@
 # Changelog
 
+## [1.5.1](https://github.com/rknightion/.github/compare/v1.5.0...v1.5.1) (2026-07-30)
+
+
+### Build & CI
+
+* **deps:** update dependency goreleaser/goreleaser to v2.17.1 ([#35](https://github.com/rknightion/.github/issues/35)) ([97aae72](https://github.com/rknightion/.github/commit/97aae722476d1cef638f1dadc5138b0fb2c6a856))
+* **deps:** update docker/login-action action to v4.5.1 ([#33](https://github.com/rknightion/.github/issues/33)) ([753677b](https://github.com/rknightion/.github/commit/753677b09b35686a8caeea43e0d465269af382d1))
+* **deps:** update docker/login-action action to v4.5.2 ([#36](https://github.com/rknightion/.github/issues/36)) ([90112ed](https://github.com/rknightion/.github/commit/90112edce5f2e6d5c4fdd829c6976a1411f847e1))
+* **deps:** update docker/login-action action to v4.6.0 ([#37](https://github.com/rknightion/.github/issues/37)) ([aaf5b05](https://github.com/rknightion/.github/commit/aaf5b05211e740a14dbd09654326b63ca0151547))
+
 ## [1.5.0](https://github.com/rknightion/.github/compare/v1.4.3...v1.5.0) (2026-07-24)
 
 
