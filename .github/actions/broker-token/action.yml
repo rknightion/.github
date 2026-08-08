@@ -27,8 +27,8 @@ inputs:
   permission-set:
     description: >-
       Name of the OpenBao permission set to mint from, e.g.
-      release-please-<repo>. The JWT role and ACL policy share this exact name;
-      a repo can only mint its own set.
+      release-please-<repo>. The ACL policy is `gha-<this name>`. The JWT role
+      usually shares this name too -- but not always, so see `role` below.
     required: true
   role:
     description: >-
