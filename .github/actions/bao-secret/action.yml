@@ -37,11 +37,25 @@ inputs:
     required: false
     default: https://openbao.saga-turtle.ts.net
   tailscale-client-id:
-    description: Tailscale federated identity client ID (an identifier, not a secret).
-    required: true
+    description: >-
+      Tailscale federated identity client ID (an identifier, not a secret).
+      Not required when join-tailnet is false.
+    required: false
+    default: ""
   tailscale-audience:
-    description: Tailscale federated identity audience (an identifier, not a secret).
-    required: true
+    description: >-
+      Tailscale federated identity audience (an identifier, not a secret).
+      Not required when join-tailnet is false.
+    required: false
+    default: ""
+  join-tailnet:
+    description: >-
+      Whether to join the tailnet. Set to 'false' on self-hosted runners that
+      are ALREADY on the tailnet -- brewmdm's arc-arm64 runners in EKS are, and
+      they cannot join anyway: tailscaled needs privileges a runner pod does
+      not have. GitHub-hosted runners must leave this true.
+    required: false
+    default: "true"
 
 outputs:
   keys:
@@ -56,6 +70,7 @@ runs:
   using: composite
   steps:
     - name: Join the tailnet
+      if: inputs.join-tailnet == 'true'
       uses: tailscale/github-action@780049a30b6ff5c378a9e7b389d15ece7a204888 # v4.1.3
       with:
         oauth-client-id: ${{ inputs.tailscale-client-id }}
@@ -67,6 +82,10 @@ runs:
         args: --accept-dns=false
 
     - name: Resolve OpenBao without tailnet DNS
+      # Only needed when WE joined with --accept-dns=false. A runner that was
+      # already on the tailnet has whatever DNS its own setup provides, and
+      # rewriting /etc/hosts under it would be wrong.
+      if: inputs.join-tailnet == 'true'
       shell: bash
       env:
         BAO_ADDR: ${{ inputs.bao-addr }}
