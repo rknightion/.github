@@ -129,23 +129,43 @@ runs:
         KV_PATH: ${{ inputs.path }}
       run: |
         set -euo pipefail
+        tmp=$(mktemp -d); trap 'rm -rf "$tmp"' EXIT
 
-        gh_jwt=$(curl -sS --fail-with-body \
+        # `curl --fail-with-body` needs curl >= 7.76 and NOT every runner has
+        # it: rkps-awsinfra's self-hosted jobs run in a container whose curl
+        # rejects the flag outright (`option --fail-with-body: is unknown`),
+        # which then surfaces as an unrelated-looking JSON decode error on empty
+        # input. Capturing the status code with -w is portable to every curl.
+        req() { # req <outfile> <what> <curl args...>
+          local out=$1 what=$2; shift 2
+          local code
+          code=$(curl -sS -o "$out" -w '%{http_code}' "$@")
+          if [ "$code" -ge 400 ]; then
+            echo "::error::${what} returned HTTP ${code}"
+            cat "$out" >&2 || true
+            return 1
+          fi
+        }
+
+        req "$tmp/jwt.json" "the GitHub OIDC token request" \
           -H "Authorization: bearer ${ACTIONS_ID_TOKEN_REQUEST_TOKEN}" \
-          "${ACTIONS_ID_TOKEN_REQUEST_URL}&audience=${BAO_ADDR}" \
-          | python3 -c 'import sys,json; print(json.load(sys.stdin)["value"])')
+          "${ACTIONS_ID_TOKEN_REQUEST_URL}&audience=${BAO_ADDR}"
+        gh_jwt=$(python3 -c 'import sys,json; print(json.load(open(sys.argv[1]))["value"])' "$tmp/jwt.json")
 
-        bao_token=$(curl -sS --fail-with-body \
+        printf '%s' "$gh_jwt" > "$tmp/jwt.txt"
+        python3 -c 'import json,os,sys; print(json.dumps({"role": os.environ["BAO_ROLE"], "jwt": open(sys.argv[1]).read().strip()}))' \
+          "$tmp/jwt.txt" > "$tmp/login.json"
+        req "$tmp/auth.json" "auth/gha/login" \
           ${BAO_RESOLVE} -X POST "${BAO_ADDR}/v1/auth/gha/login" \
-          -H 'Content-Type: application/json' \
-          --data-binary "$(python3 -c 'import json,os,sys; print(json.dumps({"role": os.environ["BAO_ROLE"], "jwt": sys.stdin.read().strip()}))' <<<"$gh_jwt")" \
-          | python3 -c 'import sys,json; print(json.load(sys.stdin)["auth"]["client_token"])')
+          -H 'Content-Type: application/json' --data-binary @"$tmp/login.json"
+        bao_token=$(python3 -c 'import sys,json; print(json.load(open(sys.argv[1]))["auth"]["client_token"])' "$tmp/auth.json")
         echo "::add-mask::${bao_token}"
 
         # KV v2 reads go through <mount>/data/<path>; the CLI hides that but the
         # HTTP API does not, and omitting it is the classic KV v2 mistake.
-        curl -sS --fail-with-body ${BAO_RESOLVE} -H "X-Vault-Token: ${bao_token}" \
-          "${BAO_ADDR}/v1/${KV_MOUNT}/data/${KV_PATH}" > /tmp/bao-kv.json
+        req /tmp/bao-kv.json "the KV read" ${BAO_RESOLVE} \
+          -H "X-Vault-Token: ${bao_token}" \
+          "${BAO_ADDR}/v1/${KV_MOUNT}/data/${KV_PATH}"
 
         # Mask every value BEFORE anything else can echo one, then export each
         # as an env var. Values never become step outputs: step outputs persist

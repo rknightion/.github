@@ -152,38 +152,58 @@ runs:
         BAO_ROLE: ${{ inputs.role || inputs.permission-set }}
       run: |
         set -euo pipefail
+        tmp=$(mktemp -d); trap 'rm -rf "$tmp"' EXIT
+
+        # `curl --fail-with-body` would be the obvious way to surface an error
+        # body on a 4xx, but it needs curl >= 7.76 and NOT every runner has it:
+        # rkps-awsinfra's self-hosted jobs run in a container whose curl rejects
+        # the flag outright (`option --fail-with-body: is unknown`), which then
+        # surfaces as an unrelated-looking JSON decode error on empty input.
+        # Capturing the status code with -w is portable to every curl.
+        req() { # req <outfile> <what> <curl args...>
+          local out=$1 what=$2; shift 2
+          local code
+          code=$(curl -sS -o "$out" -w '%{http_code}' "$@")
+          if [ "$code" -ge 400 ]; then
+            echo "::error::${what} returned HTTP ${code}"
+            cat "$out" >&2 || true
+            return 1
+          fi
+        }
 
         # A second OIDC token, with OpenBao's audience rather than Tailscale's.
         # GitHub issues a fresh token per audience; reusing the Tailscale one
         # would fail OpenBao's bound_audiences check.
-        gh_jwt=$(curl -sS --fail-with-body \
+        req "$tmp/jwt.json" "the GitHub OIDC token request" \
           -H "Authorization: bearer ${ACTIONS_ID_TOKEN_REQUEST_TOKEN}" \
-          "${ACTIONS_ID_TOKEN_REQUEST_URL}&audience=${BAO_ADDR}" \
-          | python3 -c 'import sys,json; print(json.load(sys.stdin)["value"])')
+          "${ACTIONS_ID_TOKEN_REQUEST_URL}&audience=${BAO_ADDR}"
+        gh_jwt=$(python3 -c 'import sys,json; print(json.load(open(sys.argv[1]))["value"])' "$tmp/jwt.json")
 
         # Exchange it for an OpenBao token. The role's bound_claims pin the repo,
         # so a job in another repo presenting a perfectly valid GitHub OIDC token
         # is rejected HERE, not merely limited later.
         #
-        # --fail-with-body matters: a 400 from this endpoint usually means the
-        # role does not exist, which is what happens if you assume the role name
-        # always equals the permission-set name. It does not for docs-sync.
-        bao_token=$(curl -sS --fail-with-body \
+        # A 400 from this endpoint usually means the role does not exist, which
+        # is what happens if you assume the role name always equals the
+        # permission-set name. It does not for docs-sync.
+        printf '%s' "$gh_jwt" > "$tmp/jwt.txt"
+        python3 -c 'import json,os,sys; print(json.dumps({"role": os.environ["BAO_ROLE"], "jwt": open(sys.argv[1]).read().strip()}))' \
+          "$tmp/jwt.txt" > "$tmp/login.json"
+        req "$tmp/auth.json" "auth/gha/login" \
           ${BAO_RESOLVE} -X POST "${BAO_ADDR}/v1/auth/gha/login" \
-          -H 'Content-Type: application/json' \
-          --data-binary "$(python3 -c 'import json,os,sys; print(json.dumps({"role": os.environ["BAO_ROLE"], "jwt": sys.stdin.read().strip()}))' <<<"$gh_jwt")" \
-          | python3 -c 'import sys,json; print(json.load(sys.stdin)["auth"]["client_token"])')
+          -H 'Content-Type: application/json' --data-binary @"$tmp/login.json"
+        bao_token=$(python3 -c 'import sys,json; print(json.load(open(sys.argv[1]))["auth"]["client_token"])' "$tmp/auth.json")
         echo "::add-mask::${bao_token}"
 
-        resp=$(curl -sS --fail-with-body \
+        req "$tmp/token.json" "the token mint" \
           ${BAO_RESOLVE} -H "X-Vault-Token: ${bao_token}" \
-          -X POST "${BAO_ADDR}/v1/github-app-broker/token/${PERMISSION_SET}")
+          -X POST "${BAO_ADDR}/v1/github-app-broker/token/${PERMISSION_SET}"
 
-        gh_token=$(printf '%s' "$resp" | python3 -c 'import sys,json; print(json.load(sys.stdin)["data"]["token"])')
+        gh_token=$(python3 -c 'import sys,json; print(json.load(open(sys.argv[1]))["data"]["token"])' "$tmp/token.json")
         # Mask BEFORE the value can reach any later log line.
         echo "::add-mask::${gh_token}"
         echo "token=${gh_token}" >> "$GITHUB_OUTPUT"
 
         # Report what was granted, so a permissions problem downstream is
         # diagnosable without minting a second token to inspect by hand.
-        printf '%s' "$resp" | python3 -c 'import sys,json; d=json.load(sys.stdin)["data"]; print("minted for repositories:", d.get("repositories")); print("permissions:", d.get("permissions")); print("expires_at:", d.get("expires_at"))'
+        python3 -c 'import sys,json; d=json.load(open(sys.argv[1]))["data"]; print("minted for repositories:", d.get("repositories")); print("permissions:", d.get("permissions")); print("expires_at:", d.get("expires_at"))' "$tmp/token.json"
