@@ -174,6 +174,18 @@ runs:
         # stdout is NOT redirected here on purpose: ::add-mask:: has to reach
         # the log stream to take effect, so the env and output files are
         # written directly rather than by shell redirection.
+        #
+        # ☠️ ::add-mask:: IS A LINE-BASED COMMAND. Handing it a multi-line value
+        # registers ONLY THE FIRST LINE as a secret and ECHOES EVERY REMAINING
+        # LINE TO THE LOG AS PLAIN OUTPUT. An earlier version of this action did
+        # `print(f"::add-mask::{v}")` first and masked line-by-line afterwards,
+        # which printed the body of an RSA private key in cleartext before any
+        # of it was masked. It leaked the Renovate App key in
+        # m7kni/renovate-config run 31257891458 and went unnoticed because every
+        # prior secret happened to be single-line base64.
+        #
+        # So: mask line-by-line FIRST, and only register the whole value when it
+        # contains no newline. Never print a value that might be multi-line.
         python3 - <<'PY'
         import json, os
         d = json.load(open('/tmp/bao-kv.json'))['data']['data']
@@ -181,10 +193,14 @@ runs:
         with open(os.environ['GITHUB_ENV'], 'a') as env:
             for k, v in d.items():
                 v = str(v)
-                print(f"::add-mask::{v}", flush=True)
-                for line in v.splitlines():          # mask each line too, so a
-                    if line.strip():                 # multi-line PEM cannot leak
+                for line in v.splitlines():
+                    if line.strip():
                         print(f"::add-mask::{line}", flush=True)
+                if "\n" not in v and v.strip():
+                    # Single-line values still need the whole-value registration;
+                    # for multi-line ones every line is already covered above and
+                    # printing the whole thing is exactly the bug described.
+                    print(f"::add-mask::{v}", flush=True)
                 name = k.upper().replace('-', '_')
                 names.append(name)
                 # Heredoc form so multi-line values (PEM keys, certs) survive.
