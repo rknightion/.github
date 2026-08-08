@@ -48,6 +48,15 @@ inputs:
       Not required when join-tailnet is false.
     required: false
     default: ""
+  resolve-via:
+    description: >-
+      Hostname to resolve in order to reach OpenBao when NOT joining the tailnet
+      -- for in-cluster runners this is the Tailscale operator's egress Service,
+      e.g. openbao.tailscale.svc.cluster.local. The action resolves it and pins
+      it with `curl --resolve` against OpenBao's real ts.net name, so the TLS
+      SAN still validates. Ignored when join-tailnet is true.
+    required: false
+    default: ""
   join-tailnet:
     description: >-
       Whether to join the tailnet. Set to 'false' on self-hosted runners that
@@ -81,19 +90,34 @@ runs:
         # name the moment the runner joins.
         args: --accept-dns=false
 
-    - name: Resolve OpenBao without tailnet DNS
-      # Only needed when WE joined with --accept-dns=false. A runner that was
-      # already on the tailnet has whatever DNS its own setup provides, and
-      # rewriting /etc/hosts under it would be wrong.
-      if: inputs.join-tailnet == 'true'
+    - name: Work out how to reach OpenBao
+      # Produces a `curl --resolve` argument rather than editing /etc/hosts:
+      # runner pods have no root and no sudo, and --resolve pins the address
+      # while still presenting the ts.net NAME for TLS, so the certificate's
+      # SAN check passes either way. Never disable certificate verification to
+      # work around this.
       shell: bash
       env:
         BAO_ADDR: ${{ inputs.bao-addr }}
+        JOIN_TAILNET: ${{ inputs.join-tailnet }}
+        RESOLVE_VIA: ${{ inputs.resolve-via }}
       run: |
         set -euo pipefail
         host=${BAO_ADDR#https://}
-        ip=$(tailscale ip -4 openbao)
-        echo "${ip} ${host}" | sudo tee -a /etc/hosts >/dev/null
+        if [ "$JOIN_TAILNET" = "true" ]; then
+          # We joined with --accept-dns=false, so MagicDNS will not resolve the
+          # name. tailscaled's peer list does not depend on DNS.
+          ip=$(tailscale ip -4 openbao)
+        elif [ -n "$RESOLVE_VIA" ]; then
+          ip=$(getent hosts "$RESOLVE_VIA" | head -1 | awk '{print $1}')
+          [ -n "$ip" ] || { echo "::error::could not resolve ${RESOLVE_VIA}"; exit 1; }
+        else
+          echo "BAO_RESOLVE=" >> "$GITHUB_ENV"
+          echo "no address pinning; relying on ambient DNS for ${host}"
+          exit 0
+        fi
+        echo "BAO_RESOLVE=--resolve ${host}:443:${ip}" >> "$GITHUB_ENV"
+        echo "pinned ${host} -> ${ip}"
 
     - name: Read the secret
       id: read
@@ -112,7 +136,7 @@ runs:
           | python3 -c 'import sys,json; print(json.load(sys.stdin)["value"])')
 
         bao_token=$(curl -sS --fail-with-body \
-          -X POST "${BAO_ADDR}/v1/auth/gha/login" \
+          ${BAO_RESOLVE} -X POST "${BAO_ADDR}/v1/auth/gha/login" \
           -H 'Content-Type: application/json' \
           --data-binary "$(python3 -c 'import json,os,sys; print(json.dumps({"role": os.environ["BAO_ROLE"], "jwt": sys.stdin.read().strip()}))' <<<"$gh_jwt")" \
           | python3 -c 'import sys,json; print(json.load(sys.stdin)["auth"]["client_token"])')
@@ -120,7 +144,7 @@ runs:
 
         # KV v2 reads go through <mount>/data/<path>; the CLI hides that but the
         # HTTP API does not, and omitting it is the classic KV v2 mistake.
-        curl -sS --fail-with-body -H "X-Vault-Token: ${bao_token}" \
+        curl -sS --fail-with-body ${BAO_RESOLVE} -H "X-Vault-Token: ${bao_token}" \
           "${BAO_ADDR}/v1/${KV_MOUNT}/data/${KV_PATH}" > /tmp/bao-kv.json
 
         # Mask every value BEFORE anything else can echo one, then export each
