@@ -30,6 +30,15 @@ inputs:
       release-please-<repo>. The JWT role and ACL policy share this exact name;
       a repo can only mint its own set.
     required: true
+  role:
+    description: >-
+      auth/gha JWT role to log in as. Defaults to `permission-set`, which is the
+      right answer whenever a permission set has exactly one consuming repo.
+      Pass it explicitly when they diverge: docs-sync shares ONE permission set
+      across every consumer (they all dispatch at the same hub) but needs a role
+      per repo to pin repository_id, so the names cannot match.
+    required: false
+    default: ""
   bao-addr:
     description: OpenBao address (tailnet-only).
     required: false
@@ -95,6 +104,7 @@ runs:
       env:
         BAO_ADDR: ${{ inputs.bao-addr }}
         PERMISSION_SET: ${{ inputs.permission-set }}
+        BAO_ROLE: ${{ inputs.role || inputs.permission-set }}
       run: |
         set -euo pipefail
 
@@ -106,14 +116,17 @@ runs:
           "${ACTIONS_ID_TOKEN_REQUEST_URL}&audience=${BAO_ADDR}" \
           | python3 -c 'import sys,json; print(json.load(sys.stdin)["value"])')
 
-        # Exchange it for an OpenBao token. The role name equals the permission
-        # set name, and its bound_claims pin the repo -- so a job in another
-        # repo presenting a perfectly valid GitHub OIDC token is rejected here,
-        # not merely limited later.
+        # Exchange it for an OpenBao token. The role's bound_claims pin the repo,
+        # so a job in another repo presenting a perfectly valid GitHub OIDC token
+        # is rejected HERE, not merely limited later.
+        #
+        # --fail-with-body matters: a 400 from this endpoint usually means the
+        # role does not exist, which is what happens if you assume the role name
+        # always equals the permission-set name. It does not for docs-sync.
         bao_token=$(curl -sS --fail-with-body \
           -X POST "${BAO_ADDR}/v1/auth/gha/login" \
           -H 'Content-Type: application/json' \
-          --data-binary "$(python3 -c 'import json,os,sys; print(json.dumps({"role": os.environ["PERMISSION_SET"], "jwt": sys.stdin.read().strip()}))' <<<"$gh_jwt")" \
+          --data-binary "$(python3 -c 'import json,os,sys; print(json.dumps({"role": os.environ["BAO_ROLE"], "jwt": sys.stdin.read().strip()}))' <<<"$gh_jwt")" \
           | python3 -c 'import sys,json; print(json.load(sys.stdin)["auth"]["client_token"])')
         echo "::add-mask::${bao_token}"
 
