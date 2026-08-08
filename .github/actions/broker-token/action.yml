@@ -58,6 +58,36 @@ runs:
         oauth-client-id: ${{ inputs.tailscale-client-id }}
         audience: ${{ inputs.tailscale-audience }}
         tags: tag:gha
+        # --accept-dns=false is LOAD-BEARING, not a tidy-up.
+        #
+        # This tailnet's global nameserver is 10.0.0.254 (OPNsense), and
+        # tag:gha is granted OpenBao on :443 and nothing else -- so accepting
+        # tailnet DNS points the runner at a resolver it is not allowed to
+        # reach, and EVERY public name stops resolving the moment it joins.
+        # That breaks api.github.com, which is the whole point of the token
+        # being minted. Observed as `curl: (6) Could not resolve host:
+        # pkgs.tailscale.com` in run 31250275443.
+        #
+        # The alternative -- granting tag:gha DNS to 10.0.0.254 -- would also
+        # work, but it puts OPNsense on the critical path for resolving
+        # api.github.com from public-repo CI. Keeping the runner's own resolver
+        # is both tighter on network grants and one less availability link.
+        args: --accept-dns=false
+
+    - name: Resolve OpenBao without tailnet DNS
+      shell: bash
+      env:
+        BAO_ADDR: ${{ inputs.bao-addr }}
+      run: |
+        set -euo pipefail
+        # With MagicDNS off we must map the name ourselves. Address it by NAME
+        # rather than IP so the TLS SAN still matches -- OpenBao's certificate
+        # is issued for the ts.net hostname. The IP comes from tailscaled's own
+        # peer list, which does not depend on DNS, so nothing is hardcoded.
+        host=${BAO_ADDR#https://}
+        ip=$(tailscale ip -4 openbao)
+        echo "${ip} ${host}" | sudo tee -a /etc/hosts >/dev/null
+        echo "mapped ${host} -> ${ip}"
 
     - name: Mint a scoped installation token
       id: mint
