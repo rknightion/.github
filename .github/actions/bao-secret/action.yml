@@ -130,6 +130,7 @@ runs:
       run: |
         set -euo pipefail
         tmp=$(mktemp -d); trap 'rm -rf "$tmp"' EXIT
+        export BAO_SUMMARY="$tmp/summary"
 
         # `curl --fail-with-body` needs curl >= 7.76 and NOT every runner has
         # it: rkps-awsinfra's self-hosted jobs run in a container whose curl
@@ -167,46 +168,67 @@ runs:
           -H "X-Vault-Token: ${bao_token}" \
           "${BAO_ADDR}/v1/${KV_MOUNT}/data/${KV_PATH}"
 
-        # Mask every value BEFORE anything else can echo one, then export each
-        # as an env var. Values never become step outputs: step outputs persist
-        # in the workflow's object graph and are easy to interpolate somewhere
-        # that gets logged, whereas env vars stay scoped to the job.
-        # stdout is NOT redirected here on purpose: ::add-mask:: has to reach
-        # the log stream to take effect, so the env and output files are
-        # written directly rather than by shell redirection.
+        # Export each value as a masked env var. Values never become step
+        # outputs: step outputs persist in the workflow's object graph and are
+        # easy to interpolate somewhere that gets logged, whereas env vars stay
+        # scoped to the job.
         #
-        # ☠️ ::add-mask:: IS A LINE-BASED COMMAND. Handing it a multi-line value
-        # registers ONLY THE FIRST LINE as a secret and ECHOES EVERY REMAINING
-        # LINE TO THE LOG AS PLAIN OUTPUT. An earlier version of this action did
-        # `print(f"::add-mask::{v}")` first and masked line-by-line afterwards,
-        # which printed the body of an RSA private key in cleartext before any
-        # of it was masked. It leaked the Renovate App key in
-        # m7kni/renovate-config run 31257891458 and went unnoticed because every
-        # prior secret happened to be single-line base64.
+        # ☠️ WHY THIS IS SHAPED SO DEFENSIVELY -- a real leak, 2026-08-08.
         #
-        # So: mask line-by-line FIRST, and only register the whole value when it
-        # contains no newline. Never print a value that might be multi-line.
-        python3 - <<'PY'
+        # `::add-mask::` is a workflow COMMAND the runner parses out of the log
+        # stream. There is no file-based equivalent (unlike GITHUB_ENV and
+        # GITHUB_OUTPUT), so the value genuinely has to cross stdout. And the
+        # command is LINE-BASED: handed a multi-line value it registers only the
+        # FIRST line as a secret and echoes every remaining line to the log as
+        # ordinary output.
+        #
+        # An earlier version printed the whole value and masked line-by-line
+        # afterwards, so an RSA private key's body reached the log in cleartext
+        # before anything masked it. Every secret handled until then happened to
+        # be single-line base64, so it stayed invisible until the first PEM.
+        #
+        # Getting the print order right is necessary but NOT sufficient -- it
+        # leaves the next edit one stray print() away from the same bug. So the
+        # log stream is closed off structurally instead:
+        #
+        #   1. The generator's stdout is captured to a FILE. Nothing it writes
+        #      can reach the log, whatever anyone changes it to print later.
+        #   2. Every captured line is then checked to be a single, well-formed
+        #      ::add-mask:: command. A line that is not is a value that escaped,
+        #      so the step FAILS -- reporting the count only, never the content.
+        #   3. Only the vetted lines are emitted.
+        #
+        # The worst a future bug can now do is fail the step. It cannot print.
+        python3 - > "$tmp/masks" <<'PY'
         import json, os
         d = json.load(open('/tmp/bao-kv.json'))['data']['data']
         names = []
         with open(os.environ['GITHUB_ENV'], 'a') as env:
             for k, v in d.items():
                 v = str(v)
+                # One command per LINE, always -- never the whole value when it
+                # spans more than one, since that is the leak.
                 for line in v.splitlines():
                     if line.strip():
-                        print(f"::add-mask::{line}", flush=True)
-                if "\n" not in v and v.strip():
-                    # Single-line values still need the whole-value registration;
-                    # for multi-line ones every line is already covered above and
-                    # printing the whole thing is exactly the bug described.
-                    print(f"::add-mask::{v}", flush=True)
+                        print(f"::add-mask::{line}")
                 name = k.upper().replace('-', '_')
                 names.append(name)
                 # Heredoc form so multi-line values (PEM keys, certs) survive.
                 env.write(f"{name}<<__BAO_EOF__\n{v}\n__BAO_EOF__\n")
         with open(os.environ['GITHUB_OUTPUT'], 'a') as out:
             out.write("keys=" + " ".join(names) + "\n")
-        print(f"read {len(names)} key(s): {' '.join(names)}")
+        # The summary goes to a file too; the shell prints it after vetting.
+        with open(os.environ['BAO_SUMMARY'], 'w') as s:
+            s.write("read %d key(s): %s\n" % (len(names), " ".join(names)))
         PY
+
+        # Anything that is not exactly one ::add-mask::<non-empty> line is a
+        # value that escaped the generator. Fail loudly, print only the count.
+        stray=$(grep -cv '^::add-mask::.' "$tmp/masks" || true)
+        if [ "${stray:-0}" -ne 0 ]; then
+          echo "::error::secret reader produced ${stray} unexpected output line(s); refusing to emit them"
+          exit 1
+        fi
+        cat "$tmp/masks"          # every line here is a command the runner consumes
+        cat "$BAO_SUMMARY"        # key NAMES only, no values
         rm -f /tmp/bao-kv.json

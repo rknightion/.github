@@ -171,6 +171,21 @@ runs:
           fi
         }
 
+        # ::add-mask:: is LINE-BASED: given a multi-line value it registers only
+        # the first line and ECHOES THE REST TO THE LOG AS PLAIN OUTPUT. Every
+        # value masked here is a single-line token by construction, but "by
+        # construction" is what the sibling action also assumed right up until it
+        # printed an RSA private key into a log (2026-08-08). So assert it rather
+        # than assume it: refuse to emit anything that could leak, and name only
+        # the label, never the value.
+        mask() { # mask <label> <value>
+          case $2 in
+            *$'\n'*) echo "::error::$1 is multi-line; refusing to emit a mask that would leak it"; return 1 ;;
+            '')      echo "::error::$1 is empty"; return 1 ;;
+          esac
+          printf '::add-mask::%s\n' "$2"
+        }
+
         # A second OIDC token, with OpenBao's audience rather than Tailscale's.
         # GitHub issues a fresh token per audience; reusing the Tailscale one
         # would fail OpenBao's bound_audiences check.
@@ -193,7 +208,7 @@ runs:
           ${BAO_RESOLVE} -X POST "${BAO_ADDR}/v1/auth/gha/login" \
           -H 'Content-Type: application/json' --data-binary @"$tmp/login.json"
         bao_token=$(python3 -c 'import sys,json; print(json.load(open(sys.argv[1]))["auth"]["client_token"])' "$tmp/auth.json")
-        echo "::add-mask::${bao_token}"
+        mask "the OpenBao token" "$bao_token"
 
         req "$tmp/token.json" "the token mint" \
           ${BAO_RESOLVE} -H "X-Vault-Token: ${bao_token}" \
@@ -201,7 +216,7 @@ runs:
 
         gh_token=$(python3 -c 'import sys,json; print(json.load(open(sys.argv[1]))["data"]["token"])' "$tmp/token.json")
         # Mask BEFORE the value can reach any later log line.
-        echo "::add-mask::${gh_token}"
+        mask "the installation token" "$gh_token"
         echo "token=${gh_token}" >> "$GITHUB_OUTPUT"
 
         # Report what was granted, so a permissions problem downstream is
