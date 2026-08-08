@@ -12,7 +12,12 @@ description: >-
 # Nothing durable is stored in the consuming repo. TS_WIF_CLIENT_ID and
 # TS_WIF_AUDIENCE are IDENTIFIERS, not credentials: possession of either grants
 # nothing without a GitHub-signed OIDC token whose claims match the federated
-# identity (owner id 12484127, ref refs/heads/main).
+# identity. There is one federated identity per owner -- rknightion 12484127,
+# brewmdm 312016889, m7kni 278668071 -- and the App is installed on all three,
+# so a permission set names the installation its repositories belong to.
+#
+# On a runner that already has tailnet access, pass join-tailnet: "false" and
+# skip both identifiers entirely; nothing at all is then stored in the repo.
 #
 # AVAILABILITY: this makes the calling workflow depend on camden being up,
 # unsealed, and on the tailnet. A camden outage fails releases rather than
@@ -44,11 +49,36 @@ inputs:
     required: false
     default: https://openbao.saga-turtle.ts.net
   tailscale-client-id:
-    description: Tailscale federated identity client ID (an identifier, not a secret).
-    required: true
+    description: >-
+      Tailscale federated identity client ID (an identifier, not a secret).
+      Not required when join-tailnet is false.
+    required: false
+    default: ""
   tailscale-audience:
-    description: Tailscale federated identity audience (an identifier, not a secret).
-    required: true
+    description: >-
+      Tailscale federated identity audience (an identifier, not a secret).
+      Not required when join-tailnet is false.
+    required: false
+    default: ""
+  resolve-via:
+    description: >-
+      Hostname to resolve in order to reach OpenBao when NOT joining the tailnet
+      -- for in-cluster runners this is the Tailscale operator's egress Service,
+      e.g. openbao.tailscale.svc.cluster.local. The action resolves it and pins
+      it with `curl --resolve` against OpenBao's real ts.net name, so the TLS
+      SAN still validates. Ignored when join-tailnet is true, and unnecessary on
+      a runner that already resolves the ts.net name through ambient DNS.
+    required: false
+    default: ""
+  join-tailnet:
+    description: >-
+      Whether to join the tailnet. Set to 'false' on self-hosted runners that
+      are ALREADY on the tailnet -- brewmdm's arc-arm64 runners in EKS are (via
+      the operator egress proxy, so pass resolve-via too), and the `runners` VM
+      and macos-mbp14 resolve OpenBao through ambient DNS with neither input.
+      GitHub-hosted runners must leave this true.
+    required: false
+    default: "true"
 
 outputs:
   token:
@@ -62,6 +92,7 @@ runs:
   using: composite
   steps:
     - name: Join the tailnet
+      if: inputs.join-tailnet == 'true'
       uses: tailscale/github-action@780049a30b6ff5c378a9e7b389d15ece7a204888 # v4.1.3
       with:
         oauth-client-id: ${{ inputs.tailscale-client-id }}
@@ -83,20 +114,34 @@ runs:
         # is both tighter on network grants and one less availability link.
         args: --accept-dns=false
 
-    - name: Resolve OpenBao without tailnet DNS
+    - name: Work out how to reach OpenBao
+      # Produces a `curl --resolve` argument rather than editing /etc/hosts:
+      # runner pods have no root and no sudo, and --resolve pins the address
+      # while still presenting the ts.net NAME for TLS, so the certificate's
+      # SAN check passes either way. Never disable certificate verification to
+      # work around this.
       shell: bash
       env:
         BAO_ADDR: ${{ inputs.bao-addr }}
+        JOIN_TAILNET: ${{ inputs.join-tailnet }}
+        RESOLVE_VIA: ${{ inputs.resolve-via }}
       run: |
         set -euo pipefail
-        # With MagicDNS off we must map the name ourselves. Address it by NAME
-        # rather than IP so the TLS SAN still matches -- OpenBao's certificate
-        # is issued for the ts.net hostname. The IP comes from tailscaled's own
-        # peer list, which does not depend on DNS, so nothing is hardcoded.
         host=${BAO_ADDR#https://}
-        ip=$(tailscale ip -4 openbao)
-        echo "${ip} ${host}" | sudo tee -a /etc/hosts >/dev/null
-        echo "mapped ${host} -> ${ip}"
+        if [ "$JOIN_TAILNET" = "true" ]; then
+          # We joined with --accept-dns=false, so MagicDNS will not resolve the
+          # name. tailscaled's peer list does not depend on DNS.
+          ip=$(tailscale ip -4 openbao)
+        elif [ -n "$RESOLVE_VIA" ]; then
+          ip=$(getent hosts "$RESOLVE_VIA" | head -1 | awk '{print $1}')
+          [ -n "$ip" ] || { echo "::error::could not resolve ${RESOLVE_VIA}"; exit 1; }
+        else
+          echo "BAO_RESOLVE=" >> "$GITHUB_ENV"
+          echo "no address pinning; relying on ambient DNS for ${host}"
+          exit 0
+        fi
+        echo "BAO_RESOLVE=--resolve ${host}:443:${ip}" >> "$GITHUB_ENV"
+        echo "pinned ${host} -> ${ip}"
 
     - name: Mint a scoped installation token
       id: mint
@@ -124,14 +169,14 @@ runs:
         # role does not exist, which is what happens if you assume the role name
         # always equals the permission-set name. It does not for docs-sync.
         bao_token=$(curl -sS --fail-with-body \
-          -X POST "${BAO_ADDR}/v1/auth/gha/login" \
+          ${BAO_RESOLVE} -X POST "${BAO_ADDR}/v1/auth/gha/login" \
           -H 'Content-Type: application/json' \
           --data-binary "$(python3 -c 'import json,os,sys; print(json.dumps({"role": os.environ["BAO_ROLE"], "jwt": sys.stdin.read().strip()}))' <<<"$gh_jwt")" \
           | python3 -c 'import sys,json; print(json.load(sys.stdin)["auth"]["client_token"])')
         echo "::add-mask::${bao_token}"
 
         resp=$(curl -sS --fail-with-body \
-          -H "X-Vault-Token: ${bao_token}" \
+          ${BAO_RESOLVE} -H "X-Vault-Token: ${bao_token}" \
           -X POST "${BAO_ADDR}/v1/github-app-broker/token/${PERMISSION_SET}")
 
         gh_token=$(printf '%s' "$resp" | python3 -c 'import sys,json; print(json.load(sys.stdin)["data"]["token"])')
