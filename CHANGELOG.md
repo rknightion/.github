@@ -1,5 +1,42 @@
 # Changelog
 
+## [1.6.0](https://github.com/rknightion/.github/compare/v1.5.1...v1.6.0) (2026-08-08)
+
+
+### Features
+
+* add bao-secret action for generic KV reads ([7f9080f](https://github.com/rknightion/.github/commit/7f9080f3b84a1bbbbee25f6c8e6143b12e22dd94))
+* add broker-token composite action ([468cc01](https://github.com/rknightion/.github/commit/468cc0199b5e49cf854c719495f9e1828d9a7ff3))
+* allow skipping the tailnet join for already-joined runners ([5c1bdf7](https://github.com/rknightion/.github/commit/5c1bdf7f2fb1456d4cb0089de1089b803135e940))
+* **broker-token:** support runners already on the tailnet ([f55d65c](https://github.com/rknightion/.github/commit/f55d65c2f96358b49d871ea5515c48fa3bce1fef))
+* mint release-please token from the OpenBao broker ([0da8f49](https://github.com/rknightion/.github/commit/0da8f49263d4a6ccd1d1e2f8c8fe48fae0fc62a4))
+* reach OpenBao via curl --resolve, and support in-cluster egress ([0104f58](https://github.com/rknightion/.github/commit/0104f5892b5ad5414c98bfdc213430dce083ad80))
+
+
+### Bug Fixes
+
+* allow the JWT role to differ from the permission set ([d43f0d6](https://github.com/rknightion/.github/commit/d43f0d6140bee0438725500c8977a340d0f0407f))
+* **bao-secret:** stop ::add-mask:: leaking multi-line secrets to the log ([ea66f8e](https://github.com/rknightion/.github/commit/ea66f8eac8f05d697f087337c2311bd484757e70))
+* **bao:** make a secret leak structurally impossible, not merely avoided ([06d6727](https://github.com/rknightion/.github/commit/06d6727487515cd6628e01696af6f886f1421e04))
+* **bao:** stop using curl --fail-with-body, it is not portable ([b57e328](https://github.com/rknightion/.github/commit/b57e328fd53127925b32501d2c48b42630b2e07d))
+* keep the runner's own resolver when joining the tailnet ([b9ab5f8](https://github.com/rknightion/.github/commit/b9ab5f80961f2c29c47a8d7d5dff112b6551169c))
+
+
+### Build & CI
+
+* **deps:** update actions/attest-build-provenance action to v4.2.2 ([#45](https://github.com/rknightion/.github/issues/45)) ([9d6bb9b](https://github.com/rknightion/.github/commit/9d6bb9b47c0cd7108d9fe0b874935bccd436f442))
+* **deps:** update github/codeql-action action to v4.37.4 ([#38](https://github.com/rknightion/.github/issues/38)) ([af12a75](https://github.com/rknightion/.github/commit/af12a754b33e6f35a63faf7fae414fb62a09d814))
+* **deps:** update github/codeql-action action to v4.37.5 ([#42](https://github.com/rknightion/.github/issues/42)) ([dd11e93](https://github.com/rknightion/.github/commit/dd11e933a585d0fc665aca22ea06b488fe8bb1f2))
+* **deps:** update github/codeql-action action to v4.37.6 ([#43](https://github.com/rknightion/.github/issues/43)) ([9d4fc3a](https://github.com/rknightion/.github/commit/9d4fc3a2978b42eca18b9259a85dba3ff7cdb773))
+* **deps:** update hadolint/hadolint-action action to v3.4.0 ([#40](https://github.com/rknightion/.github/issues/40)) ([64a3fed](https://github.com/rknightion/.github/commit/64a3fed6716e354ab2a311f136fc703109cf762b))
+* **deps:** update step-security/harden-runner action to v2.20.1 ([#44](https://github.com/rknightion/.github/issues/44)) ([3df41d9](https://github.com/rknightion/.github/commit/3df41d927efc36b1637ed5e8d303d5c61b1f2041))
+* **deps:** update zizmorcore/zizmor-action action to v0.6.2 ([#41](https://github.com/rknightion/.github/issues/41)) ([2cef6f9](https://github.com/rknightion/.github/commit/2cef6f9a8c98b228dad17ea3c9abd0dea78a3f36))
+
+
+### Documentation
+
+* correct the permission-set input description ([1cd0af4](https://github.com/rknightion/.github/commit/1cd0af4cdb0f46266b34f3b981543e32e7c98b4a))
+
 ## [1.5.1](https://github.com/rknightion/.github/compare/v1.5.0...v1.5.1) (2026-07-30)
 
 
