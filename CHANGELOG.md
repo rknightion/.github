@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.6.1](https://github.com/rknightion/.github/compare/v1.6.0...v1.6.1) (2026-08-12)
+
+
+### Bug Fixes
+
+* **ci:** verify actionlint downloads ([328bc72](https://github.com/rknightion/.github/commit/328bc72e11165b582079d424fd6b551221435250)), closes [#46](https://github.com/rknightion/.github/issues/46)
+
 ## [1.6.0](https://github.com/rknightion/.github/compare/v1.5.1...v1.6.0) (2026-08-08)
 
 
