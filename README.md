@@ -21,15 +21,15 @@ bash scripts/cloud-environment-setup.sh
 * **Codex:** turn off automatic setup and enter the command above in
   [Codex environment settings](https://chatgpt.com/codex/settings/environments).
 * **Claude Code:** enter the same command in the **Setup script** field of the cloud
-  environment selector at [claude.ai/code](https://claude.ai/code). Keep network
-  access at **Trusted** or higher and keep the setup under Claude's five-minute limit.
+  environment selector at [claude.ai/code](https://claude.ai/code). Network access
+  should be set to **Trusted** by default. The setup requires npm, PyPI, and
+  proxy.golang.org; document an exception only when an additional domain is needed.
+  Keep the setup under Claude's five-minute limit.
 
 The script installs pinned versions of `backlog`, `actionlint`, and `zizmor` under
 `~/.local/bin`, adds that directory to `PATH` through `~/.bashrc` for the later agent
 phase, verifies each tool, and can be safely run again when rebuilding an environment.
-It retrieves packages only through npm, PyPI, and the Go module proxy, all of which are
-available to Claude's default Trusted network policy; it does not download GitHub
-release assets, which Claude restricts to repositories attached to the session.
+It retrieves packages only through npm, PyPI, and the Go module proxy.
 
 ## Reusable workflows (`.github/workflows/`)
 

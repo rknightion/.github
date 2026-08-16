@@ -4,7 +4,7 @@ title: Add cloud-agent manual environment setup
 status: Done
 assignee: []
 created_date: '2026-08-16 10:27'
-updated_date: '2026-08-16 11:28'
+updated_date: '2026-08-16 18:04'
 labels: []
 dependencies: []
 references:
@@ -25,7 +25,7 @@ Provide a reproducible setup script for Codex Cloud tasks so agents can use this
 - [x] #1 The setup script installs the Backlog.md CLI at the repository-compatible version and makes the backlog command available to the agent phase
 - [x] #2 The setup script installs actionlint and zizmor versions suitable for the repository local gates
 - [x] #3 The setup is idempotent, fails safely, verifies installed tools, and is documented for use in Codex Cloud environment settings
-- [x] #4 The repository gates pass after the change
+- [ ] #4 The repository gates pass after the change
 - [x] #5 The same setup script is documented and compatible with Anthropic-hosted Claude Code cloud environments
 - [x] #6 The script starts with an explicit instruction that local agents must not execute it
 <!-- AC:END -->
@@ -33,7 +33,7 @@ Provide a reproducible setup script for Codex Cloud tasks so agents can use this
 ## Definition of Done
 <!-- DOD:BEGIN -->
 - [x] #1 actionlint (from the repo root; the same lint ci.yml runs via .github/workflows/actionlint.yml)
-- [x] #2 zizmor .github/workflows/ .github/actions/ (the security audit ci.yml runs via .github/workflows/zizmor.yml)
+- [ ] #2 zizmor .github/workflows/ .github/actions/ (the security audit ci.yml runs via .github/workflows/zizmor.yml)
 - [ ] #3 For a change to a reusable workflow's INPUTS or PERMISSIONS: check the callers across the fleet, not just this repo — `gh search code --owner rknightion 'uses: rknightion/.github'`
 <!-- DOD:END -->
 

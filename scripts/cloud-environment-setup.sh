@@ -21,7 +21,7 @@ require() {
 }
 
 version_is() {
-  "$1" --version 2>/dev/null | head -n 1 | grep -Fq "$2"
+  "$1" --version 2>/dev/null | head -n 1 | grep -Eq "(^|[^0-9.])$2([^0-9.]|$)"
 }
 
 install_backlog() {
@@ -79,10 +79,10 @@ main() {
   install_zizmor
   persist_path
 
-  version_is backlog "${BACKLOG_VERSION}"
-  version_is actionlint "${ACTIONLINT_VERSION}"
-  version_is zizmor "${ZIZMOR_VERSION}"
-  backlog instructions overview >/dev/null
+  version_is "${LOCAL_BIN}/backlog" "${BACKLOG_VERSION}"
+  version_is "${LOCAL_BIN}/actionlint" "${ACTIONLINT_VERSION}"
+  version_is "${LOCAL_BIN}/zizmor" "${ZIZMOR_VERSION}"
+  "${LOCAL_BIN}/backlog" instructions overview >/dev/null
   log "ready: Backlog.md, actionlint, and zizmor are available"
 }
 
