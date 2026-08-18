@@ -1,0 +1,110 @@
+# Shared reusable: prune GHCR.
+#
+# WHY THIS IS NOT actions/delete-package-versions: that action's
+# `delete-only-untagged-versions` would delete the per-architecture child
+# manifests that a merged multi-arch index references, silently breaking every
+# tagged image, and it does not understand cosign's `sha256-<digest>` signature
+# tags. dataaxiom/ghcr-cleanup-action understands multi-arch children,
+# referrers/attestations and orphaned signature tags, and `validate: true`
+# re-resolves every surviving multi-arch image afterwards.
+#
+# DEFAULTS TO DRY RUN. A caller must pass dry-run: false to actually delete.
+name: ghcr-cleanup (reusable)
+
+on:
+  workflow_call:
+    inputs:
+      packages:
+        description: "Comma-separated GHCR packages to prune, e.g. 'graph2otel,charts/graph2otel'."
+        required: true
+        type: string
+      dry-run:
+        description: "Report what would be deleted without deleting it."
+        required: false
+        type: boolean
+        default: true
+      keep-n-rc:
+        description: "How many of the newest release-candidate versions to keep."
+        required: false
+        type: number
+        default: 10
+      edge-older-than:
+        description: "Delete main-<sha> edge images older than this."
+        required: false
+        type: string
+        default: "7 days"
+
+permissions:
+  contents: read
+
+jobs:
+  prune:
+    name: prune ${{ inputs.packages }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    # Two concurrent prunes on one package race each other's version listings and
+    # one deletes a digest the other has already resolved. Serialize, never cancel.
+    concurrency:
+      group: ghcr-cleanup-${{ github.repository }}
+      cancel-in-progress: false
+    permissions:
+      contents: read
+      packages: write # delete package versions
+    steps:
+      - name: Harden the runner (audit egress)
+        uses: step-security/harden-runner@05e31511f85b41b11d1cf0ef85d0992719546e2c # v2.21.0
+        with:
+          egress-policy: audit
+
+      # Stale buildkit layer caches. Regenerated on the next build; referenced by
+      # nothing. Safe to prune hard, and this is the bulk of the untagged volume.
+      - name: Prune stale buildcache
+        uses: dataaxiom/ghcr-cleanup-action@d52806a0dc70b430571a37da1fde39733ffd640f # v1.2.2
+        with:
+          token: ${{ github.token }}
+          packages: ${{ inputs.packages }}
+          delete-tags: "buildcache-*"
+          older-than: 7 days
+          delete-orphaned-images: true
+          validate: true
+          dry-run: ${{ inputs.dry-run }}
+
+      # Edge images from ordinary pushes to main. `main` itself is never deleted
+      # (it is the moving edge pointer); only the pinned main-<sha> history is.
+      - name: Prune old edge images
+        uses: dataaxiom/ghcr-cleanup-action@d52806a0dc70b430571a37da1fde39733ffd640f # v1.2.2
+        with:
+          token: ${{ github.token }}
+          packages: ${{ inputs.packages }}
+          delete-tags: "main-*"
+          exclude-tags: "main"
+          older-than: ${{ inputs.edge-older-than }}
+          delete-orphaned-images: true
+          validate: true
+          dry-run: ${{ inputs.dry-run }}
+
+      # Release candidates: keep the newest N, drop the rest. Stable tags are
+      # excluded by the glob -- `*-rc.*` cannot match vX.Y.Z, X.Y, X or latest.
+      - name: Prune old release candidates
+        uses: dataaxiom/ghcr-cleanup-action@d52806a0dc70b430571a37da1fde39733ffd640f # v1.2.2
+        with:
+          token: ${{ github.token }}
+          packages: ${{ inputs.packages }}
+          delete-tags: "*-rc.*"
+          keep-n-tagged: ${{ inputs.keep-n-rc }}
+          delete-orphaned-images: true
+          validate: true
+          dry-run: ${{ inputs.dry-run }}
+
+      # Anything left untagged and unreferenced -- orphaned attestation layers and
+      # cosign sha256- signatures whose subject digest is already gone. Runs last
+      # so the earlier steps' orphans are swept in the same pass.
+      - name: Prune orphans
+        uses: dataaxiom/ghcr-cleanup-action@d52806a0dc70b430571a37da1fde39733ffd640f # v1.2.2
+        with:
+          token: ${{ github.token }}
+          packages: ${{ inputs.packages }}
+          delete-orphaned-images: true
+          keep-n-untagged: 0
+          validate: true
+          dry-run: ${{ inputs.dry-run }}

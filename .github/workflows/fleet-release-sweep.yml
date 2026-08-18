@@ -1,0 +1,117 @@
+# Fleet-wide release train status. Runs daily and reports every public rknightion
+# repo's release PR: pending version, age, and whether its checks are green.
+#
+# This exists because a release PR can go red and sit unnoticed indefinitely --
+# on 2026-08-18 opnsense2otel and sf2loki had both been broken for days with
+# nothing surfacing it.
+#
+# GITHUB_TOKEN can read public repos cross-repo, so no broker token is needed.
+name: fleet-release-sweep
+
+on:
+  schedule:
+    - cron: "17 7 * * *"
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+
+concurrency:
+  group: fleet-release-sweep
+  cancel-in-progress: false
+
+jobs:
+  sweep:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    permissions:
+      contents: read
+      issues: write # maintain the status issue
+    steps:
+      - name: Harden the runner (audit egress)
+        uses: step-security/harden-runner@05e31511f85b41b11d1cf0ef85d0992719546e2c # v2.21.0
+        with:
+          egress-policy: audit
+
+      - name: Build the report
+        id: report
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          out="${RUNNER_TEMP}/report.md"
+          {
+            echo "| Repo | Release PR | Pending | Age | Checks | Last release |"
+            echo "|---|---|---|---|---|---|"
+          } > "${out}"
+
+          repos="$(gh repo list rknightion --limit 200 \
+            --json name,isFork,isArchived,isPrivate \
+            --jq '.[] | select(.isPrivate==false and .isFork==false and .isArchived==false) | .name')"
+
+          red=0
+          for repo in ${repos}; do
+            # Discover the release PR by branch PREFIX, never by exact name. Every
+            # repo in this fleet actually uses release-please's COMPONENT-scoped
+            # branch (release-please--branches--main--components--<component>), and
+            # the component is not always the repo name (paperless-ngx-dedupe uses
+            # "paperless-dedupe"). An exact --head match silently finds nothing and
+            # reports the repo as having no release PR at all.
+            pr="$(gh pr list --repo "rknightion/${repo}" --state open --limit 100 \
+                   --json number,title,createdAt,headRefName,statusCheckRollup \
+                   --jq '[.[] | select(.headRefName | startswith("release-please--branches--main"))] | .[0] // empty')"
+            last="$(gh release list --repo "rknightion/${repo}" --limit 1 \
+                     --json tagName,publishedAt --jq '.[0].tagName // "—"' 2>/dev/null || echo "—")"
+
+            if [ -z "${pr}" ]; then
+              printf '| %s | — | — | — | — | %s |\n' "${repo}" "${last}" >> "${out}"
+              continue
+            fi
+
+            num="$(printf '%s' "${pr}" | jq -r '.number')"
+            title="$(printf '%s' "${pr}" | jq -r '.title')"
+            created="$(printf '%s' "${pr}" | jq -r '.createdAt')"
+            age=$(( ( $(date -u +%s) - $(date -u -d "${created}" +%s) ) / 86400 ))
+            failed="$(printf '%s' "${pr}" \
+              | jq -r '[.statusCheckRollup[]? | select(.conclusion=="FAILURE") | .name // .context] | join(", ")')"
+
+            if [ -n "${failed}" ]; then
+              state="🔴 ${failed}"
+              red=$((red + 1))
+            else
+              state="🟢"
+            fi
+
+            printf '| %s | [#%s](https://github.com/rknightion/%s/pull/%s) | %s | %sd | %s | %s |\n' \
+              "${repo}" "${num}" "${repo}" "${num}" "${title#chore*release }" "${age}" "${state}" "${last}" >> "${out}"
+          done
+
+          echo "red=${red}" >> "$GITHUB_OUTPUT"
+          echo "path=${out}" >> "$GITHUB_OUTPUT"
+          cat "${out}"
+
+      - name: Publish the status issue
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          RED: ${{ steps.report.outputs.red }}
+          REPORT: ${{ steps.report.outputs.path }}
+        run: |
+          set -euo pipefail
+          body="${RUNNER_TEMP}/body.md"
+          {
+            # shellcheck disable=SC2016 # backticks here are literal markdown, not command substitution
+            printf '_Updated %s by `fleet-release-sweep`._\n\n' "$(date -u '+%Y-%m-%d %H:%M UTC')"
+            if [ "${RED}" -gt 0 ]; then
+              printf '> [!WARNING]\n> **%s release train(s) are red.**\n\n' "${RED}"
+            fi
+            cat "${REPORT}"
+          } > "${body}"
+
+          existing="$(gh issue list --repo "${REPO}" --state open \
+            --search 'Release train status in:title' --json number --jq '.[0].number // empty')"
+          if [ -n "${existing}" ]; then
+            gh issue edit "${existing}" --repo "${REPO}" --body-file "${body}"
+          else
+            gh issue create --repo "${REPO}" --title "Release train status" --body-file "${body}"
+          fi

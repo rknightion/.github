@@ -1,0 +1,69 @@
+# Shared reusable: arm GitHub auto-merge on a release-please PR.
+#
+# Applying the `release: ready` label says "release this when it is green".
+# GitHub then merges the PR itself the moment the required checks pass -- which
+# closes the loop where a release PR went red, nobody noticed, and the release
+# train sat broken for days.
+#
+# Stable releases still require an explicit human action (applying the label).
+# Nothing here auto-merges anything unattended.
+#
+# Uses `pull_request`, NOT `pull_request_target`: release-please branches are in
+# the base repo, so the token is already write-capable, and this avoids the
+# pull_request_target injection surface entirely. PR code is never checked out.
+name: arm-automerge (reusable)
+
+on:
+  workflow_call:
+    inputs:
+      label:
+        description: "Label that arms auto-merge."
+        required: false
+        type: string
+        default: "release: ready"
+      release-pr-branch-prefix:
+        description: "Only PRs from a branch with this prefix may be armed."
+        required: false
+        type: string
+        default: "release-please--"
+      merge-method:
+        description: "squash | merge | rebase"
+        required: false
+        type: string
+        default: "squash"
+
+permissions:
+  contents: read
+
+jobs:
+  arm:
+    name: arm auto-merge
+    # Belt and braces: the caller filters on the label, and so do we. The branch
+    # prefix guard means a stray label on an ordinary PR cannot arm anything.
+    if: >-
+      github.event.label.name == inputs.label &&
+      startsWith(github.event.pull_request.head.ref, inputs.release-pr-branch-prefix) &&
+      github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    permissions:
+      contents: write      # enabling auto-merge is a write on the merge ref
+      pull-requests: write # gh pr merge --auto operates on the PR resource
+    steps:
+      - name: Enable auto-merge
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          PR: ${{ github.event.pull_request.number }}
+          METHOD: ${{ inputs.merge-method }}
+        run: |
+          set -euo pipefail
+          # METHOD is interpolated into a CLI flag, so constrain it to the three
+          # merge methods rather than letting a caller pass e.g. --admin.
+          case "${METHOD}" in
+            squash|merge|rebase) ;;
+            *) echo "invalid merge-method: ${METHOD}" >&2; exit 1 ;;
+          esac
+          echo "Arming auto-merge (${METHOD}) on #${PR}"
+          gh pr merge "${PR}" --repo "${REPO}" --auto "--${METHOD}"
+          echo "Auto-merge armed. #${PR} will merge once required checks pass."
