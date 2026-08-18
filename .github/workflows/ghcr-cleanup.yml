@@ -33,6 +33,17 @@ on:
         required: false
         type: string
         default: "7 days"
+      protected-tags:
+        description: >-
+          Regex of tags that must NEVER be pruned, whatever other rule matches.
+          A GHCR "version" is a DIGEST, and every tag on that digest belongs to
+          the one version -- so the release build and the edge build of the same
+          commit share a version carrying BOTH `main-<sha>` AND `2.0.0`/`latest`.
+          Deleting it by the edge rule would delete the release. Verified on
+          graph2otel: version 1116391216 carried main-0d14f3f,2,2.0,2.0.0,latest.
+        required: false
+        type: string
+        default: '^(latest|main|v?[0-9]+(\.[0-9]+)*)$'
 
 permissions:
   contents: read
@@ -63,7 +74,9 @@ jobs:
         with:
           token: ${{ github.token }}
           packages: ${{ inputs.packages }}
-          delete-tags: "buildcache-*"
+          use-regex: true
+          delete-tags: '^buildcache-.*$'
+          exclude-tags: ${{ inputs.protected-tags }}
           older-than: 7 days
           delete-orphaned-images: true
           validate: true
@@ -76,8 +89,9 @@ jobs:
         with:
           token: ${{ github.token }}
           packages: ${{ inputs.packages }}
-          delete-tags: "main-*"
-          exclude-tags: "main"
+          use-regex: true
+          delete-tags: '^main-[0-9a-f]+$'
+          exclude-tags: ${{ inputs.protected-tags }}
           older-than: ${{ inputs.edge-older-than }}
           delete-orphaned-images: true
           validate: true
@@ -90,7 +104,9 @@ jobs:
         with:
           token: ${{ github.token }}
           packages: ${{ inputs.packages }}
-          delete-tags: "*-rc.*"
+          use-regex: true
+          delete-tags: '^.*-rc\.[0-9]+$'
+          exclude-tags: ${{ inputs.protected-tags }}
           keep-n-tagged: ${{ inputs.keep-n-rc }}
           delete-orphaned-images: true
           validate: true
@@ -104,6 +120,8 @@ jobs:
         with:
           token: ${{ github.token }}
           packages: ${{ inputs.packages }}
+          use-regex: true
+          exclude-tags: ${{ inputs.protected-tags }}
           delete-orphaned-images: true
           keep-n-untagged: 0
           validate: true
