@@ -217,8 +217,18 @@ jobs:
                 echo "superseded by a newer push — no RC for this commit"
                 exit 0
               fi
-              echo "${CHECK} did not succeed — refusing to cut an RC"
-              exit 1
+              # A red CI run is ALREADY a red run in the Actions tab. Failing here
+              # too just doubles the notification for one problem, and on a repo
+              # whose CI has been broken for weeks it never stops. Warn loudly and
+              # exit clean instead -- the annotation is visible on the run, and the
+              # fleet release sweep is what reports a stalled train.
+              #
+              # This covers only "CI rendered a verdict of failure". A genuine
+              # fault in this workflow -- a tag push that fails, a release that
+              # cannot be created -- still fails the run.
+              echo "::warning::${CHECK} concluded ${conclusion} on ${SHA} — no release candidate cut"
+              echo "proceed=false" >> "$GITHUB_OUTPUT"
+              exit 0
             fi
             echo "${CHECK} not yet completed (status=${status:-not started}); sleeping 30s (${i}/${ATTEMPTS})"
             sleep 30
