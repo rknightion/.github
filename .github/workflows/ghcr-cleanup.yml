@@ -56,7 +56,12 @@ jobs:
   prune:
     name: prune ${{ inputs.packages }}
     runs-on: ubuntu-24.04
-    timeout-minutes: 30
+    # 30 minutes is not enough for a FIRST prune. The action deletes one version
+    # per API call, and an un-pruned repo accumulates ~6 versions per push to
+    # main: graph2otel had 3,659 versions and its first real run was killed by a
+    # 30-minute timeout less than halfway through. Steady-state weekly runs take
+    # a couple of minutes; the ceiling exists for the initial backlog.
+    timeout-minutes: 300
     # Two concurrent prunes on one package race each other's version listings and
     # one deletes a digest the other has already resolved. Serialize, never cancel.
     concurrency:
