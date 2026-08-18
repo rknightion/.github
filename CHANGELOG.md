@@ -1,5 +1,30 @@
 # Changelog
 
+## [1.8.0](https://github.com/rknightion/.github/compare/v1.7.0...v1.8.0) (2026-08-18)
+
+
+### Features
+
+* **arm-automerge:** add require-label so a repo can release fully automatically ([d79a0c5](https://github.com/rknightion/.github/commit/d79a0c5cef46dfddc24d8d698d4fc4076d9f600c))
+
+
+### Bug Fixes
+
+* **auto-rc:** warn instead of failing when CI is red ([e32ee05](https://github.com/rknightion/.github/commit/e32ee05fba532ff43a6e99f17b3da1b516305c8b))
+* **ghcr-cleanup:** raise the job timeout for a first-time prune ([3795c83](https://github.com/rknightion/.github/commit/3795c834a504255b1788477755fb56b1479717b7))
+* **sweep:** report the last STABLE release, not the newest prerelease ([1f56d2e](https://github.com/rknightion/.github/commit/1f56d2ec709b71dd33799130e4f8807579170b38))
+
+
+### Build & CI
+
+* use our own arm-automerge reusable on this repo's release PRs ([117b069](https://github.com/rknightion/.github/commit/117b069953f8441569a558430fb6311b0962bd44))
+
+
+### Miscellaneous
+
+* **tracker:** add GHC-0002 for the release automation work ([35e7db7](https://github.com/rknightion/.github/commit/35e7db7ab55e014fe9c72747391b2d5bfe0d0414))
+* **tracker:** record the rollout inventory and the defects it surfaced ([89acacb](https://github.com/rknightion/.github/commit/89acacbc1a7c902d84cb3a81b71ed78c7beefb4c))
+
 ## [1.7.0](https://github.com/rknightion/.github/compare/v1.6.1...v1.7.0) (2026-08-18)
 
 
