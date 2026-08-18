@@ -1,0 +1,301 @@
+# Shared reusable: cut an automatic release CANDIDATE off main.
+#
+# On every push to main whose CI check goes green, this tags vX.Y.Z-rc.N and
+# creates a GitHub PRERELEASE for it. X.Y.Z is the PENDING stable version that
+# release-please has already computed and written into its open release PR's
+# manifest -- so release-please stays the single owner of versioning and the
+# changelog, and this path never opens a PR, never writes a changelog, and never
+# touches the release PR.
+#
+# The caller publishes artifacts by feeding the `tag` output into its own
+# publish.yml (image + chart) and the shared binaries.yml (goreleaser).
+#
+# TOKEN: GITHUB_TOKEN, not the OpenBao broker. Tagging and releasing are
+# same-repo operations, so this deliberately keeps the RC channel working when
+# the broker host is unreachable. A GITHUB_TOKEN-created tag does NOT trigger
+# other workflows -- which is why the caller invokes publish.yml directly rather
+# than relying on a `push: tags:` trigger.
+name: auto-rc (reusable)
+
+on:
+  workflow_call:
+    inputs:
+      release-pr-branch-prefix:
+        description: >-
+          Prefix of the release-please PR branch. Matched as a PREFIX, never
+          exactly: every repo in this fleet uses the component-scoped branch
+          name (release-please--branches--main--components--<component>), and
+          the component is not always the repo name.
+        required: false
+        type: string
+        default: "release-please--branches--main"
+      ci-check-name:
+        description: "Name of the aggregate check that must be green before an RC is cut."
+        required: false
+        type: string
+        default: "ci-success"
+      poll-attempts:
+        description: >-
+          How many 30s polls to wait for the CI check. Keep attempts x 30s below
+          the wait-for-ci job's 60-minute timeout; the default 90 is 45 minutes.
+        required: false
+        type: number
+        default: 90
+      image-ref:
+        description: >-
+          Container image the RC publishes, without a tag, e.g.
+          ghcr.io/rknightion/graph2otel. Empty (the default) omits the docker
+          pull hint from the release notes -- correct for repos that ship no image.
+        required: false
+        type: string
+        default: ""
+    outputs:
+      tag:
+        description: "The RC tag created, or empty when no RC was cut."
+        value: ${{ jobs.tag.outputs.tag }}
+
+permissions:
+  contents: read
+
+# Two concurrent runs both compute the SAME next RC number from the same tag
+# list, and one then fails to push a tag that already exists. Serialize, never
+# cancel a half-published RC.
+#
+# The group name deliberately does NOT derive from github.workflow: that would
+# resolve to the CALLER's workflow name, collide with the caller's own group,
+# and deadlock the caller behind the reusable it is waiting on.
+concurrency:
+  group: auto-rc-reusable-${{ github.repository }}
+  cancel-in-progress: false
+
+jobs:
+  # Decide whether this commit deserves an RC, and what it would be called.
+  guard:
+    name: guard
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      contents: read       # read the release PR branch manifest and the tag list
+      pull-requests: read  # find the open release-please PR
+    outputs:
+      should_release: ${{ steps.decide.outputs.should_release }}
+      tag: ${{ steps.rc.outputs.tag }}
+      version: ${{ steps.decide.outputs.version }}
+      previous_tag: ${{ steps.decide.outputs.previous_tag }}
+      release_pr: ${{ steps.decide.outputs.release_pr }}
+    steps:
+      - name: Harden the runner (audit egress)
+        uses: step-security/harden-runner@05e31511f85b41b11d1cf0ef85d0992719546e2c # v2.21.0
+        with:
+          egress-policy: audit
+
+      - name: Checkout repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Decide whether to cut an RC
+        id: decide
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          PR_PREFIX: ${{ inputs.release-pr-branch-prefix }}
+        run: |
+          set -euo pipefail
+          skip() { echo "should_release=false" >> "$GITHUB_OUTPUT"; echo "SKIP: $1"; exit 0; }
+
+          # (1) HEAD already carries a stable release tag -- this is the commit
+          # release-please just merged and tagged. That release is its to own.
+          if git tag --points-at HEAD | grep -qE '^v[0-9]+\.[0-9]+\.[0-9]+$'; then
+            skip "HEAD is already a stable release tag"
+          fi
+
+          # (2) An RC already points at this exact commit: a re-run, or a push
+          # that changed nothing taggable. Never publish identical code under two
+          # RC numbers -- the GHCR digest it produced is immutable.
+          existing="$(git tag --points-at HEAD | grep -E -- '-rc\.[0-9]+$' || true)"
+          [ -z "${existing}" ] || skip "commit already tagged ${existing}"
+
+          # (3) No open release PR means nothing releasable has landed since the
+          # last stable tag (only chore/test/style commits). Nothing to candidate.
+          prs="$(gh pr list --repo "${REPO}" --state open --limit 100 \
+            --json number,headRefName,author \
+            --jq "[.[] | select(.headRefName | startswith(\"${PR_PREFIX}\"))]")"
+          count="$(printf '%s' "${prs}" | jq -r 'length')"
+          [ "${count}" != "0" ] || skip "no open release-please PR"
+          # More than one match means this repo runs multiple release-please
+          # components. Picking .[0] would silently candidate an arbitrary one,
+          # so refuse instead of guessing.
+          if [ "${count}" != "1" ]; then
+            echo "::error::${count} open PRs match ${PR_PREFIX}; auto-rc supports a single release train"
+            exit 1
+          fi
+          pr="$(printf '%s' "${prs}" | jq -r '.[0].number')"
+          branch="$(printf '%s' "${prs}" | jq -r '.[0].headRefName')"
+
+          # (4) The pending version lives in the release PR branch's manifest.
+          # Read it over the API rather than fetching the branch: no extra fetch,
+          # and no reliance on the checkout's remote still being usable after
+          # persist-credentials: false.
+          version="$(gh api "repos/${REPO}/contents/.release-please-manifest.json?ref=${branch}" \
+            --jq '.content' | base64 -d | jq -r '.["."] // empty')"
+          [ -n "${version}" ] || skip "no root package version in the release PR manifest"
+
+          prev="$(git tag -l 'v[0-9]*' | grep -Ev -- '-' | sort -V | tail -1 || true)"
+
+          {
+            echo "should_release=true"
+            echo "version=${version}"
+            echo "previous_tag=${prev}"
+            echo "release_pr=${pr}"
+          } >> "$GITHUB_OUTPUT"
+          {
+            echo "tags<<__EOF__"
+            git tag -l
+            echo "__EOF__"
+          } >> "$GITHUB_OUTPUT"
+          echo "Pending stable ${version}, release PR #${pr} on ${branch}"
+
+      - name: Compute the next release-candidate tag
+        id: rc
+        if: steps.decide.outputs.should_release == 'true'
+        uses: rknightion/.github/.github/actions/next-rc-tag@f7accf32f4a97ef424230d3e32ad626077bc4af8 # main
+        with:
+          version: ${{ steps.decide.outputs.version }}
+          tags: ${{ steps.decide.outputs.tags }}
+
+  # Only candidate code that actually passed CI. Polls the aggregate check for
+  # THIS commit -- github.sha is guaranteed to be the pushed commit, unlike
+  # workflow_run.head_sha which races ahead on rapid pushes.
+  wait-for-ci:
+    name: wait-for-ci
+    needs: guard
+    if: needs.guard.outputs.should_release == 'true'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    permissions:
+      contents: read  # required for the implicit token to read this repo
+      checks: read    # poll the aggregate CI check for this commit
+    steps:
+      - name: Poll the CI check for this commit
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          SHA: ${{ github.sha }}
+          CHECK: ${{ inputs.ci-check-name }}
+          ATTEMPTS: ${{ inputs.poll-attempts }}
+        run: |
+          set -euo pipefail
+          echo "Waiting for the ${CHECK} check on ${SHA}..."
+          for i in $(seq 1 "${ATTEMPTS}"); do
+            # --paginate with --jq runs the filter once PER PAGE, so `last`
+            # would emit one object per page and the downstream jq would then
+            # see a stream, not a document. --slurp collects the pages first.
+            run="$(gh api "repos/${REPO}/commits/${SHA}/check-runs" --paginate --slurp \
+              --jq "[.[].check_runs[] | select(.name==\"${CHECK}\")] | last")"
+            status="$(printf '%s' "${run}" | jq -r '.status // empty')"
+            conclusion="$(printf '%s' "${run}" | jq -r '.conclusion // empty')"
+            if [ "${status}" = "completed" ]; then
+              echo "${CHECK} conclusion: ${conclusion}"
+              [ "${conclusion}" = "success" ] && exit 0
+              echo "${CHECK} did not succeed — refusing to cut an RC"
+              exit 1
+            fi
+            echo "${CHECK} not yet completed (status=${status:-not started}); sleeping 30s (${i}/${ATTEMPTS})"
+            sleep 30
+          done
+          echo "Timed out waiting for ${CHECK}"
+          exit 1
+
+  tag:
+    name: tag + prerelease
+    needs: [guard, wait-for-ci]
+    if: needs.guard.outputs.should_release == 'true'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      contents: write # create the tag and the GitHub prerelease
+    outputs:
+      tag: ${{ steps.create.outputs.tag }}
+    steps:
+      - name: Harden the runner (audit egress)
+        uses: step-security/harden-runner@05e31511f85b41b11d1cf0ef85d0992719546e2c # v2.21.0
+        with:
+          egress-policy: audit
+
+      # persist-credentials stays false even though this job pushes: the tag push
+      # below authenticates with an explicit token URL instead, so no credential
+      # is left in .git/config for a later step to pick up.
+      - name: Checkout repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Create the tag and the GitHub prerelease
+        id: create
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ needs.guard.outputs.tag }}
+          VERSION: ${{ needs.guard.outputs.version }}
+          PREV: ${{ needs.guard.outputs.previous_tag }}
+          PR: ${{ needs.guard.outputs.release_pr }}
+          SHA: ${{ github.sha }}
+          REPO: ${{ github.repository }}
+          IMAGE_REF: ${{ inputs.image-ref }}
+        run: |
+          set -euo pipefail
+
+          # wait-for-ci can hold for up to 45 minutes. In that window the release
+          # PR may have merged (making this a stable release commit) or another
+          # run may have claimed this RC number. Re-check both before writing
+          # anything, and leave `tag` empty so the caller publishes nothing.
+          git fetch --tags --force origin
+          if git tag --points-at HEAD | grep -qE '^v[0-9]+\.[0-9]+\.[0-9]+$'; then
+            echo "HEAD became a stable release tag while waiting for CI — nothing to do"
+            exit 0
+          fi
+
+          if git ls-remote --exit-code --tags origin "refs/tags/${TAG}" >/dev/null 2>&1; then
+            target="$(git ls-remote origin "refs/tags/${TAG}^{}" | awk '{print $1}')"
+            [ -n "${target}" ] || target="$(git ls-remote origin "refs/tags/${TAG}" | awk '{print $1}')"
+            if [ "${target}" != "${SHA}" ]; then
+              echo "::error::${TAG} already points at ${target}, not ${SHA} — another run claimed it"
+              exit 1
+            fi
+            echo "${TAG} already points at ${SHA} (retry); reusing it"
+          else
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git tag -a "${TAG}" "${SHA}" -m "Release candidate ${TAG}"
+            git push "https://x-access-token:${GH_TOKEN}@github.com/${REPO}.git" "refs/tags/${TAG}"
+          fi
+
+          notes="${RUNNER_TEMP}/rc-notes.md"
+          {
+            echo "> [!NOTE]"
+            echo "> Automated release candidate for the pending **${VERSION}** release, built from"
+            echo "> \`${SHA}\` after CI passed. Not a stable release — behaviour may still change"
+            echo "> before ${VERSION} ships. Stable release PR: #${PR}."
+            if [ -n "${IMAGE_REF}" ]; then
+              echo
+              echo '```bash'
+              echo "docker pull ${IMAGE_REF}:${TAG#v}"
+              echo '```'
+            fi
+          } > "${notes}"
+
+          # Idempotent: a retried run that already pushed the tag but failed
+          # partway through must not abort on an existing release.
+          if gh release view "${TAG}" --repo "${REPO}" >/dev/null 2>&1; then
+            gh release edit "${TAG}" --repo "${REPO}" --notes-file "${notes}" --prerelease
+          elif [ -n "${PREV}" ]; then
+            gh release create "${TAG}" --repo "${REPO}" --target "${SHA}" --title "${TAG}" \
+              --notes-file "${notes}" --generate-notes --notes-start-tag "${PREV}" --prerelease
+          else
+            gh release create "${TAG}" --repo "${REPO}" --target "${SHA}" --title "${TAG}" \
+              --notes-file "${notes}" --generate-notes --prerelease
+          fi
+
+          echo "tag=${TAG}" >> "$GITHUB_OUTPUT"
