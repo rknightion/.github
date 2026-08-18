@@ -60,8 +60,13 @@ jobs:
             pr="$(gh pr list --repo "rknightion/${repo}" --state open --limit 100 \
                    --json number,title,createdAt,headRefName,statusCheckRollup \
                    --jq '[.[] | select(.headRefName | startswith("release-please--branches--main"))] | .[0] // empty')"
-            last="$(gh release list --repo "rknightion/${repo}" --limit 1 \
-                     --json tagName,publishedAt --jq '.[0].tagName // "—"' 2>/dev/null || echo "—")"
+            # Last STABLE release. Without the isPrerelease filter every repo on
+            # the RC channel reports its newest -rc.N here, hiding how far behind
+            # the actual shipped version is -- which is the whole point of the column.
+            last="$(gh release list --repo "rknightion/${repo}" --limit 30 \
+                     --json tagName,isPrerelease,isDraft \
+                     --jq '[.[] | select(.isPrerelease == false and .isDraft == false)][0].tagName // "—"' \
+                     2>/dev/null || echo "—")"
 
             if [ -z "${pr}" ]; then
               printf '| %s | — | — | — | — | %s |\n' "${repo}" "${last}" >> "${out}"
