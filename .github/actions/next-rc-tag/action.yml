@@ -1,0 +1,37 @@
+name: next-rc-tag
+description: >-
+  Compute the next release-candidate tag (vX.Y.Z-rc.N) for a pending
+  release-please version. Wraps next-rc-tag.sh, which is unit-tested by
+  next-rc-tag_test.sh in this directory.
+
+# Lives as a composite action rather than a script the caller checks out,
+# because a reusable workflow cannot reference its OWN repo's files: the
+# workspace holds the CONSUMER's checkout. Referencing this action by SHA is
+# the same pattern broker-token uses, and Renovate keeps the pin current.
+
+inputs:
+  version:
+    description: "Pending stable version from the release PR manifest, e.g. 2.1.0."
+    required: true
+  tags:
+    description: "Newline-separated list of existing git tags."
+    required: true
+
+outputs:
+  tag:
+    description: "The next release-candidate tag, e.g. v2.1.0-rc.3."
+    value: ${{ steps.compute.outputs.tag }}
+
+runs:
+  using: composite
+  steps:
+    - id: compute
+      shell: bash
+      env:
+        VERSION: ${{ inputs.version }}
+        TAGS: ${{ inputs.tags }}
+      run: |
+        set -euo pipefail
+        tag="$(printf '%s' "${TAGS}" | "${GITHUB_ACTION_PATH}/next-rc-tag.sh" "${VERSION}")"
+        echo "tag=${tag}" >> "$GITHUB_OUTPUT"
+        echo "next release candidate: ${tag}"
