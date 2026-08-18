@@ -177,8 +177,11 @@ jobs:
     permissions:
       contents: read  # required for the implicit token to read this repo
       checks: read    # poll the aggregate CI check for this commit
+    outputs:
+      proceed: ${{ steps.poll.outputs.proceed }}
     steps:
       - name: Poll the CI check for this commit
+        id: poll
         env:
           GH_TOKEN: ${{ github.token }}
           REPO: ${{ github.repository }}
@@ -200,7 +203,20 @@ jobs:
             conclusion="$(printf '%s' "${run}" | jq -r '.conclusion // empty')"
             if [ "${status}" = "completed" ]; then
               echo "${CHECK} conclusion: ${conclusion}"
-              [ "${conclusion}" = "success" ] && exit 0
+              if [ "${conclusion}" = "success" ]; then
+                echo "proceed=true" >> "$GITHUB_OUTPUT"
+                exit 0
+              fi
+              # A cancelled or skipped run means a newer push superseded this
+              # commit -- CI never rendered a verdict on it. That is not a
+              # failure to report; the newer commit's own auto-rc run will cut
+              # the candidate. Exit clean so rapid pushes do not litter the
+              # Actions tab with red runs.
+              if [ "${conclusion}" = "cancelled" ] || [ "${conclusion}" = "skipped" ]; then
+                echo "proceed=false" >> "$GITHUB_OUTPUT"
+                echo "superseded by a newer push — no RC for this commit"
+                exit 0
+              fi
               echo "${CHECK} did not succeed — refusing to cut an RC"
               exit 1
             fi
@@ -213,7 +229,7 @@ jobs:
   tag:
     name: tag + prerelease
     needs: [guard, wait-for-ci]
-    if: needs.guard.outputs.should_release == 'true'
+    if: needs.guard.outputs.should_release == 'true' && needs.wait-for-ci.outputs.proceed == 'true'
     runs-on: ubuntu-24.04
     timeout-minutes: 10
     permissions:
