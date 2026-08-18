@@ -189,11 +189,13 @@ jobs:
           set -euo pipefail
           echo "Waiting for the ${CHECK} check on ${SHA}..."
           for i in $(seq 1 "${ATTEMPTS}"); do
-            # --paginate with --jq runs the filter once PER PAGE, so `last`
-            # would emit one object per page and the downstream jq would then
-            # see a stream, not a document. --slurp collects the pages first.
+            # --paginate with --jq runs the filter once PER PAGE, so `last` would
+            # emit one object per page and the downstream jq would see a stream,
+            # not a document. --slurp collects the pages into one array first --
+            # and gh rejects --slurp together with --jq, so the filter has to run
+            # as a separate jq process.
             run="$(gh api "repos/${REPO}/commits/${SHA}/check-runs" --paginate --slurp \
-              --jq "[.[].check_runs[] | select(.name==\"${CHECK}\")] | last")"
+              | jq -c "[.[].check_runs[] | select(.name==\"${CHECK}\")] | last")"
             status="$(printf '%s' "${run}" | jq -r '.status // empty')"
             conclusion="$(printf '%s' "${run}" | jq -r '.conclusion // empty')"
             if [ "${status}" = "completed" ]; then
