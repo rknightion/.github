@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.9.0](https://github.com/rknightion/.github/compare/v1.8.0...v1.9.0) (2026-08-18)
+
+
+### Features
+
+* **arm-automerge:** make the runner configurable ([27fba8b](https://github.com/rknightion/.github/commit/27fba8b9f16ea23466fcfea158640f28812ce9b3))
+
 ## [1.8.0](https://github.com/rknightion/.github/compare/v1.7.0...v1.8.0) (2026-08-18)
 
 
