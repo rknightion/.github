@@ -31,6 +31,15 @@ on:
         required: false
         type: string
         default: "squash"
+      runner:
+        description: >-
+          Runner label. Defaults to a GitHub-hosted runner. The m7kni org cannot
+          use hosted runners -- its jobs fail before starting with a billing
+          error -- so callers there must pass a self-hosted label such as
+          runners-vm.
+        required: false
+        type: string
+        default: "ubuntu-24.04"
       require-label:
         description: >-
           When true (the default) a release PR is only armed once someone applies
@@ -56,7 +65,7 @@ jobs:
       startsWith(github.event.pull_request.head.ref, inputs.release-pr-branch-prefix) &&
       github.event.pull_request.head.repo.full_name == github.repository &&
       (!inputs.require-label || github.event.label.name == inputs.label)
-    runs-on: ubuntu-24.04
+    runs-on: ${{ inputs.runner }}
     timeout-minutes: 5
     permissions:
       contents: write      # enabling auto-merge is a write on the merge ref
