@@ -1,5 +1,44 @@
 # Changelog
 
+## [1.7.0](https://github.com/rknightion/.github/compare/v1.6.1...v1.7.0) (2026-08-18)
+
+
+### Features
+
+* **workflows:** add auto-rc reusable for automatic release candidates ([0043ba4](https://github.com/rknightion/.github/commit/0043ba42217751d3e403485d438bf90320dead1e))
+* **workflows:** add auto-RC support workflows and fleet release sweep ([b340c7f](https://github.com/rknightion/.github/commit/b340c7f496648601087e8b56268c172f558b7054))
+
+
+### Bug Fixes
+
+* **auto-rc:** gh api rejects --slurp together with --jq ([abfb917](https://github.com/rknightion/.github/commit/abfb917ddc93841112e3b4cc3c90da0be0dd148f))
+* **auto-rc:** treat a cancelled CI run as superseded, not failed ([3c70eb5](https://github.com/rknightion/.github/commit/3c70eb5f85aa5c288c23967533aeb23b32ab9607))
+* **ghcr-cleanup:** flatten the protected-tags regex ([a363b59](https://github.com/rknightion/.github/commit/a363b594a7adc19292361081969f2d7af12026f7))
+* **ghcr-cleanup:** stop the edge rule deleting stable releases ([2fa138d](https://github.com/rknightion/.github/commit/2fa138dfc8fa582001eaccb2b4f708ae463d9d0b))
+
+
+### Refactor
+
+* **actions:** make next-rc-tag a composite action ([f7accf3](https://github.com/rknightion/.github/commit/f7accf32f4a97ef424230d3e32ad626077bc4af8))
+
+
+### Build & CI
+
+* **deps:** update github/codeql-action action to v4.37.7 ([#48](https://github.com/rknightion/.github/issues/48)) ([f75c257](https://github.com/rknightion/.github/commit/f75c257695aee3e83ecc9bbf94bcdf2117cf307b))
+* **deps:** update step-security/harden-runner action to v2.21.0 ([#50](https://github.com/rknightion/.github/issues/50)) ([1d56dc9](https://github.com/rknightion/.github/commit/1d56dc9ac43a302da02cbfeb714631b99f0f77e7))
+
+
+### Documentation
+
+* document the four new release-automation workflows ([5095ea2](https://github.com/rknightion/.github/commit/5095ea299501253ccbd528ff4f1967d0e8136fac))
+* re-import fan-out protocol (context-cost rules) ([b7deade](https://github.com/rknightion/.github/commit/b7deadeda2bf1b33a6c2ecc63964d2ff8b70a4e9))
+* **tracker:** align canonical fan-out protocol ([fda5f3b](https://github.com/rknightion/.github/commit/fda5f3b9a3f88f187a827e85b33181ea5668478e))
+
+
+### Miscellaneous
+
+* migrate issue tracking to Backlog.md, archive closed issues ([d207874](https://github.com/rknightion/.github/commit/d207874ba8d15fed9d9ec3c11b7957139e1a293d))
+
 ## [1.6.1](https://github.com/rknightion/.github/compare/v1.6.0...v1.6.1) (2026-08-12)
 
 
