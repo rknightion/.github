@@ -31,6 +31,18 @@ on:
         required: false
         type: string
         default: "squash"
+      require-label:
+        description: >-
+          When true (the default) a release PR is only armed once someone applies
+          the label -- the human decision to release. Set false for a repo whose
+          releases should be fully automatic, and have the caller trigger on
+          pull_request opened/synchronize/reopened as well as labeled. Only do
+          that where a release carries no user-facing risk: the hub repos publish
+          reusable workflows that consumers pick up through a Renovate pin bump,
+          so a release there is a version number, not a rollout.
+        required: false
+        type: boolean
+        default: true
 
 permissions:
   contents: read
@@ -41,9 +53,9 @@ jobs:
     # Belt and braces: the caller filters on the label, and so do we. The branch
     # prefix guard means a stray label on an ordinary PR cannot arm anything.
     if: >-
-      github.event.label.name == inputs.label &&
       startsWith(github.event.pull_request.head.ref, inputs.release-pr-branch-prefix) &&
-      github.event.pull_request.head.repo.full_name == github.repository
+      github.event.pull_request.head.repo.full_name == github.repository &&
+      (!inputs.require-label || github.event.label.name == inputs.label)
     runs-on: ubuntu-24.04
     timeout-minutes: 5
     permissions:

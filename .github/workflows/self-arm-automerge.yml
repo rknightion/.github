@@ -1,27 +1,30 @@
-# This hub's OWN caller for the arm-automerge reusable it publishes.
+# This hub releases itself. No label, no human step.
+#
+# A release here only moves a version number: consumers pin the reusables by SHA
+# and pick a new one up through a Renovate bump, which runs their own CI. So
+# there is nothing to approve -- gating it just left the release PR sitting.
 #
 # It cannot live at .github/workflows/arm-automerge.yml -- that path IS the
-# reusable. Hence the distinct filename.
+# reusable it calls. Hence the distinct filename.
 #
-# The hub publishes no artefacts of its own (consumers pin its reusables by SHA),
-# so it gets no auto-rc prerelease channel and no ghcr-cleanup.
+# The hub publishes no artefacts, so it gets no auto-rc channel and no ghcr-cleanup.
 name: self-arm-automerge
 
 on:
   pull_request:
-    types: [labeled]
+    types: [opened, synchronize, reopened, labeled]
 
 permissions:
   contents: read
 
 jobs:
   arm:
-    # Quoted: the label text contains ": ", which YAML would otherwise parse as
-    # a nested mapping rather than part of the expression.
-    if: "github.event.label.name == 'release: ready'"
     permissions:
       contents: write      # enabling auto-merge writes the merge ref
       pull-requests: write # gh pr merge --auto operates on the PR
     # `./` so it always tests the current ref, matching how ci.yml calls the
-    # other reusables here.
+    # other reusables here. The reusable's own guards (release branch prefix,
+    # same-repo head) are what keep this off ordinary PRs.
     uses: ./.github/workflows/arm-automerge.yml
+    with:
+      require-label: false
