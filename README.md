@@ -45,6 +45,10 @@ SHA-pinned and kept current by Renovate (`helpers:pinGitHubActionDigests`).
 | `dependency-review.yml` | PR dependency review; fails on newly introduced high-severity vulns. |
 | `docker-security.yml` | hadolint (Dockerfile lint) + Trivy fs scan (vuln/misconfig/secret), both SARIF, non-gating. |
 | `scorecard.yml` | OpenSSF Scorecard supply-chain analysis (SARIF → Security tab) + publishes to the OpenSSF API for the [scorecard.dev](https://scorecard.dev) badge. No PAT needed — the fleet uses Repository Rulesets, readable with the default token. |
+| `auto-rc.yml` | Cuts an automatic `vX.Y.Z-rc.N` prerelease off `main` once the aggregate CI check is green, versioned from the pending release-please version. Outputs `tag`; the caller feeds it into its own `publish.yml` and `binaries.yml`. |
+| `arm-automerge.yml` | Applying the `release: ready` label to a release PR arms GitHub auto-merge, so it merges itself when checks pass instead of sitting red unnoticed. |
+| `ghcr-cleanup.yml` | Multi-arch-safe GHCR retention: keeps every stable release, the newest 10 RCs, and 7 days of edge images. Dry-run by default. |
+| `fleet-release-sweep.yml` | Not reusable — runs here daily and reports every public repo's release PR state into the `Release train status` issue. |
 
 ### Example caller
 
