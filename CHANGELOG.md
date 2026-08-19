@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.9.1](https://github.com/rknightion/.github/compare/v1.9.0...v1.9.1) (2026-08-19)
+
+
+### Build & CI
+
+* **deps:** update docker/setup-buildx-action action to v4.3.0 ([#55](https://github.com/rknightion/.github/issues/55)) ([4077d2c](https://github.com/rknightion/.github/commit/4077d2c3972c68a482b5487834933a69b7cb24cc))
+
 ## [1.9.0](https://github.com/rknightion/.github/compare/v1.8.0...v1.9.0) (2026-08-18)
 
 
