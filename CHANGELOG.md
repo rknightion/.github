@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.9.2](https://github.com/rknightion/.github/compare/v1.9.1...v1.9.2) (2026-08-22)
+
+
+### Build & CI
+
+* **deps:** update github/codeql-action action to v4.37.8 ([#57](https://github.com/rknightion/.github/issues/57)) ([3807359](https://github.com/rknightion/.github/commit/3807359bfb67ad88b8b3853ce19a6d4562060a5d))
+
 ## [1.9.1](https://github.com/rknightion/.github/compare/v1.9.0...v1.9.1) (2026-08-19)
 
 
