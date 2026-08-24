@@ -109,7 +109,12 @@ runs:
           # name. tailscaled's peer list does not depend on DNS.
           ip=$(tailscale ip -4 openbao)
         elif [ -n "$RESOLVE_VIA" ]; then
-          ip=$(getent hosts "$RESOLVE_VIA" | head -1 | awk '{print $1}')
+          # getent exits 2 when the host is absent. Keep that failure from
+          # set -e so the guard below can name the unresolved host, while
+          # clearing any partial output keeps this path fail-closed.
+          if ! ip=$(getent hosts "$RESOLVE_VIA" | head -1 | awk '{print $1}'); then
+            ip=
+          fi
           [ -n "$ip" ] || { echo "::error::could not resolve ${RESOLVE_VIA}"; exit 1; }
         else
           echo "BAO_RESOLVE=" >> "$GITHUB_ENV"
