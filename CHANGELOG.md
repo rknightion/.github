@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.9.4](https://github.com/rknightion/.github/compare/v1.9.3...v1.9.4) (2026-08-24)
+
+
+### Build & CI
+
+* **deps:** update dependency goreleaser/goreleaser to v2.18.0 ([#60](https://github.com/rknightion/.github/issues/60)) ([d998d32](https://github.com/rknightion/.github/commit/d998d32c78aeb3e0ec0b434bec910b147136418d))
+
 ## [1.9.3](https://github.com/rknightion/.github/compare/v1.9.2...v1.9.3) (2026-08-24)
 
 
