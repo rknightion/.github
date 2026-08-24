@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.9.5](https://github.com/rknightion/.github/compare/v1.9.4...v1.9.5) (2026-08-24)
+
+
+### Build & CI
+
+* bump the broker-token action pin ([d97ef42](https://github.com/rknightion/.github/commit/d97ef42f9c9649a34137870d05fae8cb206d8fc0))
+
 ## [1.9.4](https://github.com/rknightion/.github/compare/v1.9.3...v1.9.4) (2026-08-24)
 
 
