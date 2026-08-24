@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.9.3](https://github.com/rknightion/.github/compare/v1.9.2...v1.9.3) (2026-08-24)
+
+
+### Bug Fixes
+
+* **actions:** fail clearly on unresolved Bao host ([f2c547a](https://github.com/rknightion/.github/commit/f2c547ab3f199be26bd439664edaa16cd72450d1))
+
 ## [1.9.2](https://github.com/rknightion/.github/compare/v1.9.1...v1.9.2) (2026-08-22)
 
 
