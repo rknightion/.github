@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.9.6](https://github.com/rknightion/.github/compare/v1.9.5...v1.9.6) (2026-08-25)
+
+
+### Build & CI
+
+* **deps:** update hadolint/hadolint-action action to v3.5.0 ([#63](https://github.com/rknightion/.github/issues/63)) ([b9f5d34](https://github.com/rknightion/.github/commit/b9f5d3461064bbdb12ea6e4cc9e7b51e9e868937))
+
 ## [1.9.5](https://github.com/rknightion/.github/compare/v1.9.4...v1.9.5) (2026-08-24)
 
 
