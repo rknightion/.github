@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.9.9](https://github.com/rknightion/.github/compare/v1.9.8...v1.9.9) (2026-08-28)
+
+
+### Miscellaneous
+
+* **backlog:** add GHC-0003 — migrate the repo task surface to just ([a38cc71](https://github.com/rknightion/.github/commit/a38cc71c2081a2893b0b95cf28666ad2a2c56e44))
+
 ## [1.9.8](https://github.com/rknightion/.github/compare/v1.9.7...v1.9.8) (2026-08-28)
 
 
