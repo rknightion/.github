@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.17.1](https://github.com/rknightion/.github/compare/v1.17.0...v1.17.1) (2026-08-29)
+
+
+### Documentation
+
+* **ci:** document just task surface ([84e2fbc](https://github.com/rknightion/.github/commit/84e2fbcd8a169602e994596f8f94c7f9d887207e))
+
 ## [1.17.0](https://github.com/rknightion/.github/compare/v1.16.0...v1.17.0) (2026-08-29)
 
 
