@@ -1,0 +1,250 @@
+# Shared reusable: lint a Helm chart, render it, and schema-validate the result
+# against the Kubernetes API.
+#
+# WHY THIS EXISTS: 10 repos in this fleet ship a Helm chart to GHCR and only 4
+# validated the rendered output. tailscale2otel, graph2otel, fleet-management-
+# operator, genai-otel-bridge, polylens2otel and rfc6035-2otel published charts
+# whose manifests had never been checked against the API schemas at all.
+#
+# It deliberately covers the COMMON CORE only. Charts with their own render
+# contracts (synthkit's fixture suite, sf2loki's single-instance guard,
+# graph2otel's Go contract test, tailscale2otel's configcheck) keep those as
+# their own steps; this workflow is not a place to encode one chart's semantics.
+name: helm-validate (reusable)
+
+on:
+  workflow_call:
+    inputs:
+      chart-path:
+        description: "Path to the chart directory, e.g. charts/foo or deploy/helm."
+        required: true
+        type: string
+      release-name:
+        description: "Release name passed to helm template/lint."
+        required: false
+        type: string
+        default: "test"
+      kubernetes-versions:
+        description: >-
+          Space-separated list of Kubernetes versions to validate against, e.g.
+          "1.29.0" or "1.32.0 1.35.0". Each is validated in turn.
+
+          Pin this to the FLOOR your Chart.yaml kubeVersion claims to support.
+          Validating only against the newest schemas passes manifests the oldest
+          supported cluster would reject.
+        required: false
+        type: string
+        default: "1.29.0"
+      permutations:
+        description: >-
+          One `helm template` argument set per line; each line is rendered and
+          validated separately. A BLANK line means the bare default render, so a
+          chart can validate the default alongside its variants. Example:
+
+            --set ha.enabled=true --set replicaCount=2
+            --set externalSecrets.enabled=true
+
+          The default renders the chart once with no extra arguments.
+        required: false
+        type: string
+        default: ""
+      values-glob:
+        description: >-
+          Optional glob of values files, each rendered and validated in addition
+          to `permutations` — for charts that keep an open-ended fixture
+          directory rather than a fixed list, e.g. "charts/foo/ci/*-values.yaml".
+        required: false
+        type: string
+        default: ""
+      lint-args:
+        description: >-
+          Extra arguments for `helm lint` only — typically the --set values a
+          chart needs to satisfy its own required-value guards.
+        required: false
+        type: string
+        default: ""
+      schema-locations:
+        description: >-
+          Space-separated -schema-location values. "default" is kubeconform's
+          built-in set. Add a CRD catalogue here when a chart renders CRDs, e.g.
+          'default https://raw.githubusercontent.com/datreeio/CRDs-catalog/main/{{.Group}}/{{.ResourceKind}}_{{.ResourceAPIVersion}}.json'
+        required: false
+        type: string
+        default: "default"
+      ignore-missing-schemas:
+        description: >-
+          Pass -ignore-missing-schemas. DEFAULT FALSE, deliberately.
+
+          The flag silently skips any kind kubeconform has no schema for, so a
+          run carrying it can pass while validating nothing — which is exactly
+          how a chart ends up "covered" by a check that never looked at it. If a
+          chart renders a CRD, add its schema to `schema-locations` instead of
+          turning this on and losing coverage of everything else.
+        required: false
+        type: boolean
+        default: false
+      helm-dependency-build:
+        description: "Run `helm dependency build` first. Needed only for charts with subcharts."
+        required: false
+        type: boolean
+        default: false
+      kubeconform-version:
+        description: "kubeconform release tag, without the leading v."
+        required: false
+        type: string
+        # renovate: datasource=github-releases depName=yannh/kubeconform
+        default: "0.8.0"
+      runs-on:
+        description: "Runner label. Self-hosted callers must also set harden to false."
+        required: false
+        type: string
+        default: "ubuntu-24.04"
+      harden:
+        description: >-
+          Run step-security/harden-runner. MUST be false on a self-hosted runner:
+          it is Enterprise-tier there and needs an agent on the runner host.
+        required: false
+        type: boolean
+        default: true
+
+permissions:
+  contents: read
+
+concurrency:
+  group: helm-validate-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  helm-validate:
+    name: helm lint · template · kubeconform
+    runs-on: ${{ inputs.runs-on }}
+    timeout-minutes: 15
+    permissions:
+      contents: read
+    steps:
+      - name: Harden the runner (audit egress)
+        if: ${{ inputs.harden }}
+        uses: step-security/harden-runner@05e31511f85b41b11d1cf0ef85d0992719546e2c # v2.21.0
+        with:
+          egress-policy: audit
+
+      - name: Checkout repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Set up Helm
+        uses: azure/setup-helm@9bc31f4ebc9c6b171d7bfbaa5d006ae7abdb4310 # v5.0.1
+
+      # Verified against the release's OWN published CHECKSUMS file, never a
+      # hash transcribed into this repo. sf2loki carried a hand-written pin whose
+      # first 42 hex characters matched the real digest and whose tail did not;
+      # two different files cannot collide on a 42-character prefix, so it was a
+      # mistranscription, and it failed every run for six days before anyone
+      # traced a red release train back to it. A hash a human never types cannot
+      # be mistyped.
+      - name: Install kubeconform
+        env:
+          KUBECONFORM_VERSION: ${{ inputs.kubeconform-version }}
+        run: |
+          set -euo pipefail
+          base="https://github.com/yannh/kubeconform/releases/download/v${KUBECONFORM_VERSION}"
+          # uname, not dpkg --print-architecture: dpkg exists only on Debian
+          # derivatives, and `runs-on` is a caller-supplied input.
+          case "$(uname -m)" in
+            x86_64)          arch=amd64 ;;
+            aarch64|arm64)   arch=arm64 ;;
+            *) echo "::error::unsupported architecture $(uname -m)"; exit 1 ;;
+          esac
+          asset="kubeconform-linux-${arch}.tar.gz"
+          curl -fsSL --retry 3 -o "${asset}" "${base}/${asset}"
+          curl -fsSL --retry 3 -o CHECKSUMS "${base}/CHECKSUMS"
+          grep "  ${asset}\$" CHECKSUMS | sha256sum -c -
+          tar -xzf "${asset}" kubeconform
+          sudo install -m 0755 kubeconform /usr/local/bin/kubeconform
+          kubeconform -v
+
+      - name: Helm dependency build
+        if: ${{ inputs.helm-dependency-build }}
+        env:
+          CHART: ${{ inputs.chart-path }}
+        run: helm dependency build "${CHART}"
+
+      - name: Helm lint
+        env:
+          CHART: ${{ inputs.chart-path }}
+          LINT_ARGS: ${{ inputs.lint-args }}
+        run: |
+          set -euo pipefail
+          # shellcheck disable=SC2086
+          helm lint "${CHART}" ${LINT_ARGS}
+
+      - name: Helm template + kubeconform validate
+        env:
+          CHART: ${{ inputs.chart-path }}
+          RELEASE: ${{ inputs.release-name }}
+          K8S_VERSIONS: ${{ inputs.kubernetes-versions }}
+          PERMUTATIONS: ${{ inputs.permutations }}
+          VALUES_GLOB: ${{ inputs.values-glob }}
+          SCHEMA_LOCATIONS: ${{ inputs.schema-locations }}
+          IGNORE_MISSING: ${{ inputs.ignore-missing-schemas }}
+        run: |
+          set -euo pipefail
+
+          kc_args=(-strict -summary)
+          [ "${IGNORE_MISSING}" = "true" ] && kc_args+=(-ignore-missing-schemas)
+          for loc in ${SCHEMA_LOCATIONS}; do kc_args+=(-schema-location "${loc}"); done
+
+          failed=0
+          validate() {
+            local label="$1"; shift
+            for v in ${K8S_VERSIONS}; do
+              echo "::group::${label} @ k8s ${v}"
+              if helm template "${RELEASE}" "${CHART}" "$@" \
+                   | kubeconform "${kc_args[@]}" -kubernetes-version "${v}" -; then
+                echo "ok"
+              else
+                echo "::error::${label} failed kubeconform against ${v}"
+                failed=1
+              fi
+              echo "::endgroup::"
+            done
+          }
+
+          # Fixed permutations: one `helm template` argument set per line.
+          # A blank PERMUTATIONS still renders the bare default once.
+          if [ -z "${PERMUTATIONS//[$'\n\r\t ']/}" ]; then
+            validate "default"
+          else
+            did_default=0
+            while IFS= read -r line; do
+              # A blank line means the bare default render, so a caller can ask for
+              # "the default AND these variants". Honoured once; later blanks are
+              # just formatting.
+              if [ -z "${line//[$'\r\t ']/}" ]; then
+                if [ "${did_default}" -eq 0 ]; then
+                  did_default=1
+                  validate "default"
+                fi
+                continue
+              fi
+              # shellcheck disable=SC2086
+              validate "${line}" ${line}
+            done <<< "${PERMUTATIONS}"
+          fi
+
+          # Open-ended fixture directory, for charts that keep one.
+          if [ -n "${VALUES_GLOB}" ]; then
+            shopt -s nullglob
+            found=0
+            for f in ${VALUES_GLOB}; do
+              found=1
+              validate "$(basename "${f}")" -f "${f}"
+            done
+            if [ "${found}" -eq 0 ]; then
+              echo "::error::values-glob '${VALUES_GLOB}' matched no files"
+              failed=1
+            fi
+          fi
+
+          exit "${failed}"
