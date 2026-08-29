@@ -36,33 +36,30 @@ Every line below is what most repos already do. Nothing here is invented.
 
 ## Divergence
 
-- **Branch ruleset on `main`** — 4 outlier(s): `codexlb2otel`, `grafana-cloud-vending-machine`, `polylens2otel`, `rfc6035-2otel`
-- **`delete_branch_on_merge`** — 4 outlier(s): `codexlb2otel`, `grafana-cloud-vending-machine`, `polylens2otel`, `rfc6035-2otel`
-- **`allow_auto_merge`** — 4 outlier(s): `codexlb2otel`, `grafana-cloud-vending-machine`, `polylens2otel`, `rfc6035-2otel`
-- **`allow_update_branch`** — 5 outlier(s): `bumblebee-intune`, `meraki-dashboard-ha`, `openbao-plugin-secrets-github`, `opnsense2otel`, `transceiver-exporter`
-- **`web_commit_signoff_required`** — 4 outlier(s): `bumblebee-intune`, `openbao-plugin-secrets-github`, `opnsense2otel`, `transceiver-exporter`
-- **`has_wiki`** — 10 outlier(s): `.github`, `autopi-ha`, `bumblebee-catalog`, `bumblebee-intune`, `meraki-dashboard-exporter`, `openbao-plugin-secrets-github`, `opnsense2otel`, `paperless-ngx-dedupe`, `rfc6035-2otel`, `transceiver-exporter`
-- **`has_projects`** — 2 outlier(s): `meraki-dashboard-ha`, `sagemcom-f3896-py`
-- **`has_discussions`** — 2 outlier(s): `opnsense2otel`, `paperless-ngx-dedupe`
-- **Secret scanning** — 3 outlier(s): `codexlb2otel`, `grafana-cloud-vending-machine`, `sf2loki`
-- **Secret scanning push protection** — 3 outlier(s): `codexlb2otel`, `grafana-cloud-vending-machine`, `sf2loki`
-- **Dependabot **security updates**** — 2 outlier(s): `grafana-cloud-org-insights`, `polylens2otel`
-- **Dependabot **alerts**** — 1 outlier(s): `codexlb2otel`
-- **Automated security fixes** — 2 outlier(s): `grafana-cloud-org-insights`, `polylens2otel`
-- **`renovate.json` present** — 1 outlier(s): `codexlb2otel`
+**None.** As of 2026-08-29 all 25 public repos match on every checked
+setting. `./fleet/collect-repo-settings.py --check` exits 0.
 
-## Worst offenders
+Three exceptions are recorded in the script's `ALLOWED` set rather than reported, because aligning
+them would **destroy content** — a consistency win is never worth that:
 
-- `codexlb2otel` — 7 settings off standard
-- `grafana-cloud-vending-machine` — 5 settings off standard
-- `polylens2otel` — 5 settings off standard
-- `rfc6035-2otel` — 4 settings off standard
-- `opnsense2otel` — 4 settings off standard
-- `bumblebee-intune` — 3 settings off standard
-- `openbao-plugin-secrets-github` — 3 settings off standard
-- `transceiver-exporter` — 3 settings off standard
+- `opnsense2otel` and `paperless-ngx-dedupe` each have a real discussion thread.
+- `meraki-dashboard-exporter` has an actual wiki (it returns HTTP 200; an empty wiki 302s to the repo).
 
-## Deliberate exceptions, not drift
+Two more are allowed on the ruleset check: `meraki-dashboard-ha` also gates `validate-success` and
+`tailscale2otel` also gates `helm-success`. Both have a genuine second workflow.
 
-- `meraki-dashboard-ha` also gates `validate-success`, and `tailscale2otel` also gates `helm-success`. Both have a genuine second workflow. Keep.
-- Licences vary by project and are not a fleet setting.
+## What the first run found, and what was done
+
+The audit was written on 2026-08-29 against 23 divergences. Fixed the same day:
+
+| Was | Now |
+|---|---|
+| 4 repos with **no branch ruleset at all** | all 25 gate `ci-success` |
+| 3 repos with secret scanning + push protection off | on |
+| `codexlb2otel` with no dependency-update mechanism of any kind | Dependabot alerts on, `renovate.json` added |
+| 2 repos running Dependabot security updates against the Renovate-only posture | off |
+| merge settings and empty wikis scattered | aligned |
+
+Two repos needed a `ci-success` aggregator built before a ruleset could be applied to them at all —
+gating a check that never reports would have blocked every merge permanently. That ordering is the
+one real trap in this work.

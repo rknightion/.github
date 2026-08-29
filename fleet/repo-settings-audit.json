@@ -108,7 +108,7 @@
       "has_discussions": false,
       "has_issues": true,
       "has_projects": true,
-      "has_wiki": true,
+      "has_wiki": false,
       "web_commit_signoff_required": false
     },
     "visibility": "public",
@@ -223,7 +223,7 @@
       "has_discussions": false,
       "has_issues": true,
       "has_projects": true,
-      "has_wiki": true,
+      "has_wiki": false,
       "web_commit_signoff_required": false
     },
     "visibility": "public",
@@ -338,7 +338,7 @@
       "has_discussions": false,
       "has_issues": true,
       "has_projects": true,
-      "has_wiki": true,
+      "has_wiki": false,
       "web_commit_signoff_required": false
     },
     "visibility": "public",
@@ -446,14 +446,14 @@
       "allow_merge_commit": true,
       "allow_rebase_merge": true,
       "allow_squash_merge": true,
-      "allow_update_branch": true,
+      "allow_update_branch": false,
       "archived": false,
       "delete_branch_on_merge": true,
       "has_discussions": false,
       "has_issues": true,
       "has_projects": true,
-      "has_wiki": true,
-      "web_commit_signoff_required": true
+      "has_wiki": false,
+      "web_commit_signoff_required": false
     },
     "visibility": "public",
     "vulnerability_alerts": true
@@ -471,25 +471,99 @@
     "automated_security_fixes": false,
     "default_branch": "main",
     "has_dependabot_yml": false,
-    "has_renovate_json": false,
+    "has_renovate_json": true,
     "license": null,
     "repo": "rknightion/codexlb2otel",
-    "rulesets": [],
+    "rulesets": [
+      {
+        "_links": {
+          "html": {
+            "href": "https://github.com/rknightion/codexlb2otel/rules/21798856"
+          },
+          "self": {
+            "href": "https://api.github.com/repos/rknightion/codexlb2otel/rulesets/21798856"
+          }
+        },
+        "bypass_actors": [
+          {
+            "actor_id": 5,
+            "actor_type": "RepositoryRole",
+            "bypass_mode": "always"
+          }
+        ],
+        "conditions": {
+          "ref_name": {
+            "exclude": [],
+            "include": [
+              "~DEFAULT_BRANCH"
+            ]
+          }
+        },
+        "created_at": "2026-08-29T12:32:04.838+01:00",
+        "current_user_can_bypass": "always",
+        "enforcement": "active",
+        "id": 21798856,
+        "name": "main",
+        "node_id": "RRS_lACqUmVwb3NpdG9yec5PB4UqzgFMn8g",
+        "rules": [
+          {
+            "type": "deletion"
+          },
+          {
+            "type": "non_fast_forward"
+          },
+          {
+            "parameters": {
+              "allowed_merge_methods": [
+                "merge",
+                "squash",
+                "rebase"
+              ],
+              "dismiss_stale_reviews_on_push": false,
+              "require_code_owner_review": false,
+              "require_extra_approval_for_unattributed_changes": true,
+              "require_last_push_approval": false,
+              "required_approving_review_count": 0,
+              "required_review_thread_resolution": false,
+              "required_reviewers": []
+            },
+            "type": "pull_request"
+          },
+          {
+            "parameters": {
+              "do_not_enforce_on_create": false,
+              "required_status_checks": [
+                {
+                  "context": "ci-success",
+                  "integration_id": 15368
+                }
+              ],
+              "strict_required_status_checks_policy": false
+            },
+            "type": "required_status_checks"
+          }
+        ],
+        "source": "rknightion/codexlb2otel",
+        "source_type": "Repository",
+        "target": "branch",
+        "updated_at": "2026-08-29T12:32:04.929+01:00"
+      }
+    ],
     "security_and_analysis": {
       "dependabot_security_updates": "disabled",
-      "secret_scanning": "disabled",
+      "secret_scanning": "enabled",
       "secret_scanning_non_provider_patterns": "disabled",
-      "secret_scanning_push_protection": "disabled",
+      "secret_scanning_push_protection": "enabled",
       "secret_scanning_validity_checks": "disabled"
     },
     "settings": {
-      "allow_auto_merge": false,
+      "allow_auto_merge": true,
       "allow_merge_commit": true,
       "allow_rebase_merge": true,
       "allow_squash_merge": true,
       "allow_update_branch": false,
       "archived": false,
-      "delete_branch_on_merge": false,
+      "delete_branch_on_merge": true,
       "has_discussions": false,
       "has_issues": true,
       "has_projects": true,
@@ -497,7 +571,7 @@
       "web_commit_signoff_required": false
     },
     "visibility": "public",
-    "vulnerability_alerts": false
+    "vulnerability_alerts": true
   },
   {
     "actions_permissions": {
@@ -739,7 +813,7 @@
       "can_approve_pull_request_reviews": false,
       "default_workflow_permissions": "read"
     },
-    "automated_security_fixes": true,
+    "automated_security_fixes": false,
     "default_branch": "main",
     "has_dependabot_yml": false,
     "has_renovate_json": true,
@@ -821,7 +895,7 @@
       }
     ],
     "security_and_analysis": {
-      "dependabot_security_updates": "enabled",
+      "dependabot_security_updates": "disabled",
       "secret_scanning": "enabled",
       "secret_scanning_non_provider_patterns": "disabled",
       "secret_scanning_push_protection": "enabled",
@@ -860,22 +934,96 @@
     "has_renovate_json": true,
     "license": "Apache-2.0",
     "repo": "rknightion/grafana-cloud-vending-machine",
-    "rulesets": [],
+    "rulesets": [
+      {
+        "_links": {
+          "html": {
+            "href": "https://github.com/rknightion/grafana-cloud-vending-machine/rules/21798855"
+          },
+          "self": {
+            "href": "https://api.github.com/repos/rknightion/grafana-cloud-vending-machine/rulesets/21798855"
+          }
+        },
+        "bypass_actors": [
+          {
+            "actor_id": 5,
+            "actor_type": "RepositoryRole",
+            "bypass_mode": "always"
+          }
+        ],
+        "conditions": {
+          "ref_name": {
+            "exclude": [],
+            "include": [
+              "~DEFAULT_BRANCH"
+            ]
+          }
+        },
+        "created_at": "2026-08-29T12:32:03.822+01:00",
+        "current_user_can_bypass": "always",
+        "enforcement": "active",
+        "id": 21798855,
+        "name": "main",
+        "node_id": "RRS_lACqUmVwb3NpdG9yec5O1ZPezgFMn8c",
+        "rules": [
+          {
+            "type": "deletion"
+          },
+          {
+            "type": "non_fast_forward"
+          },
+          {
+            "parameters": {
+              "allowed_merge_methods": [
+                "merge",
+                "squash",
+                "rebase"
+              ],
+              "dismiss_stale_reviews_on_push": false,
+              "require_code_owner_review": false,
+              "require_extra_approval_for_unattributed_changes": true,
+              "require_last_push_approval": false,
+              "required_approving_review_count": 0,
+              "required_review_thread_resolution": false,
+              "required_reviewers": []
+            },
+            "type": "pull_request"
+          },
+          {
+            "parameters": {
+              "do_not_enforce_on_create": false,
+              "required_status_checks": [
+                {
+                  "context": "ci-success",
+                  "integration_id": 15368
+                }
+              ],
+              "strict_required_status_checks_policy": false
+            },
+            "type": "required_status_checks"
+          }
+        ],
+        "source": "rknightion/grafana-cloud-vending-machine",
+        "source_type": "Repository",
+        "target": "branch",
+        "updated_at": "2026-08-29T12:32:03.891+01:00"
+      }
+    ],
     "security_and_analysis": {
       "dependabot_security_updates": "disabled",
-      "secret_scanning": "disabled",
+      "secret_scanning": "enabled",
       "secret_scanning_non_provider_patterns": "disabled",
-      "secret_scanning_push_protection": "disabled",
+      "secret_scanning_push_protection": "enabled",
       "secret_scanning_validity_checks": "disabled"
     },
     "settings": {
-      "allow_auto_merge": false,
+      "allow_auto_merge": true,
       "allow_merge_commit": true,
       "allow_rebase_merge": true,
       "allow_squash_merge": true,
       "allow_update_branch": false,
       "archived": false,
-      "delete_branch_on_merge": false,
+      "delete_branch_on_merge": true,
       "has_discussions": false,
       "has_issues": true,
       "has_projects": true,
@@ -1451,12 +1599,12 @@
       "allow_merge_commit": true,
       "allow_rebase_merge": true,
       "allow_squash_merge": true,
-      "allow_update_branch": true,
+      "allow_update_branch": false,
       "archived": false,
       "delete_branch_on_merge": true,
       "has_discussions": false,
       "has_issues": true,
-      "has_projects": false,
+      "has_projects": true,
       "has_wiki": false,
       "web_commit_signoff_required": false
     },
@@ -1565,14 +1713,14 @@
       "allow_merge_commit": true,
       "allow_rebase_merge": true,
       "allow_squash_merge": true,
-      "allow_update_branch": true,
+      "allow_update_branch": false,
       "archived": false,
       "delete_branch_on_merge": true,
       "has_discussions": false,
       "has_issues": true,
       "has_projects": true,
-      "has_wiki": true,
-      "web_commit_signoff_required": true
+      "has_wiki": false,
+      "web_commit_signoff_required": false
     },
     "visibility": "public",
     "vulnerability_alerts": true
@@ -1680,14 +1828,14 @@
       "allow_merge_commit": true,
       "allow_rebase_merge": true,
       "allow_squash_merge": true,
-      "allow_update_branch": true,
+      "allow_update_branch": false,
       "archived": false,
       "delete_branch_on_merge": true,
       "has_discussions": true,
       "has_issues": true,
       "has_projects": true,
-      "has_wiki": true,
-      "web_commit_signoff_required": true
+      "has_wiki": false,
+      "web_commit_signoff_required": false
     },
     "visibility": "public",
     "vulnerability_alerts": true
@@ -1801,7 +1949,7 @@
       "has_discussions": true,
       "has_issues": true,
       "has_projects": true,
-      "has_wiki": true,
+      "has_wiki": false,
       "web_commit_signoff_required": false
     },
     "visibility": "public",
@@ -1817,28 +1965,102 @@
       "can_approve_pull_request_reviews": false,
       "default_workflow_permissions": "read"
     },
-    "automated_security_fixes": true,
+    "automated_security_fixes": false,
     "default_branch": "main",
     "has_dependabot_yml": false,
     "has_renovate_json": true,
     "license": "NOASSERTION",
     "repo": "rknightion/polylens2otel",
-    "rulesets": [],
+    "rulesets": [
+      {
+        "_links": {
+          "html": {
+            "href": "https://github.com/rknightion/polylens2otel/rules/21798236"
+          },
+          "self": {
+            "href": "https://api.github.com/repos/rknightion/polylens2otel/rulesets/21798236"
+          }
+        },
+        "bypass_actors": [
+          {
+            "actor_id": 5,
+            "actor_type": "RepositoryRole",
+            "bypass_mode": "always"
+          }
+        ],
+        "conditions": {
+          "ref_name": {
+            "exclude": [],
+            "include": [
+              "~DEFAULT_BRANCH"
+            ]
+          }
+        },
+        "created_at": "2026-08-29T12:12:29.437+01:00",
+        "current_user_can_bypass": "always",
+        "enforcement": "active",
+        "id": 21798236,
+        "name": "main",
+        "node_id": "RRS_lACqUmVwb3NpdG9yec5PYkIxzgFMnVw",
+        "rules": [
+          {
+            "type": "deletion"
+          },
+          {
+            "type": "non_fast_forward"
+          },
+          {
+            "parameters": {
+              "allowed_merge_methods": [
+                "merge",
+                "squash",
+                "rebase"
+              ],
+              "dismiss_stale_reviews_on_push": false,
+              "require_code_owner_review": false,
+              "require_extra_approval_for_unattributed_changes": true,
+              "require_last_push_approval": false,
+              "required_approving_review_count": 0,
+              "required_review_thread_resolution": false,
+              "required_reviewers": []
+            },
+            "type": "pull_request"
+          },
+          {
+            "parameters": {
+              "do_not_enforce_on_create": false,
+              "required_status_checks": [
+                {
+                  "context": "ci-success",
+                  "integration_id": 15368
+                }
+              ],
+              "strict_required_status_checks_policy": false
+            },
+            "type": "required_status_checks"
+          }
+        ],
+        "source": "rknightion/polylens2otel",
+        "source_type": "Repository",
+        "target": "branch",
+        "updated_at": "2026-08-29T12:12:29.518+01:00"
+      }
+    ],
     "security_and_analysis": {
-      "dependabot_security_updates": "enabled",
+      "dependabot_security_updates": "disabled",
       "secret_scanning": "enabled",
       "secret_scanning_non_provider_patterns": "disabled",
       "secret_scanning_push_protection": "enabled",
       "secret_scanning_validity_checks": "disabled"
     },
     "settings": {
-      "allow_auto_merge": false,
+      "allow_auto_merge": true,
       "allow_merge_commit": true,
       "allow_rebase_merge": true,
       "allow_squash_merge": true,
       "allow_update_branch": false,
       "archived": false,
-      "delete_branch_on_merge": false,
+      "delete_branch_on_merge": true,
       "has_discussions": false,
       "has_issues": true,
       "has_projects": true,
@@ -1979,7 +2201,81 @@
     "has_renovate_json": true,
     "license": "AGPL-3.0",
     "repo": "rknightion/rfc6035-2otel",
-    "rulesets": [],
+    "rulesets": [
+      {
+        "_links": {
+          "html": {
+            "href": "https://github.com/rknightion/rfc6035-2otel/rules/21798237"
+          },
+          "self": {
+            "href": "https://api.github.com/repos/rknightion/rfc6035-2otel/rulesets/21798237"
+          }
+        },
+        "bypass_actors": [
+          {
+            "actor_id": 5,
+            "actor_type": "RepositoryRole",
+            "bypass_mode": "always"
+          }
+        ],
+        "conditions": {
+          "ref_name": {
+            "exclude": [],
+            "include": [
+              "~DEFAULT_BRANCH"
+            ]
+          }
+        },
+        "created_at": "2026-08-29T12:12:29.934+01:00",
+        "current_user_can_bypass": "always",
+        "enforcement": "active",
+        "id": 21798237,
+        "name": "main",
+        "node_id": "RRS_lACqUmVwb3NpdG9yec5PZ-PRzgFMnV0",
+        "rules": [
+          {
+            "type": "deletion"
+          },
+          {
+            "type": "non_fast_forward"
+          },
+          {
+            "parameters": {
+              "allowed_merge_methods": [
+                "merge",
+                "squash",
+                "rebase"
+              ],
+              "dismiss_stale_reviews_on_push": false,
+              "require_code_owner_review": false,
+              "require_extra_approval_for_unattributed_changes": true,
+              "require_last_push_approval": false,
+              "required_approving_review_count": 0,
+              "required_review_thread_resolution": false,
+              "required_reviewers": []
+            },
+            "type": "pull_request"
+          },
+          {
+            "parameters": {
+              "do_not_enforce_on_create": false,
+              "required_status_checks": [
+                {
+                  "context": "ci-success",
+                  "integration_id": 15368
+                }
+              ],
+              "strict_required_status_checks_policy": false
+            },
+            "type": "required_status_checks"
+          }
+        ],
+        "source": "rknightion/rfc6035-2otel",
+        "source_type": "Repository",
+        "target": "branch",
+        "updated_at": "2026-08-29T12:12:29.999+01:00"
+      }
+    ],
     "security_and_analysis": {
       "dependabot_security_updates": "disabled",
       "secret_scanning": "enabled",
@@ -1988,17 +2284,17 @@
       "secret_scanning_validity_checks": "disabled"
     },
     "settings": {
-      "allow_auto_merge": false,
+      "allow_auto_merge": true,
       "allow_merge_commit": true,
       "allow_rebase_merge": true,
       "allow_squash_merge": true,
       "allow_update_branch": false,
       "archived": false,
-      "delete_branch_on_merge": false,
+      "delete_branch_on_merge": true,
       "has_discussions": false,
       "has_issues": true,
       "has_projects": true,
-      "has_wiki": true,
+      "has_wiki": false,
       "web_commit_signoff_required": false
     },
     "visibility": "public",
@@ -2112,7 +2408,7 @@
       "delete_branch_on_merge": true,
       "has_discussions": false,
       "has_issues": true,
-      "has_projects": false,
+      "has_projects": true,
       "has_wiki": false,
       "web_commit_signoff_required": false
     },
@@ -2212,9 +2508,9 @@
     ],
     "security_and_analysis": {
       "dependabot_security_updates": "disabled",
-      "secret_scanning": "disabled",
+      "secret_scanning": "enabled",
       "secret_scanning_non_provider_patterns": "disabled",
-      "secret_scanning_push_protection": "disabled",
+      "secret_scanning_push_protection": "enabled",
       "secret_scanning_validity_checks": "disabled"
     },
     "settings": {
@@ -2571,14 +2867,14 @@
       "allow_merge_commit": true,
       "allow_rebase_merge": true,
       "allow_squash_merge": true,
-      "allow_update_branch": true,
+      "allow_update_branch": false,
       "archived": false,
       "delete_branch_on_merge": true,
       "has_discussions": false,
       "has_issues": true,
       "has_projects": true,
-      "has_wiki": true,
-      "web_commit_signoff_required": true
+      "has_wiki": false,
+      "web_commit_signoff_required": false
     },
     "visibility": "public",
     "vulnerability_alerts": true

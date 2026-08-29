@@ -121,6 +121,13 @@ ALLOWED = {
     # Both have a genuine second workflow whose aggregator the ruleset gates.
     ("ruleset", "rknightion/meraki-dashboard-ha"),
     ("ruleset", "rknightion/tailscale2otel"),
+    # Aligning these three would DESTROY CONTENT, which is never worth a
+    # consistency win. Verified 2026-08-29 before deciding: each of the two
+    # repos below has a real discussion thread, and the wiki below returns
+    # HTTP 200 rather than the 302-to-repo an empty wiki gives.
+    ("has_discussions", "rknightion/opnsense2otel"),
+    ("has_discussions", "rknightion/paperless-ngx-dedupe"),
+    ("has_wiki", "rknightion/meraki-dashboard-exporter"),
 }
 
 
