@@ -13,9 +13,21 @@
 # a decision to take explicitly, not a side effect of adding a workflow.
 name: repo-settings-drift
 
+# BLOCKED, dispatch-only: the broker's GitHub App does not hold the
+# `administration` permission, so the mint fails 422 "The permissions requested
+# are not granted to this installation." Everything else is wired and proven --
+# tailnet join, OIDC login, the JWT role and the policy all work; the App grant
+# is the only missing piece.
+#
+# To unblock: add `Repository permissions -> Administration: Read-only` to the
+# App, then accept the new permission on the rknightion installation (GitHub
+# will not apply it until an owner approves). Re-enable the cron in that same
+# change.
+#
+# The cron is off deliberately rather than left to fail every Monday -- a
+# workflow that always fails gets muted, and then it is worthless on the day it
+# would have been right.
 on:
-  schedule:
-    - cron: "41 6 * * 1"
   workflow_dispatch: {}
 
 permissions:
