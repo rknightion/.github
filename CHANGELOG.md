@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.9.10](https://github.com/rknightion/.github/compare/v1.9.9...v1.9.10) (2026-08-29)
+
+
+### Build & CI
+
+* **deps:** update anchore/sbom-action action to v0.24.2 ([#70](https://github.com/rknightion/.github/issues/70)) ([5ab9bc0](https://github.com/rknightion/.github/commit/5ab9bc001bc6c4dd397a02e56711c5689bd66a0f))
+
 ## [1.9.9](https://github.com/rknightion/.github/compare/v1.9.8...v1.9.9) (2026-08-28)
 
 
