@@ -21,16 +21,41 @@ gh search code --owner rknightion 'uses: rknightion/.github'
 ## Gate
 
 ```bash
-actionlint                                  # workflow correctness
-zizmor .github/workflows/ .github/actions/  # Actions security audit
+just check
 ```
 
-Both mirror what `ci.yml` runs against this repo via its own reusables (it calls them by `./` path so
-they always test the current ref). CodeQL's `actions` language runs in CI only. `ci-success` is the
-single required status check.
+`fmt-check` + `lint` (actionlint, zizmor, shellcheck) + `test` (the next-rc-tag shell suite) +
+`pii-check` (the `backlog/` identifier sweep below). `just setup` installs the pinned actionlint and
+zizmor into `.tools/` first; it is idempotent.
+
+`ci.yml` runs the same `just check` through `.github/workflows/just-check.yml`, and additionally
+dogfoods the `actionlint`, `zizmor` and `codeql` reusables against this repo so those reusables get
+tested at all. `ci-success` is the single required status check.
+
+zizmor runs with `--no-exit-codes` because CI's zizmor job is non-gating — findings go to the
+Security tab as SARIF. Removing that flag turns the gate red on findings this repo has already
+accepted.
 
 A Linux binary is not executed on macOS and a composite action's behaviour on a consumer's runner is
 not observable from here — so when a change executes in CI, name the run that will prove it.
+
+## Task interface
+
+This repo's task surface is a `justfile`. Discover it, don't guess it:
+
+    just --list                        # human-readable
+    just --dump --dump-format json     # machine-readable
+    just --show <recipe>               # what a recipe actually runs
+
+- `just check` is the full gate and is exactly what CI enforces. It must pass before you commit.
+- Prefer `just <recipe>` over the underlying tool. If you are typing `actionlint`, you want
+  `just lint`.
+- Run `just` with stdin from /dev/null. Recipes marked `[confirm]` are destructive — stop and ask
+  before running one; never pass `--yes` or `JUST_YES=1`.
+- If a task you need does not exist, add a recipe with a `#` doc comment and a `[group(...)]` rather
+  than running a bare command.
+- `scripts/cloud-environment-setup.sh` has deliberately **no** recipe. It is the cloud-environment
+  setup phase's entry point and local agents must not run it.
 
 ## Task tracking
 

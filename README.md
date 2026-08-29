@@ -4,6 +4,14 @@
 
 Shared GitHub configuration for the rknightion open-source repos.
 
+## Task surface
+
+```bash
+just --list     # every task in this repo
+just setup      # install the pinned actionlint + zizmor into .tools/
+just check      # the full gate — exactly what ci.yml enforces
+```
+
 ## Cloud agent environments
 
 Codex and Claude Code cloud tasks use one manual setup script so they can work with
@@ -48,6 +56,7 @@ SHA-pinned and kept current by Renovate (`helpers:pinGitHubActionDigests`).
 | `auto-rc.yml` | Cuts an automatic `vX.Y.Z-rc.N` prerelease off `main` once the aggregate CI check is green, versioned from the pending release-please version. Outputs `tag`; the caller feeds it into its own `publish.yml` and `binaries.yml`. |
 | `arm-automerge.yml` | Applying the `release: ready` label to a release PR arms GitHub auto-merge, so it merges itself when checks pass instead of sitting red unnoticed. |
 | `ghcr-cleanup.yml` | Multi-arch-safe GHCR retention: keeps every stable release, the newest 10 RCs, and 7 days of edge images. Dry-run by default. |
+| `just-check.yml` | Checks out the caller, installs a pinned `just`, and runs one recipe (default `check`). For repos whose whole gate is one recipe on one runner; anything needing a matrix or toolchain caching should use the `setup-just` composite action inside its own job instead. |
 | `fleet-release-sweep.yml` | Not reusable — runs here daily and reports every public repo's release PR state into the `Release train status` issue. |
 
 ### Example caller
@@ -87,11 +96,31 @@ jobs:
     uses: rknightion/.github/.github/workflows/scorecard.yml@main
 ```
 
+### Example caller — just check
+
+```yaml
+  gate:
+    permissions:
+      contents: read
+    uses: rknightion/.github/.github/workflows/just-check.yml@<sha> # v1.x.y
+    with:
+      setup: true
+```
+
 Add the badge to the repo README:
 
 ```markdown
 [![OpenSSF Scorecard](https://api.scorecard.dev/projects/github.com/rknightion/<repo>/badge)](https://scorecard.dev/viewer/?uri=github.com/rknightion/<repo>)
 ```
+
+## Composite actions (`.github/actions/`)
+
+| Action | Purpose |
+|---|---|
+| `setup-just` | Install a pinned `just`. Use inside your own job when `just-check.yml` is too rigid (matrices, toolchain caching, extra steps). |
+| `broker-token` | Mint a short-lived, permission-scoped GitHub App installation token from the OpenBao broker. |
+| `bao-secret` | Read a KV v2 secret from OpenBao into masked env vars. |
+| `next-rc-tag` | Compute the next `vX.Y.Z-rc.N` tag for a pending release-please version. |
 
 ## Shared CodeQL config (`codeql/codeql-config.yml`)
 

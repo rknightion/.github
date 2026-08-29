@@ -1,10 +1,10 @@
 ---
 id: GHC-0003
 title: Migrate the repo task surface to just and retire Makefiles and ad-hoc scripts
-status: In Progress
+status: Done
 assignee: []
 created_date: '2026-08-28 19:06'
-updated_date: '2026-08-29 12:49'
+updated_date: '2026-08-29 13:20'
 labels:
   - 'wave:1-hub'
 dependencies: []
@@ -729,23 +729,23 @@ Green at every step. Nothing is deleted at any step, because nothing in this rep
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 A top-level justfile defines all seven mandatory recipes (default, setup, fmt, fmt-check, lint, test, check) plus pii-check, callers and clean; just --list shows a # doc comment and a [group(...)] for every recipe except the ungrouped default and setup, and just --dump --dump-format json exits 0
-- [ ] #2 just --fmt --check exits 0 against the committed justfile and is a line of the fmt-check recipe; fmt-check is a dependency of check
-- [ ] #3 just setup then just check exits 0 on a clean checkout, running actionlint, zizmor --no-exit-codes over .github/workflows/ and .github/actions/, shellcheck over git ls-files '*.sh', .github/actions/next-rc-tag/next-rc-tag_test.sh, and the backlog/ identifier sweep
-- [ ] #4 .github/actions/setup-just/action.yml exists, wraps extractions/setup-just pinned by SHA with a # v4.0.0 comment, and defaults just-version to an exact version with a # renovate: comment directly above the default: line
-- [ ] #5 .github/workflows/just-check.yml exists as a workflow_call reusable with permissions: {} at the top, contents: read on the job, a unique concurrency group, inputs recipe/setup/just-version/runner/timeout-minutes, the recipe passed via env: not interpolated into run:, and setup-just referenced as rknightion/.github/.github/actions/setup-just@<sha> rather than a ./ path
-- [ ] #6 ci.yml gained a just job calling ./.github/workflows/just-check.yml with setup: true, the ci-success job still exists under that exact name with just added to its needs: list, and an observed CI run shows both the just job and ci-success green
-- [ ] #7 The other 15 workflow files (actionlint, arm-automerge, auto-rc, binaries, codeql, container-publish, dependency-review, docker-security, fleet-release-sweep, ghcr-cleanup, release-please, scorecard, scorecard-analysis, self-arm-automerge, zizmor) are unchanged: no reusable workflow run: body was converted to just and no ./ action path was introduced into a reusable
-- [ ] #8 git ls-files | grep -iE 'makefile|\.mk$' is empty and no Makefile was created; scripts/cloud-environment-setup.sh, next-rc-tag.sh and next-rc-tag_test.sh all still exist, with next-rc-tag_test.sh reachable via just test and cloud-environment-setup.sh deliberately given no recipe
-- [ ] #9 AGENTS.md's Gate section names just check and the file carries the Task interface block; README.md documents just --list / just setup / just check, lists just-check.yml in the reusable-workflow table with a caller example, and documents setup-just in a composite-actions table; no doc instructs anyone to run make
-- [ ] #10 backlog/config.yml definition_of_done names just check and just callers instead of the raw actionlint, zizmor and gh search commands, with task_prefix ghc and every other key unchanged
+- [x] #1 A top-level justfile defines all seven mandatory recipes (default, setup, fmt, fmt-check, lint, test, check) plus pii-check, callers and clean; just --list shows a # doc comment and a [group(...)] for every recipe except the ungrouped default and setup, and just --dump --dump-format json exits 0
+- [x] #2 just --fmt --check exits 0 against the committed justfile and is a line of the fmt-check recipe; fmt-check is a dependency of check
+- [x] #3 just setup then just check exits 0 on a clean checkout, running actionlint, zizmor --no-exit-codes over .github/workflows/ and .github/actions/, shellcheck over git ls-files '*.sh', .github/actions/next-rc-tag/next-rc-tag_test.sh, and the backlog/ identifier sweep
+- [x] #4 .github/actions/setup-just/action.yml exists, wraps extractions/setup-just pinned by SHA with a # v4.0.0 comment, and defaults just-version to an exact version with a # renovate: comment directly above the default: line
+- [x] #5 .github/workflows/just-check.yml exists as a workflow_call reusable with permissions: {} at the top, contents: read on the job, a unique concurrency group, inputs recipe/setup/just-version/runner/timeout-minutes, the recipe passed via env: not interpolated into run:, and setup-just referenced as rknightion/.github/.github/actions/setup-just@<sha> rather than a ./ path
+- [x] #6 ci.yml gained a just job calling ./.github/workflows/just-check.yml with setup: true, the ci-success job still exists under that exact name with just added to its needs: list, and an observed CI run shows both the just job and ci-success green
+- [x] #7 The other 15 workflow files (actionlint, arm-automerge, auto-rc, binaries, codeql, container-publish, dependency-review, docker-security, fleet-release-sweep, ghcr-cleanup, release-please, scorecard, scorecard-analysis, self-arm-automerge, zizmor) are unchanged: no reusable workflow run: body was converted to just and no ./ action path was introduced into a reusable
+- [x] #8 git ls-files | grep -iE 'makefile|\.mk$' is empty and no Makefile was created; scripts/cloud-environment-setup.sh, next-rc-tag.sh and next-rc-tag_test.sh all still exist, with next-rc-tag_test.sh reachable via just test and cloud-environment-setup.sh deliberately given no recipe
+- [x] #9 AGENTS.md's Gate section names just check and the file carries the Task interface block; README.md documents just --list / just setup / just check, lists just-check.yml in the reusable-workflow table with a caller example, and documents setup-just in a composite-actions table; no doc instructs anyone to run make
+- [x] #10 backlog/config.yml definition_of_done names just check and just callers instead of the raw actionlint, zizmor and gh search commands, with task_prefix ghc and every other key unchanged
 <!-- AC:END -->
 
 ## Definition of Done
 <!-- DOD:BEGIN -->
-- [ ] #1 actionlint (from the repo root; the same lint ci.yml runs via .github/workflows/actionlint.yml)
-- [ ] #2 zizmor .github/workflows/ .github/actions/ (the security audit ci.yml runs via .github/workflows/zizmor.yml)
-- [ ] #3 For a change to a reusable workflow's INPUTS or PERMISSIONS: check the callers across the fleet, not just this repo — `gh search code --owner rknightion 'uses: rknightion/.github'`
+- [x] #1 actionlint (from the repo root; the same lint ci.yml runs via .github/workflows/actionlint.yml)
+- [x] #2 zizmor .github/workflows/ .github/actions/ (the security audit ci.yml runs via .github/workflows/zizmor.yml)
+- [x] #3 For a change to a reusable workflow's INPUTS or PERMISSIONS: check the callers across the fleet, not just this repo — `gh search code --owner rknightion 'uses: rknightion/.github'`
 <!-- DOD:END -->
 
 ## Implementation Plan
@@ -759,6 +759,22 @@ Green at every step. Nothing is deleted at any step, because nothing in this rep
 
 4. Read the finalization guide, record objective evidence, atomically check criteria and set Done.
 <!-- SECTION:PLAN:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+Validation: `just --fmt --check`, JSON dump, `just setup`, and `just check` passed with actionlint 1.7.12, zizmor 1.29.0, shellcheck, the 14-case next-rc-tag suite, and the backlog sweep.
+
+The task body documents the sweep regex, which made the verbatim recipe flag that documentation as an identifier. The recipe now excludes only that exact scanner-source line; a temporary synthetic identifier in backlog/ made `just pii-check` fail, and the committed rule passes without it.
+
+Direct actionlint passed. Direct zizmor completed with the two pre-existing accepted github-env findings and exit 14; `just lint` deliberately uses --no-exit-codes, matching the non-gating CI policy.
+
+Self-CI integration was observed in CI run 33254250842 at 2e18e12d53516fb0480894f1f5af65ded9108627: just / just check and ci-success both completed successfully.
+
+Caller audit: public Git partial-clone sweep scanned 35 repositories with zero clone errors; 26 called this hub and no external workflow referenced just-check.yml yet.
+
+The scheduled privileged fleet settings report and its Python runtime remain byte-identical and deliberately unreferenced. CodeRabbit reviewed the justfile/action/reusable changes; the CI wiring and documentation/declarative-config changes were skipped as non-branching configuration.
+<!-- SECTION:NOTES:END -->
 
 ## Comments
 
@@ -803,3 +819,9 @@ Eleven of the 42 lanes arrived at this shape independently before it was ratifie
 **If this repo has no such legs, it has no `ci` recipe at all** and `check` is the whole gate. Do not add an empty one.
 ---
 <!-- COMMENTS:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Completed the just task-surface migration: added the pinned local gate and setup action, reusable just-check workflow, self-CI enforcement, Renovate tracking, agent contract, documentation, and Backlog definition of done. Verified locally and with successful self-CI run 33254250842.
+<!-- SECTION:FINAL_SUMMARY:END -->
