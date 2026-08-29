@@ -1,5 +1,17 @@
 # Changelog
 
+## [1.14.0](https://github.com/rknightion/.github/compare/v1.13.0...v1.14.0) (2026-08-29)
+
+
+### Features
+
+* **helm-validate:** add a shared chart lint + render + schema-validation reusable ([905df03](https://github.com/rknightion/.github/commit/905df031654bc6927eb8339c6035c3b340d141ec))
+
+
+### Miscellaneous
+
+* **fleet:** record the settings audit as clean ([98d6a92](https://github.com/rknightion/.github/commit/98d6a921f2018ead7b86ca4b3fbb1c50e4f6e818))
+
 ## [1.13.0](https://github.com/rknightion/.github/compare/v1.12.0...v1.13.0) (2026-08-29)
 
 
