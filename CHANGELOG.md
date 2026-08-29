@@ -1,5 +1,17 @@
 # Changelog
 
+## [1.10.1](https://github.com/rknightion/.github/compare/v1.10.0...v1.10.1) (2026-08-29)
+
+
+### Build & CI
+
+* **deps:** update rknightion/.github action to v1.9.8 ([#73](https://github.com/rknightion/.github/issues/73)) ([8512368](https://github.com/rknightion/.github/commit/851236813e0534dfe9f24aca502e9cbc9f3d5be0))
+
+
+### Miscellaneous
+
+* **backlog:** add GHC-0004 — harvest egress audits, then move to block mode ([0f93339](https://github.com/rknightion/.github/commit/0f93339c6927ae51c478587852b6a9f21acd1cf1))
+
 ## [1.10.0](https://github.com/rknightion/.github/compare/v1.9.11...v1.10.0) (2026-08-29)
 
 
