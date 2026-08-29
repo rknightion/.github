@@ -5,6 +5,9 @@
 # PreToolUse hook in the agent config, so nothing under .claude/ is tracked.
 .claude/
 
+# Repo-local lint toolchain installed by `just setup`.
+.tools/
+
 # Local safety archive of superseded working-tree state. Kept on disk, never a
 # deliverable of this hub.
 backups/

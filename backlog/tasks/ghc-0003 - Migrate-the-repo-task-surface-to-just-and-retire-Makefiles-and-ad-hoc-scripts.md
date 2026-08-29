@@ -1,10 +1,10 @@
 ---
 id: GHC-0003
 title: Migrate the repo task surface to just and retire Makefiles and ad-hoc scripts
-status: To Do
+status: In Progress
 assignee: []
 created_date: '2026-08-28 19:06'
-updated_date: '2026-08-29 10:42'
+updated_date: '2026-08-29 12:49'
 labels:
   - 'wave:1-hub'
 dependencies: []
@@ -747,6 +747,18 @@ Green at every step. Nothing is deleted at any step, because nothing in this rep
 - [ ] #2 zizmor .github/workflows/ .github/actions/ (the security audit ci.yml runs via .github/workflows/zizmor.yml)
 - [ ] #3 For a change to a reusable workflow's INPUTS or PERMISSIONS: check the callers across the fleet, not just this repo — `gh search code --owner rknightion 'uses: rknightion/.github'`
 <!-- DOD:END -->
+
+## Implementation Plan
+
+<!-- SECTION:PLAN:BEGIN -->
+1. Preserve the pre-existing hook-retirement commit and unrelated GHC-0004→GHC-0005 rename; add the prescribed justfile, local zizmor policy, .tools ignore, and setup-just composite action, then validate and publish the bootstrap SHA.
+
+2. Pin that published SHA from the new just-check reusable; wire only self-CI to call it, preserve every existing reusable body, validate, publish, and observe the CI run.
+
+3. Update Renovate tracking, README, AGENTS task interface, and Backlog definition of done; run the targeted and final gates, inspect callers, commit only task-owned paths, push, and observe CI at the final SHA.
+
+4. Read the finalization guide, record objective evidence, atomically check criteria and set Done.
+<!-- SECTION:PLAN:END -->
 
 ## Comments
 
