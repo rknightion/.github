@@ -43,17 +43,19 @@ issues index (pre-tracker)** doc covers everything closed before 2026-08-14; the
 were archived to `archive/` and deleted from GitHub.
 
 Four rules, each one an upstream footgun that is silent and unrepairable rather than a preference.
-The first two are enforced by a `PreToolUse` hook (`.claude/hooks/backlog-guard.py`, tested by
-`backlog-guard_test.py`) because documenting them was not enough.
+The first two are enforced by a `PreToolUse` guard that lives in the agent config globally rather than
+in this repo, because documenting them was not enough. A contributor working without that guard gets
+no enforcement, so read these as rules, not as something a tool will catch for you.
 
 **Never use `--notes` or `--plan` bare.** They *silently replace* the whole section, destroying
 another session's writes with no warning and exit 0. Use `--append-notes` and `--append-plan`. This
 is an open upstream bug, not a misunderstanding.
 
-The guard matches the literal text of a Bash command, so **any command whose text contains those
-flags is blocked — including a `git commit -m` whose message merely mentions them.** That is not a
-bug to work around by weakening the guard: put the text in a file and pass the file
-(`git commit -F <path>`, `python3 <test file>`). It caught this repo's own migration commit.
+The guard judges an actual `backlog` invocation, not a mention, so a `git commit -m` or a `grep`
+whose text merely contains one of the flags passes. It also covers `--final-summary`, and carries a
+backstop for indirection (`F=--notes; backlog task edit X $F hi`). An earlier repo-local version
+matched literal command text and blocked those mentions; if you hit that, you are running a stale
+guard.
 
 **Never hand-edit task, draft, doc, decision or milestone markdown.** Section boundaries are
 HTML-comment markers; break one and the section is silently dropped at exit 0 — the data stays in the
