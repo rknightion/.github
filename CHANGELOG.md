@@ -1,5 +1,17 @@
 # Changelog
 
+## [1.16.0](https://github.com/rknightion/.github/compare/v1.15.1...v1.16.0) (2026-08-29)
+
+
+### Features
+
+* **ci:** add the just task surface ([4497319](https://github.com/rknightion/.github/commit/4497319d950b5cc0cc15aa5cc6566f9f38b5841d))
+
+
+### Miscellaneous
+
+* **hooks:** retire the repo-local Backlog guard for the global one ([8e44ba3](https://github.com/rknightion/.github/commit/8e44ba3d6041a9644022e57b47fb55bff7dc539b))
+
 ## [1.15.1](https://github.com/rknightion/.github/compare/v1.15.0...v1.15.1) (2026-08-29)
 
 
