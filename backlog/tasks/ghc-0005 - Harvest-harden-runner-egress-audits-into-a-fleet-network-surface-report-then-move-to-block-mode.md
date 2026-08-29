@@ -1,5 +1,5 @@
 ---
-id: GHC-0004
+id: GHC-0005
 title: >-
   Harvest harden-runner egress audits into a fleet network-surface report, then
   move to block mode

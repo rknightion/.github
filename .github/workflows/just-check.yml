@@ -1,0 +1,92 @@
+name: just-check (reusable)
+
+# Reusable gate runner: check out the caller, install a pinned `just`, run one
+# recipe (default `check`). Exists so a consumer whose gate is one recipe writes
+# a four-line job instead of copying checkout + install + run into ~40 repos.
+#
+# USE THIS ONLY when the whole gate is one recipe on one runner. A reusable
+# workflow replaces a whole JOB, so a repo that needs a matrix, language
+# toolchain caching (setup-go / setup-python / actions/cache) or extra steps
+# must instead call the setup-just composite action inside its own job.
+#
+# The setup-just action is referenced by OWNER/REPO@sha, never by ./ path: when
+# this workflow runs it is the CONSUMER's checkout in the workspace, so a ./
+# reference would resolve against their tree. Same constraint next-rc-tag
+# documents.
+
+on:
+  workflow_call:
+    inputs:
+      recipe:
+        description: "Recipe to run. The fleet gate is `check`."
+        required: false
+        type: string
+        default: "check"
+      setup:
+        description: >-
+          Run `just setup` before the recipe. Leave false where the runner image
+          already carries everything the recipe needs.
+        required: false
+        type: boolean
+        default: false
+      just-version:
+        description: "Exact just version. Pinned, never a range."
+        required: false
+        type: string
+        # renovate: datasource=github-releases depName=casey/just
+        default: "1.58.0"
+      runner:
+        description: >-
+          Runner label. Defaults to a GitHub-hosted runner. The m7kni org cannot
+          use hosted runners -- its jobs fail before starting with a billing
+          error -- so callers there must pass a self-hosted label such as
+          runners-vm.
+        required: false
+        type: string
+        default: "ubuntu-24.04"
+      timeout-minutes:
+        description: "Job timeout in minutes."
+        required: false
+        type: number
+        default: 20
+
+permissions: {}
+
+# Cancel a superseded run on the same ref (rapid pushes / PR updates) to free
+# runners. Unique group prefix per reusable so a caller invoking several
+# reusables doesn't put them in one group where they'd cancel each other.
+concurrency:
+  group: just-check-${{ github.workflow }}-${{ github.ref }}-${{ inputs.recipe }}
+  cancel-in-progress: true
+
+jobs:
+  just:
+    name: just ${{ inputs.recipe }}
+    runs-on: ${{ inputs.runner }}
+    timeout-minutes: ${{ inputs.timeout-minutes }}
+    permissions:
+      contents: read
+    steps:
+      - name: Harden the runner (audit egress)
+        uses: step-security/harden-runner@05e31511f85b41b11d1cf0ef85d0992719546e2c # v2.21.0
+        with:
+          egress-policy: audit
+
+      - name: Checkout repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Set up just
+        uses: rknightion/.github/.github/actions/setup-just@4497319d950b5cc0cc15aa5cc6566f9f38b5841d # main
+        with:
+          just-version: ${{ inputs.just-version }}
+
+      - name: just setup
+        if: inputs.setup
+        run: just setup
+
+      - name: just ${{ inputs.recipe }}
+        env:
+          RECIPE: ${{ inputs.recipe }}
+        run: just "${RECIPE}"
