@@ -58,6 +58,14 @@ jobs:
           # enumerate repositories -- see the policy comment for why an
           # enumerated list would silently reduce audit coverage.
           permission-set: fleet-settings-read
+          # Required on a GitHub-hosted runner: OpenBao is tailnet-only, so the
+          # action joins the tailnet via Tailscale federated identity first.
+          # Without these it fails before ever reaching OpenBao, with
+          # "Please provide either an auth key, OAuth secret and tags, or
+          # federated identity client ID and audience with tags" -- which reads
+          # like a broker problem and is not one.
+          tailscale-client-id: ${{ secrets.TS_WIF_CLIENT_ID }}
+          tailscale-audience: ${{ secrets.TS_WIF_AUDIENCE }}
 
       - name: Report drift
         env:
