@@ -216,6 +216,12 @@ jobs:
           if [ -z "${PERMUTATIONS//[$'\n\r\t ']/}" ]; then
             validate "default"
           else
+            # A `|` block scalar ends with a newline and `<<<` appends another, so
+            # the loop would see a trailing empty line and render an unrequested
+            # `default` — which fails on any chart with required values. Only
+            # INTERIOR blank lines are meaningful; strip trailing ones first.
+            perms="$(printf '%s' "${PERMUTATIONS}" | sed -e :a -e '/^[[:space:]]*$/{$d;N;ba' -e '}')"
+
             did_default=0
             while IFS= read -r line; do
               # A blank line means the bare default render, so a caller can ask for
@@ -230,7 +236,7 @@ jobs:
               fi
               # shellcheck disable=SC2086
               validate "${line}" ${line}
-            done <<< "${PERMUTATIONS}"
+            done <<< "${perms}"
           fi
 
           # Open-ended fixture directory, for charts that keep one.
