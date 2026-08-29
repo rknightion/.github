@@ -1,0 +1,73 @@
+# Fleet repo-settings drift. Reports only; it never writes a setting.
+#
+# The standard is DERIVED from the majority rather than declared in a file, so
+# a deliberate fleet-wide change needs no edit here — move 13 repos and the
+# standard follows. The trade is that a majority which drifts together is
+# invisible to this check, which is why it reports for a human rather than
+# enforcing.
+#
+# Enforcement (writing settings back) is deliberately NOT here. It needs a
+# token carrying `administration: write` on every public repo, which is a far
+# broader grant than anything else in this org currently holds, and a bug in an
+# enforcer with that grant could disable branch protection fleet-wide. That is
+# a decision to take explicitly, not a side effect of adding a workflow.
+name: repo-settings-drift
+
+# workflow_dispatch ONLY, deliberately. The broker permission set named below
+# does not exist yet -- it has to be provisioned per the CI-SECRETS runbook
+# (permission set + ACL policy + JWT role) before this can run. A weekly cron
+# against a missing permission set is a workflow that fails every Monday and
+# gets muted, which is worse than one that has not been switched on. Add the
+# schedule in the same change that provisions the role.
+on:
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+
+concurrency:
+  group: repo-settings-drift
+  cancel-in-progress: false
+
+jobs:
+  drift:
+    name: report settings drift
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    permissions:
+      contents: read
+    steps:
+      - name: Harden the runner (audit egress)
+        uses: step-security/harden-runner@05e31511f85b41b11d1cf0ef85d0992719546e2c # v2.21.0
+        with:
+          egress-policy: audit
+
+      - name: Check out source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      # Reading rulesets and security_and_analysis needs repo administration
+      # scope, which GITHUB_TOKEN does not carry cross-repo. Without this the
+      # script sees every ruleset as absent and reports the whole fleet as
+      # drifted -- a false positive, not a silent pass.
+      - name: Mint a fleet read token
+        id: token
+        uses: ./.github/actions/broker-token
+        with:
+          # NOT YET PROVISIONED -- see the note on `on:` above.
+          # Needs `administration: read` and `metadata: read` on every public
+          # rknightion repo. Read-only: this workflow never writes a setting.
+          permission-set: fleet-settings-read
+
+      - name: Report drift
+        env:
+          GH_TOKEN: ${{ steps.token.outputs.token }}
+        run: ./fleet/collect-repo-settings.py --out /tmp/audit.json
+
+      - name: Upload the audit
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: repo-settings-audit
+          path: /tmp/audit.json
+          retention-days: 30

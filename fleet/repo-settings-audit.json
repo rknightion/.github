@@ -1,0 +1,2586 @@
+[
+  {
+    "actions_permissions": {
+      "allowed_actions": "all",
+      "enabled": true,
+      "sha_pinning_required": false
+    },
+    "actions_workflow_perms": {
+      "can_approve_pull_request_reviews": false,
+      "default_workflow_permissions": "read"
+    },
+    "automated_security_fixes": false,
+    "default_branch": "main",
+    "has_dependabot_yml": false,
+    "has_renovate_json": true,
+    "license": null,
+    "repo": "rknightion/.github",
+    "rulesets": [
+      {
+        "_links": {
+          "html": {
+            "href": "https://github.com/rknightion/.github/rules/18475192"
+          },
+          "self": {
+            "href": "https://api.github.com/repos/rknightion/.github/rulesets/18475192"
+          }
+        },
+        "bypass_actors": [
+          {
+            "actor_id": 5,
+            "actor_type": "RepositoryRole",
+            "bypass_mode": "always"
+          }
+        ],
+        "conditions": {
+          "ref_name": {
+            "exclude": [],
+            "include": [
+              "~DEFAULT_BRANCH"
+            ]
+          }
+        },
+        "created_at": "2026-07-03T12:09:10.832+01:00",
+        "current_user_can_bypass": "always",
+        "enforcement": "active",
+        "id": 18475192,
+        "name": "main",
+        "node_id": "RRS_lACqUmVwb3NpdG9yec5MfLvNzgEZ6Lg",
+        "rules": [
+          {
+            "type": "deletion"
+          },
+          {
+            "type": "non_fast_forward"
+          },
+          {
+            "parameters": {
+              "do_not_enforce_on_create": false,
+              "required_status_checks": [
+                {
+                  "context": "ci-success",
+                  "integration_id": 15368
+                }
+              ],
+              "strict_required_status_checks_policy": false
+            },
+            "type": "required_status_checks"
+          },
+          {
+            "parameters": {
+              "allowed_merge_methods": [
+                "merge",
+                "squash",
+                "rebase"
+              ],
+              "dismiss_stale_reviews_on_push": false,
+              "require_code_owner_review": false,
+              "require_extra_approval_for_unattributed_changes": true,
+              "require_last_push_approval": false,
+              "required_approving_review_count": 0,
+              "required_review_thread_resolution": false,
+              "required_reviewers": []
+            },
+            "type": "pull_request"
+          }
+        ],
+        "source": "rknightion/.github",
+        "source_type": "Repository",
+        "target": "branch",
+        "updated_at": "2026-07-03T12:09:10.901+01:00"
+      }
+    ],
+    "security_and_analysis": {
+      "dependabot_security_updates": "disabled",
+      "secret_scanning": "enabled",
+      "secret_scanning_non_provider_patterns": "disabled",
+      "secret_scanning_push_protection": "enabled",
+      "secret_scanning_validity_checks": "disabled"
+    },
+    "settings": {
+      "allow_auto_merge": true,
+      "allow_merge_commit": true,
+      "allow_rebase_merge": true,
+      "allow_squash_merge": true,
+      "allow_update_branch": false,
+      "archived": false,
+      "delete_branch_on_merge": true,
+      "has_discussions": false,
+      "has_issues": true,
+      "has_projects": true,
+      "has_wiki": true,
+      "web_commit_signoff_required": false
+    },
+    "visibility": "public",
+    "vulnerability_alerts": true
+  },
+  {
+    "actions_permissions": {
+      "allowed_actions": "all",
+      "enabled": true,
+      "sha_pinning_required": false
+    },
+    "actions_workflow_perms": {
+      "can_approve_pull_request_reviews": false,
+      "default_workflow_permissions": "read"
+    },
+    "automated_security_fixes": false,
+    "default_branch": "main",
+    "has_dependabot_yml": false,
+    "has_renovate_json": true,
+    "license": "Apache-2.0",
+    "repo": "rknightion/autopi-ha",
+    "rulesets": [
+      {
+        "_links": {
+          "html": {
+            "href": "https://github.com/rknightion/autopi-ha/rules/7052025"
+          },
+          "self": {
+            "href": "https://api.github.com/repos/rknightion/autopi-ha/rulesets/7052025"
+          }
+        },
+        "bypass_actors": [
+          {
+            "actor_id": 5,
+            "actor_type": "RepositoryRole",
+            "bypass_mode": "always"
+          }
+        ],
+        "conditions": {
+          "ref_name": {
+            "exclude": [],
+            "include": [
+              "~DEFAULT_BRANCH"
+            ]
+          }
+        },
+        "created_at": "2025-07-30T07:36:19.402+01:00",
+        "current_user_can_bypass": "always",
+        "enforcement": "active",
+        "id": 7052025,
+        "name": "main",
+        "node_id": "RRS_lACqUmVwb3NpdG9yec49OUOHzgBrmvk",
+        "rules": [
+          {
+            "type": "deletion"
+          },
+          {
+            "type": "non_fast_forward"
+          },
+          {
+            "parameters": {
+              "allowed_merge_methods": [
+                "merge",
+                "squash",
+                "rebase"
+              ],
+              "dismiss_stale_reviews_on_push": false,
+              "require_code_owner_review": false,
+              "require_extra_approval_for_unattributed_changes": true,
+              "require_last_push_approval": false,
+              "required_approving_review_count": 0,
+              "required_review_thread_resolution": false,
+              "required_reviewers": []
+            },
+            "type": "pull_request"
+          },
+          {
+            "parameters": {
+              "do_not_enforce_on_create": false,
+              "required_status_checks": [
+                {
+                  "context": "ci-success",
+                  "integration_id": 15368
+                }
+              ],
+              "strict_required_status_checks_policy": false
+            },
+            "type": "required_status_checks"
+          }
+        ],
+        "source": "rknightion/autopi-ha",
+        "source_type": "Repository",
+        "target": "branch",
+        "updated_at": "2026-06-28T23:05:43.141+01:00"
+      }
+    ],
+    "security_and_analysis": {
+      "dependabot_security_updates": "disabled",
+      "secret_scanning": "enabled",
+      "secret_scanning_non_provider_patterns": "disabled",
+      "secret_scanning_push_protection": "enabled",
+      "secret_scanning_validity_checks": "disabled"
+    },
+    "settings": {
+      "allow_auto_merge": true,
+      "allow_merge_commit": true,
+      "allow_rebase_merge": true,
+      "allow_squash_merge": true,
+      "allow_update_branch": false,
+      "archived": false,
+      "delete_branch_on_merge": true,
+      "has_discussions": false,
+      "has_issues": true,
+      "has_projects": true,
+      "has_wiki": true,
+      "web_commit_signoff_required": false
+    },
+    "visibility": "public",
+    "vulnerability_alerts": true
+  },
+  {
+    "actions_permissions": {
+      "allowed_actions": "all",
+      "enabled": true,
+      "sha_pinning_required": false
+    },
+    "actions_workflow_perms": {
+      "can_approve_pull_request_reviews": false,
+      "default_workflow_permissions": "read"
+    },
+    "automated_security_fixes": false,
+    "default_branch": "main",
+    "has_dependabot_yml": false,
+    "has_renovate_json": true,
+    "license": null,
+    "repo": "rknightion/bumblebee-catalog",
+    "rulesets": [
+      {
+        "_links": {
+          "html": {
+            "href": "https://github.com/rknightion/bumblebee-catalog/rules/18229719"
+          },
+          "self": {
+            "href": "https://api.github.com/repos/rknightion/bumblebee-catalog/rulesets/18229719"
+          }
+        },
+        "bypass_actors": [
+          {
+            "actor_id": 5,
+            "actor_type": "RepositoryRole",
+            "bypass_mode": "always"
+          }
+        ],
+        "conditions": {
+          "ref_name": {
+            "exclude": [],
+            "include": [
+              "~DEFAULT_BRANCH"
+            ]
+          }
+        },
+        "created_at": "2026-06-28T19:09:41.496+01:00",
+        "current_user_can_bypass": "always",
+        "enforcement": "active",
+        "id": 18229719,
+        "name": "main",
+        "node_id": "RRS_lACqUmVwb3NpdG9yec5LI718zgEWKdc",
+        "rules": [
+          {
+            "type": "deletion"
+          },
+          {
+            "type": "non_fast_forward"
+          },
+          {
+            "parameters": {
+              "do_not_enforce_on_create": false,
+              "required_status_checks": [
+                {
+                  "context": "ci-success",
+                  "integration_id": 15368
+                }
+              ],
+              "strict_required_status_checks_policy": false
+            },
+            "type": "required_status_checks"
+          },
+          {
+            "parameters": {
+              "allowed_merge_methods": [
+                "merge",
+                "squash",
+                "rebase"
+              ],
+              "dismiss_stale_reviews_on_push": false,
+              "require_code_owner_review": false,
+              "require_extra_approval_for_unattributed_changes": true,
+              "require_last_push_approval": false,
+              "required_approving_review_count": 0,
+              "required_review_thread_resolution": false,
+              "required_reviewers": []
+            },
+            "type": "pull_request"
+          }
+        ],
+        "source": "rknightion/bumblebee-catalog",
+        "source_type": "Repository",
+        "target": "branch",
+        "updated_at": "2026-06-28T23:05:38.211+01:00"
+      }
+    ],
+    "security_and_analysis": {
+      "dependabot_security_updates": "disabled",
+      "secret_scanning": "enabled",
+      "secret_scanning_non_provider_patterns": "disabled",
+      "secret_scanning_push_protection": "enabled",
+      "secret_scanning_validity_checks": "disabled"
+    },
+    "settings": {
+      "allow_auto_merge": true,
+      "allow_merge_commit": true,
+      "allow_rebase_merge": true,
+      "allow_squash_merge": true,
+      "allow_update_branch": false,
+      "archived": false,
+      "delete_branch_on_merge": true,
+      "has_discussions": false,
+      "has_issues": true,
+      "has_projects": true,
+      "has_wiki": true,
+      "web_commit_signoff_required": false
+    },
+    "visibility": "public",
+    "vulnerability_alerts": true
+  },
+  {
+    "actions_permissions": {
+      "allowed_actions": "all",
+      "enabled": true,
+      "sha_pinning_required": false
+    },
+    "actions_workflow_perms": {
+      "can_approve_pull_request_reviews": false,
+      "default_workflow_permissions": "read"
+    },
+    "automated_security_fixes": false,
+    "default_branch": "main",
+    "has_dependabot_yml": false,
+    "has_renovate_json": true,
+    "license": "Apache-2.0",
+    "repo": "rknightion/bumblebee-intune",
+    "rulesets": [
+      {
+        "_links": {
+          "html": {
+            "href": "https://github.com/rknightion/bumblebee-intune/rules/20634014"
+          },
+          "self": {
+            "href": "https://api.github.com/repos/rknightion/bumblebee-intune/rulesets/20634014"
+          }
+        },
+        "bypass_actors": [
+          {
+            "actor_id": 5,
+            "actor_type": "RepositoryRole",
+            "bypass_mode": "always"
+          }
+        ],
+        "conditions": {
+          "ref_name": {
+            "exclude": [],
+            "include": [
+              "~DEFAULT_BRANCH"
+            ]
+          }
+        },
+        "created_at": "2026-08-10T11:18:44.000+01:00",
+        "current_user_can_bypass": "always",
+        "enforcement": "active",
+        "id": 20634014,
+        "name": "main",
+        "node_id": "RRS_lACqUmVwb3NpdG9yec5PQW-AzgE62Z4",
+        "rules": [
+          {
+            "type": "deletion"
+          },
+          {
+            "type": "non_fast_forward"
+          },
+          {
+            "parameters": {
+              "allowed_merge_methods": [
+                "merge",
+                "squash",
+                "rebase"
+              ],
+              "dismiss_stale_reviews_on_push": false,
+              "require_code_owner_review": false,
+              "require_extra_approval_for_unattributed_changes": true,
+              "require_last_push_approval": false,
+              "required_approving_review_count": 0,
+              "required_review_thread_resolution": false,
+              "required_reviewers": []
+            },
+            "type": "pull_request"
+          },
+          {
+            "parameters": {
+              "do_not_enforce_on_create": false,
+              "required_status_checks": [
+                {
+                  "context": "ci-success"
+                }
+              ],
+              "strict_required_status_checks_policy": false
+            },
+            "type": "required_status_checks"
+          }
+        ],
+        "source": "rknightion/bumblebee-intune",
+        "source_type": "Repository",
+        "target": "branch",
+        "updated_at": "2026-08-10T11:18:44.046+01:00"
+      }
+    ],
+    "security_and_analysis": {
+      "dependabot_security_updates": "disabled",
+      "secret_scanning": "enabled",
+      "secret_scanning_non_provider_patterns": "disabled",
+      "secret_scanning_push_protection": "enabled",
+      "secret_scanning_validity_checks": "disabled"
+    },
+    "settings": {
+      "allow_auto_merge": true,
+      "allow_merge_commit": true,
+      "allow_rebase_merge": true,
+      "allow_squash_merge": true,
+      "allow_update_branch": true,
+      "archived": false,
+      "delete_branch_on_merge": true,
+      "has_discussions": false,
+      "has_issues": true,
+      "has_projects": true,
+      "has_wiki": true,
+      "web_commit_signoff_required": true
+    },
+    "visibility": "public",
+    "vulnerability_alerts": true
+  },
+  {
+    "actions_permissions": {
+      "allowed_actions": "all",
+      "enabled": true,
+      "sha_pinning_required": false
+    },
+    "actions_workflow_perms": {
+      "can_approve_pull_request_reviews": false,
+      "default_workflow_permissions": "read"
+    },
+    "automated_security_fixes": false,
+    "default_branch": "main",
+    "has_dependabot_yml": false,
+    "has_renovate_json": false,
+    "license": null,
+    "repo": "rknightion/codexlb2otel",
+    "rulesets": [],
+    "security_and_analysis": {
+      "dependabot_security_updates": "disabled",
+      "secret_scanning": "disabled",
+      "secret_scanning_non_provider_patterns": "disabled",
+      "secret_scanning_push_protection": "disabled",
+      "secret_scanning_validity_checks": "disabled"
+    },
+    "settings": {
+      "allow_auto_merge": false,
+      "allow_merge_commit": true,
+      "allow_rebase_merge": true,
+      "allow_squash_merge": true,
+      "allow_update_branch": false,
+      "archived": false,
+      "delete_branch_on_merge": false,
+      "has_discussions": false,
+      "has_issues": true,
+      "has_projects": true,
+      "has_wiki": false,
+      "web_commit_signoff_required": false
+    },
+    "visibility": "public",
+    "vulnerability_alerts": false
+  },
+  {
+    "actions_permissions": {
+      "allowed_actions": "all",
+      "enabled": true,
+      "sha_pinning_required": false
+    },
+    "actions_workflow_perms": {
+      "can_approve_pull_request_reviews": false,
+      "default_workflow_permissions": "read"
+    },
+    "automated_security_fixes": false,
+    "default_branch": "main",
+    "has_dependabot_yml": false,
+    "has_renovate_json": true,
+    "license": "Apache-2.0",
+    "repo": "rknightion/fleet-management-operator",
+    "rulesets": [
+      {
+        "_links": {
+          "html": {
+            "href": "https://github.com/rknightion/fleet-management-operator/rules/18223640"
+          },
+          "self": {
+            "href": "https://api.github.com/repos/rknightion/fleet-management-operator/rulesets/18223640"
+          }
+        },
+        "bypass_actors": [
+          {
+            "actor_id": 5,
+            "actor_type": "RepositoryRole",
+            "bypass_mode": "always"
+          }
+        ],
+        "conditions": {
+          "ref_name": {
+            "exclude": [],
+            "include": [
+              "~DEFAULT_BRANCH"
+            ]
+          }
+        },
+        "created_at": "2026-06-28T11:52:29.048+01:00",
+        "current_user_can_bypass": "always",
+        "enforcement": "active",
+        "id": 18223640,
+        "name": "main",
+        "node_id": "RRS_lACqUmVwb3NpdG9yec5I7ao_zgEWEhg",
+        "rules": [
+          {
+            "type": "deletion"
+          },
+          {
+            "type": "non_fast_forward"
+          },
+          {
+            "parameters": {
+              "do_not_enforce_on_create": false,
+              "required_status_checks": [
+                {
+                  "context": "ci-success",
+                  "integration_id": 15368
+                }
+              ],
+              "strict_required_status_checks_policy": false
+            },
+            "type": "required_status_checks"
+          },
+          {
+            "parameters": {
+              "allowed_merge_methods": [
+                "merge",
+                "squash",
+                "rebase"
+              ],
+              "dismiss_stale_reviews_on_push": false,
+              "require_code_owner_review": false,
+              "require_extra_approval_for_unattributed_changes": true,
+              "require_last_push_approval": false,
+              "required_approving_review_count": 0,
+              "required_review_thread_resolution": false,
+              "required_reviewers": []
+            },
+            "type": "pull_request"
+          }
+        ],
+        "source": "rknightion/fleet-management-operator",
+        "source_type": "Repository",
+        "target": "branch",
+        "updated_at": "2026-06-28T11:52:29.112+01:00"
+      }
+    ],
+    "security_and_analysis": {
+      "dependabot_security_updates": "disabled",
+      "secret_scanning": "enabled",
+      "secret_scanning_non_provider_patterns": "disabled",
+      "secret_scanning_push_protection": "enabled",
+      "secret_scanning_validity_checks": "disabled"
+    },
+    "settings": {
+      "allow_auto_merge": true,
+      "allow_merge_commit": true,
+      "allow_rebase_merge": true,
+      "allow_squash_merge": true,
+      "allow_update_branch": false,
+      "archived": false,
+      "delete_branch_on_merge": true,
+      "has_discussions": false,
+      "has_issues": true,
+      "has_projects": true,
+      "has_wiki": false,
+      "web_commit_signoff_required": false
+    },
+    "visibility": "public",
+    "vulnerability_alerts": true
+  },
+  {
+    "actions_permissions": {
+      "allowed_actions": "all",
+      "enabled": true,
+      "sha_pinning_required": false
+    },
+    "actions_workflow_perms": {
+      "can_approve_pull_request_reviews": false,
+      "default_workflow_permissions": "read"
+    },
+    "automated_security_fixes": false,
+    "default_branch": "main",
+    "has_dependabot_yml": false,
+    "has_renovate_json": true,
+    "license": "AGPL-3.0",
+    "repo": "rknightion/genai-otel-bridge",
+    "rulesets": [
+      {
+        "_links": {
+          "html": {
+            "href": "https://github.com/rknightion/genai-otel-bridge/rules/18186732"
+          },
+          "self": {
+            "href": "https://api.github.com/repos/rknightion/genai-otel-bridge/rulesets/18186732"
+          }
+        },
+        "bypass_actors": [
+          {
+            "actor_id": 5,
+            "actor_type": "RepositoryRole",
+            "bypass_mode": "always"
+          }
+        ],
+        "conditions": {
+          "ref_name": {
+            "exclude": [],
+            "include": [
+              "~DEFAULT_BRANCH"
+            ]
+          }
+        },
+        "created_at": "2026-06-26T21:19:18.603+01:00",
+        "current_user_can_bypass": "always",
+        "enforcement": "active",
+        "id": 18186732,
+        "name": "main",
+        "node_id": "RRS_lACqUmVwb3NpdG9yec5MY-F2zgEVgew",
+        "rules": [
+          {
+            "type": "deletion"
+          },
+          {
+            "type": "non_fast_forward"
+          },
+          {
+            "parameters": {
+              "do_not_enforce_on_create": false,
+              "required_status_checks": [
+                {
+                  "context": "ci-success",
+                  "integration_id": 15368
+                }
+              ],
+              "strict_required_status_checks_policy": false
+            },
+            "type": "required_status_checks"
+          },
+          {
+            "parameters": {
+              "allowed_merge_methods": [
+                "merge",
+                "squash",
+                "rebase"
+              ],
+              "dismiss_stale_reviews_on_push": false,
+              "require_code_owner_review": false,
+              "require_extra_approval_for_unattributed_changes": true,
+              "require_last_push_approval": false,
+              "required_approving_review_count": 0,
+              "required_review_thread_resolution": false,
+              "required_reviewers": []
+            },
+            "type": "pull_request"
+          }
+        ],
+        "source": "rknightion/genai-otel-bridge",
+        "source_type": "Repository",
+        "target": "branch",
+        "updated_at": "2026-06-28T23:05:33.353+01:00"
+      }
+    ],
+    "security_and_analysis": {
+      "dependabot_security_updates": "disabled",
+      "secret_scanning": "enabled",
+      "secret_scanning_non_provider_patterns": "disabled",
+      "secret_scanning_push_protection": "enabled",
+      "secret_scanning_validity_checks": "disabled"
+    },
+    "settings": {
+      "allow_auto_merge": true,
+      "allow_merge_commit": true,
+      "allow_rebase_merge": true,
+      "allow_squash_merge": true,
+      "allow_update_branch": false,
+      "archived": false,
+      "delete_branch_on_merge": true,
+      "has_discussions": false,
+      "has_issues": true,
+      "has_projects": true,
+      "has_wiki": false,
+      "web_commit_signoff_required": false
+    },
+    "visibility": "public",
+    "vulnerability_alerts": true
+  },
+  {
+    "actions_permissions": {
+      "allowed_actions": "all",
+      "enabled": true,
+      "sha_pinning_required": false
+    },
+    "actions_workflow_perms": {
+      "can_approve_pull_request_reviews": false,
+      "default_workflow_permissions": "read"
+    },
+    "automated_security_fixes": true,
+    "default_branch": "main",
+    "has_dependabot_yml": false,
+    "has_renovate_json": true,
+    "license": "Apache-2.0",
+    "repo": "rknightion/grafana-cloud-org-insights",
+    "rulesets": [
+      {
+        "_links": {
+          "html": {
+            "href": "https://github.com/rknightion/grafana-cloud-org-insights/rules/21308502"
+          },
+          "self": {
+            "href": "https://api.github.com/repos/rknightion/grafana-cloud-org-insights/rulesets/21308502"
+          }
+        },
+        "bypass_actors": [
+          {
+            "actor_id": 5,
+            "actor_type": "RepositoryRole",
+            "bypass_mode": "always"
+          }
+        ],
+        "conditions": {
+          "ref_name": {
+            "exclude": [],
+            "include": [
+              "~DEFAULT_BRANCH"
+            ]
+          }
+        },
+        "created_at": "2026-08-24T17:44:53.186+01:00",
+        "current_user_can_bypass": "always",
+        "enforcement": "active",
+        "id": 21308502,
+        "name": "main",
+        "node_id": "RRS_lACqUmVwb3NpdG9yec5QLeHnzgFFJFY",
+        "rules": [
+          {
+            "type": "deletion"
+          },
+          {
+            "type": "non_fast_forward"
+          },
+          {
+            "parameters": {
+              "do_not_enforce_on_create": false,
+              "required_status_checks": [
+                {
+                  "context": "ci-success",
+                  "integration_id": 15368
+                }
+              ],
+              "strict_required_status_checks_policy": false
+            },
+            "type": "required_status_checks"
+          },
+          {
+            "parameters": {
+              "allowed_merge_methods": [
+                "merge",
+                "squash",
+                "rebase"
+              ],
+              "dismiss_stale_reviews_on_push": false,
+              "require_code_owner_review": false,
+              "require_extra_approval_for_unattributed_changes": true,
+              "require_last_push_approval": false,
+              "required_approving_review_count": 0,
+              "required_review_thread_resolution": false,
+              "required_reviewers": []
+            },
+            "type": "pull_request"
+          }
+        ],
+        "source": "rknightion/grafana-cloud-org-insights",
+        "source_type": "Repository",
+        "target": "branch",
+        "updated_at": "2026-08-24T17:44:53.267+01:00"
+      }
+    ],
+    "security_and_analysis": {
+      "dependabot_security_updates": "enabled",
+      "secret_scanning": "enabled",
+      "secret_scanning_non_provider_patterns": "disabled",
+      "secret_scanning_push_protection": "enabled",
+      "secret_scanning_validity_checks": "disabled"
+    },
+    "settings": {
+      "allow_auto_merge": true,
+      "allow_merge_commit": true,
+      "allow_rebase_merge": true,
+      "allow_squash_merge": true,
+      "allow_update_branch": false,
+      "archived": false,
+      "delete_branch_on_merge": true,
+      "has_discussions": false,
+      "has_issues": true,
+      "has_projects": true,
+      "has_wiki": false,
+      "web_commit_signoff_required": false
+    },
+    "visibility": "public",
+    "vulnerability_alerts": true
+  },
+  {
+    "actions_permissions": {
+      "allowed_actions": "all",
+      "enabled": true,
+      "sha_pinning_required": false
+    },
+    "actions_workflow_perms": {
+      "can_approve_pull_request_reviews": false,
+      "default_workflow_permissions": "read"
+    },
+    "automated_security_fixes": false,
+    "default_branch": "main",
+    "has_dependabot_yml": false,
+    "has_renovate_json": true,
+    "license": "Apache-2.0",
+    "repo": "rknightion/grafana-cloud-vending-machine",
+    "rulesets": [],
+    "security_and_analysis": {
+      "dependabot_security_updates": "disabled",
+      "secret_scanning": "disabled",
+      "secret_scanning_non_provider_patterns": "disabled",
+      "secret_scanning_push_protection": "disabled",
+      "secret_scanning_validity_checks": "disabled"
+    },
+    "settings": {
+      "allow_auto_merge": false,
+      "allow_merge_commit": true,
+      "allow_rebase_merge": true,
+      "allow_squash_merge": true,
+      "allow_update_branch": false,
+      "archived": false,
+      "delete_branch_on_merge": false,
+      "has_discussions": false,
+      "has_issues": true,
+      "has_projects": true,
+      "has_wiki": false,
+      "web_commit_signoff_required": false
+    },
+    "visibility": "public",
+    "vulnerability_alerts": true
+  },
+  {
+    "actions_permissions": {
+      "allowed_actions": "all",
+      "enabled": true,
+      "sha_pinning_required": false
+    },
+    "actions_workflow_perms": {
+      "can_approve_pull_request_reviews": false,
+      "default_workflow_permissions": "read"
+    },
+    "automated_security_fixes": false,
+    "default_branch": "main",
+    "has_dependabot_yml": false,
+    "has_renovate_json": true,
+    "license": "AGPL-3.0",
+    "repo": "rknightion/graph2otel",
+    "rulesets": [
+      {
+        "_links": {
+          "html": {
+            "href": "https://github.com/rknightion/graph2otel/rules/19014618"
+          },
+          "self": {
+            "href": "https://api.github.com/repos/rknightion/graph2otel/rulesets/19014618"
+          }
+        },
+        "bypass_actors": [
+          {
+            "actor_id": 5,
+            "actor_type": "RepositoryRole",
+            "bypass_mode": "always"
+          }
+        ],
+        "conditions": {
+          "ref_name": {
+            "exclude": [],
+            "include": [
+              "~DEFAULT_BRANCH"
+            ]
+          }
+        },
+        "created_at": "2026-07-15T22:55:42.087+01:00",
+        "current_user_can_bypass": "always",
+        "enforcement": "active",
+        "id": 19014618,
+        "name": "main",
+        "node_id": "RRS_lACqUmVwb3NpdG9yec5Nk_bYzgEiI9o",
+        "rules": [
+          {
+            "type": "deletion"
+          },
+          {
+            "type": "non_fast_forward"
+          },
+          {
+            "parameters": {
+              "allowed_merge_methods": [
+                "merge",
+                "squash",
+                "rebase"
+              ],
+              "dismiss_stale_reviews_on_push": false,
+              "require_code_owner_review": false,
+              "require_extra_approval_for_unattributed_changes": true,
+              "require_last_push_approval": false,
+              "required_approving_review_count": 0,
+              "required_review_thread_resolution": false,
+              "required_reviewers": []
+            },
+            "type": "pull_request"
+          },
+          {
+            "parameters": {
+              "do_not_enforce_on_create": false,
+              "required_status_checks": [
+                {
+                  "context": "ci-success",
+                  "integration_id": 15368
+                }
+              ],
+              "strict_required_status_checks_policy": false
+            },
+            "type": "required_status_checks"
+          }
+        ],
+        "source": "rknightion/graph2otel",
+        "source_type": "Repository",
+        "target": "branch",
+        "updated_at": "2026-07-15T22:55:42.150+01:00"
+      }
+    ],
+    "security_and_analysis": {
+      "dependabot_security_updates": "disabled",
+      "secret_scanning": "enabled",
+      "secret_scanning_non_provider_patterns": "disabled",
+      "secret_scanning_push_protection": "enabled",
+      "secret_scanning_validity_checks": "disabled"
+    },
+    "settings": {
+      "allow_auto_merge": true,
+      "allow_merge_commit": true,
+      "allow_rebase_merge": true,
+      "allow_squash_merge": true,
+      "allow_update_branch": false,
+      "archived": false,
+      "delete_branch_on_merge": true,
+      "has_discussions": false,
+      "has_issues": true,
+      "has_projects": true,
+      "has_wiki": false,
+      "web_commit_signoff_required": false
+    },
+    "visibility": "public",
+    "vulnerability_alerts": true
+  },
+  {
+    "actions_permissions": {
+      "allowed_actions": "all",
+      "enabled": true,
+      "sha_pinning_required": false
+    },
+    "actions_workflow_perms": {
+      "can_approve_pull_request_reviews": false,
+      "default_workflow_permissions": "read"
+    },
+    "automated_security_fixes": false,
+    "default_branch": "main",
+    "has_dependabot_yml": false,
+    "has_renovate_json": true,
+    "license": null,
+    "repo": "rknightion/grotTrack",
+    "rulesets": [
+      {
+        "_links": {
+          "html": {
+            "href": "https://github.com/rknightion/grotTrack/rules/14286093"
+          },
+          "self": {
+            "href": "https://api.github.com/repos/rknightion/grotTrack/rulesets/14286093"
+          }
+        },
+        "bypass_actors": [
+          {
+            "actor_id": 5,
+            "actor_type": "RepositoryRole",
+            "bypass_mode": "always"
+          }
+        ],
+        "conditions": {
+          "ref_name": {
+            "exclude": [],
+            "include": [
+              "~DEFAULT_BRANCH"
+            ]
+          }
+        },
+        "created_at": "2026-03-24T15:59:00.421+00:00",
+        "current_user_can_bypass": "always",
+        "enforcement": "active",
+        "id": 14286093,
+        "name": "main",
+        "node_id": "RRS_lACqUmVwb3NpdG9yec5G-GWTzgDZ_Q0",
+        "rules": [
+          {
+            "type": "deletion"
+          },
+          {
+            "type": "non_fast_forward"
+          },
+          {
+            "parameters": {
+              "do_not_enforce_on_create": false,
+              "required_status_checks": [
+                {
+                  "context": "ci-success",
+                  "integration_id": 15368
+                }
+              ],
+              "strict_required_status_checks_policy": false
+            },
+            "type": "required_status_checks"
+          },
+          {
+            "parameters": {
+              "allowed_merge_methods": [
+                "merge",
+                "squash",
+                "rebase"
+              ],
+              "dismiss_stale_reviews_on_push": false,
+              "require_code_owner_review": false,
+              "require_extra_approval_for_unattributed_changes": true,
+              "require_last_push_approval": false,
+              "required_approving_review_count": 0,
+              "required_review_thread_resolution": false,
+              "required_reviewers": []
+            },
+            "type": "pull_request"
+          }
+        ],
+        "source": "rknightion/grotTrack",
+        "source_type": "Repository",
+        "target": "branch",
+        "updated_at": "2026-06-28T23:05:44.361+01:00"
+      }
+    ],
+    "security_and_analysis": {
+      "dependabot_security_updates": "disabled",
+      "secret_scanning": "enabled",
+      "secret_scanning_non_provider_patterns": "disabled",
+      "secret_scanning_push_protection": "enabled",
+      "secret_scanning_validity_checks": "disabled"
+    },
+    "settings": {
+      "allow_auto_merge": true,
+      "allow_merge_commit": true,
+      "allow_rebase_merge": true,
+      "allow_squash_merge": true,
+      "allow_update_branch": false,
+      "archived": false,
+      "delete_branch_on_merge": true,
+      "has_discussions": false,
+      "has_issues": true,
+      "has_projects": true,
+      "has_wiki": false,
+      "web_commit_signoff_required": false
+    },
+    "visibility": "public",
+    "vulnerability_alerts": true
+  },
+  {
+    "actions_permissions": {
+      "allowed_actions": "all",
+      "enabled": true,
+      "sha_pinning_required": false
+    },
+    "actions_workflow_perms": {
+      "can_approve_pull_request_reviews": false,
+      "default_workflow_permissions": "read"
+    },
+    "automated_security_fixes": false,
+    "default_branch": "main",
+    "has_dependabot_yml": false,
+    "has_renovate_json": true,
+    "license": "AGPL-3.0",
+    "repo": "rknightion/intune-assignments-manager",
+    "rulesets": [
+      {
+        "_links": {
+          "html": {
+            "href": "https://github.com/rknightion/intune-assignments-manager/rules/20591363"
+          },
+          "self": {
+            "href": "https://api.github.com/repos/rknightion/intune-assignments-manager/rulesets/20591363"
+          }
+        },
+        "bypass_actors": [
+          {
+            "actor_id": 5,
+            "actor_type": "RepositoryRole",
+            "bypass_mode": "always"
+          }
+        ],
+        "conditions": {
+          "ref_name": {
+            "exclude": [],
+            "include": [
+              "~DEFAULT_BRANCH"
+            ]
+          }
+        },
+        "created_at": "2026-08-08T20:24:08.677+01:00",
+        "current_user_can_bypass": "always",
+        "enforcement": "active",
+        "id": 20591363,
+        "name": "main",
+        "node_id": "RRS_lACqUmVwb3NpdG9yec5FTntbzgE6MwM",
+        "rules": [
+          {
+            "type": "deletion"
+          },
+          {
+            "type": "non_fast_forward"
+          },
+          {
+            "parameters": {
+              "allowed_merge_methods": [
+                "merge",
+                "squash",
+                "rebase"
+              ],
+              "dismiss_stale_reviews_on_push": false,
+              "require_code_owner_review": false,
+              "require_extra_approval_for_unattributed_changes": true,
+              "require_last_push_approval": false,
+              "required_approving_review_count": 0,
+              "required_review_thread_resolution": false,
+              "required_reviewers": []
+            },
+            "type": "pull_request"
+          },
+          {
+            "parameters": {
+              "do_not_enforce_on_create": false,
+              "required_status_checks": [
+                {
+                  "context": "ci-success"
+                }
+              ],
+              "strict_required_status_checks_policy": false
+            },
+            "type": "required_status_checks"
+          }
+        ],
+        "source": "rknightion/intune-assignments-manager",
+        "source_type": "Repository",
+        "target": "branch",
+        "updated_at": "2026-08-08T20:24:08.720+01:00"
+      }
+    ],
+    "security_and_analysis": {
+      "dependabot_security_updates": "disabled",
+      "secret_scanning": "enabled",
+      "secret_scanning_non_provider_patterns": "disabled",
+      "secret_scanning_push_protection": "enabled",
+      "secret_scanning_validity_checks": "disabled"
+    },
+    "settings": {
+      "allow_auto_merge": true,
+      "allow_merge_commit": true,
+      "allow_rebase_merge": true,
+      "allow_squash_merge": true,
+      "allow_update_branch": false,
+      "archived": false,
+      "delete_branch_on_merge": true,
+      "has_discussions": false,
+      "has_issues": true,
+      "has_projects": true,
+      "has_wiki": false,
+      "web_commit_signoff_required": false
+    },
+    "visibility": "public",
+    "vulnerability_alerts": true
+  },
+  {
+    "actions_permissions": {
+      "allowed_actions": "all",
+      "enabled": true,
+      "sha_pinning_required": false
+    },
+    "actions_workflow_perms": {
+      "can_approve_pull_request_reviews": false,
+      "default_workflow_permissions": "read"
+    },
+    "automated_security_fixes": false,
+    "default_branch": "main",
+    "has_dependabot_yml": false,
+    "has_renovate_json": true,
+    "license": "Apache-2.0",
+    "repo": "rknightion/meraki-dashboard-exporter",
+    "rulesets": [
+      {
+        "_links": {
+          "html": {
+            "href": "https://github.com/rknightion/meraki-dashboard-exporter/rules/6568364"
+          },
+          "self": {
+            "href": "https://api.github.com/repos/rknightion/meraki-dashboard-exporter/rulesets/6568364"
+          }
+        },
+        "bypass_actors": [
+          {
+            "actor_id": 5,
+            "actor_type": "RepositoryRole",
+            "bypass_mode": "always"
+          }
+        ],
+        "conditions": {
+          "ref_name": {
+            "exclude": [],
+            "include": [
+              "~DEFAULT_BRANCH"
+            ]
+          }
+        },
+        "created_at": "2025-07-08T18:41:46.086+01:00",
+        "current_user_can_bypass": "always",
+        "enforcement": "active",
+        "id": 6568364,
+        "name": "main",
+        "node_id": "RRS_lACqUmVwb3NpdG9yec48b0t6zgBkOaw",
+        "rules": [
+          {
+            "type": "deletion"
+          },
+          {
+            "type": "non_fast_forward"
+          },
+          {
+            "parameters": {
+              "allowed_merge_methods": [
+                "merge",
+                "squash",
+                "rebase"
+              ],
+              "dismiss_stale_reviews_on_push": false,
+              "require_code_owner_review": false,
+              "require_extra_approval_for_unattributed_changes": true,
+              "require_last_push_approval": false,
+              "required_approving_review_count": 0,
+              "required_review_thread_resolution": false,
+              "required_reviewers": []
+            },
+            "type": "pull_request"
+          },
+          {
+            "parameters": {
+              "do_not_enforce_on_create": false,
+              "required_status_checks": [
+                {
+                  "context": "ci-success",
+                  "integration_id": 15368
+                }
+              ],
+              "strict_required_status_checks_policy": false
+            },
+            "type": "required_status_checks"
+          }
+        ],
+        "source": "rknightion/meraki-dashboard-exporter",
+        "source_type": "Repository",
+        "target": "branch",
+        "updated_at": "2026-06-28T23:05:45.564+01:00"
+      }
+    ],
+    "security_and_analysis": {
+      "dependabot_security_updates": "disabled",
+      "secret_scanning": "enabled",
+      "secret_scanning_non_provider_patterns": "disabled",
+      "secret_scanning_push_protection": "enabled",
+      "secret_scanning_validity_checks": "disabled"
+    },
+    "settings": {
+      "allow_auto_merge": true,
+      "allow_merge_commit": true,
+      "allow_rebase_merge": true,
+      "allow_squash_merge": true,
+      "allow_update_branch": false,
+      "archived": false,
+      "delete_branch_on_merge": true,
+      "has_discussions": false,
+      "has_issues": true,
+      "has_projects": true,
+      "has_wiki": true,
+      "web_commit_signoff_required": false
+    },
+    "visibility": "public",
+    "vulnerability_alerts": true
+  },
+  {
+    "actions_permissions": {
+      "allowed_actions": "all",
+      "enabled": true,
+      "sha_pinning_required": false
+    },
+    "actions_workflow_perms": {
+      "can_approve_pull_request_reviews": false,
+      "default_workflow_permissions": "read"
+    },
+    "automated_security_fixes": false,
+    "default_branch": "main",
+    "has_dependabot_yml": false,
+    "has_renovate_json": true,
+    "license": "Apache-2.0",
+    "repo": "rknightion/meraki-dashboard-ha",
+    "rulesets": [
+      {
+        "_links": {
+          "html": {
+            "href": "https://github.com/rknightion/meraki-dashboard-ha/rules/6200678"
+          },
+          "self": {
+            "href": "https://api.github.com/repos/rknightion/meraki-dashboard-ha/rulesets/6200678"
+          }
+        },
+        "bypass_actors": [
+          {
+            "actor_id": 5,
+            "actor_type": "RepositoryRole",
+            "bypass_mode": "always"
+          }
+        ],
+        "conditions": {
+          "ref_name": {
+            "exclude": [],
+            "include": [
+              "~DEFAULT_BRANCH"
+            ]
+          }
+        },
+        "created_at": "2025-06-20T09:35:44.920+01:00",
+        "current_user_can_bypass": "always",
+        "enforcement": "active",
+        "id": 6200678,
+        "name": "main",
+        "node_id": "RRS_lACqUmVwb3NpdG9yec473vobzgBenWY",
+        "rules": [
+          {
+            "type": "deletion"
+          },
+          {
+            "type": "non_fast_forward"
+          },
+          {
+            "parameters": {
+              "do_not_enforce_on_create": false,
+              "required_status_checks": [
+                {
+                  "context": "ci-success",
+                  "integration_id": 15368
+                },
+                {
+                  "context": "validate-success",
+                  "integration_id": 15368
+                }
+              ],
+              "strict_required_status_checks_policy": false
+            },
+            "type": "required_status_checks"
+          },
+          {
+            "parameters": {
+              "allowed_merge_methods": [
+                "merge",
+                "squash",
+                "rebase"
+              ],
+              "dismiss_stale_reviews_on_push": false,
+              "require_code_owner_review": false,
+              "require_extra_approval_for_unattributed_changes": true,
+              "require_last_push_approval": false,
+              "required_approving_review_count": 0,
+              "required_review_thread_resolution": false,
+              "required_reviewers": []
+            },
+            "type": "pull_request"
+          }
+        ],
+        "source": "rknightion/meraki-dashboard-ha",
+        "source_type": "Repository",
+        "target": "branch",
+        "updated_at": "2026-06-28T23:05:46.844+01:00"
+      }
+    ],
+    "security_and_analysis": {
+      "dependabot_security_updates": "disabled",
+      "secret_scanning": "enabled",
+      "secret_scanning_non_provider_patterns": "disabled",
+      "secret_scanning_push_protection": "enabled",
+      "secret_scanning_validity_checks": "disabled"
+    },
+    "settings": {
+      "allow_auto_merge": true,
+      "allow_merge_commit": true,
+      "allow_rebase_merge": true,
+      "allow_squash_merge": true,
+      "allow_update_branch": true,
+      "archived": false,
+      "delete_branch_on_merge": true,
+      "has_discussions": false,
+      "has_issues": true,
+      "has_projects": false,
+      "has_wiki": false,
+      "web_commit_signoff_required": false
+    },
+    "visibility": "public",
+    "vulnerability_alerts": true
+  },
+  {
+    "actions_permissions": {
+      "allowed_actions": "all",
+      "enabled": true,
+      "sha_pinning_required": false
+    },
+    "actions_workflow_perms": {
+      "can_approve_pull_request_reviews": false,
+      "default_workflow_permissions": "read"
+    },
+    "automated_security_fixes": false,
+    "default_branch": "main",
+    "has_dependabot_yml": false,
+    "has_renovate_json": true,
+    "license": "Apache-2.0",
+    "repo": "rknightion/openbao-plugin-secrets-github",
+    "rulesets": [
+      {
+        "_links": {
+          "html": {
+            "href": "https://github.com/rknightion/openbao-plugin-secrets-github/rules/20566563"
+          },
+          "self": {
+            "href": "https://api.github.com/repos/rknightion/openbao-plugin-secrets-github/rulesets/20566563"
+          }
+        },
+        "bypass_actors": [
+          {
+            "actor_id": 5,
+            "actor_type": "RepositoryRole",
+            "bypass_mode": "always"
+          }
+        ],
+        "conditions": {
+          "ref_name": {
+            "exclude": [],
+            "include": [
+              "~DEFAULT_BRANCH"
+            ]
+          }
+        },
+        "created_at": "2026-08-07T19:57:33.793+01:00",
+        "current_user_can_bypass": "always",
+        "enforcement": "active",
+        "id": 20566563,
+        "name": "main",
+        "node_id": "RRS_lACqUmVwb3NpdG9yec5PGPeszgE50iM",
+        "rules": [
+          {
+            "type": "deletion"
+          },
+          {
+            "type": "non_fast_forward"
+          },
+          {
+            "parameters": {
+              "allowed_merge_methods": [
+                "merge",
+                "squash",
+                "rebase"
+              ],
+              "dismiss_stale_reviews_on_push": false,
+              "require_code_owner_review": false,
+              "require_extra_approval_for_unattributed_changes": true,
+              "require_last_push_approval": false,
+              "required_approving_review_count": 0,
+              "required_review_thread_resolution": false,
+              "required_reviewers": []
+            },
+            "type": "pull_request"
+          },
+          {
+            "parameters": {
+              "do_not_enforce_on_create": false,
+              "required_status_checks": [
+                {
+                  "context": "ci-success"
+                }
+              ],
+              "strict_required_status_checks_policy": false
+            },
+            "type": "required_status_checks"
+          }
+        ],
+        "source": "rknightion/openbao-plugin-secrets-github",
+        "source_type": "Repository",
+        "target": "branch",
+        "updated_at": "2026-08-07T19:57:33.863+01:00"
+      }
+    ],
+    "security_and_analysis": {
+      "dependabot_security_updates": "disabled",
+      "secret_scanning": "enabled",
+      "secret_scanning_non_provider_patterns": "disabled",
+      "secret_scanning_push_protection": "enabled",
+      "secret_scanning_validity_checks": "disabled"
+    },
+    "settings": {
+      "allow_auto_merge": true,
+      "allow_merge_commit": true,
+      "allow_rebase_merge": true,
+      "allow_squash_merge": true,
+      "allow_update_branch": true,
+      "archived": false,
+      "delete_branch_on_merge": true,
+      "has_discussions": false,
+      "has_issues": true,
+      "has_projects": true,
+      "has_wiki": true,
+      "web_commit_signoff_required": true
+    },
+    "visibility": "public",
+    "vulnerability_alerts": true
+  },
+  {
+    "actions_permissions": {
+      "allowed_actions": "all",
+      "enabled": true,
+      "sha_pinning_required": false
+    },
+    "actions_workflow_perms": {
+      "can_approve_pull_request_reviews": false,
+      "default_workflow_permissions": "read"
+    },
+    "automated_security_fixes": false,
+    "default_branch": "main",
+    "has_dependabot_yml": false,
+    "has_renovate_json": true,
+    "license": "Apache-2.0",
+    "repo": "rknightion/opnsense2otel",
+    "rulesets": [
+      {
+        "_links": {
+          "html": {
+            "href": "https://github.com/rknightion/opnsense2otel/rules/13911267"
+          },
+          "self": {
+            "href": "https://api.github.com/repos/rknightion/opnsense2otel/rulesets/13911267"
+          }
+        },
+        "bypass_actors": [
+          {
+            "actor_id": 5,
+            "actor_type": "RepositoryRole",
+            "bypass_mode": "always"
+          }
+        ],
+        "conditions": {
+          "ref_name": {
+            "exclude": [],
+            "include": [
+              "~DEFAULT_BRANCH"
+            ]
+          }
+        },
+        "created_at": "2026-03-14T18:34:38.903+00:00",
+        "current_user_can_bypass": "always",
+        "enforcement": "active",
+        "id": 13911267,
+        "name": "main",
+        "node_id": "RRS_lACqUmVwb3NpdG9yec5FvatizgDUROM",
+        "rules": [
+          {
+            "type": "deletion"
+          },
+          {
+            "type": "non_fast_forward"
+          },
+          {
+            "parameters": {
+              "do_not_enforce_on_create": false,
+              "required_status_checks": [
+                {
+                  "context": "ci-success",
+                  "integration_id": 15368
+                }
+              ],
+              "strict_required_status_checks_policy": false
+            },
+            "type": "required_status_checks"
+          },
+          {
+            "parameters": {
+              "allowed_merge_methods": [
+                "merge",
+                "squash",
+                "rebase"
+              ],
+              "dismiss_stale_reviews_on_push": false,
+              "require_code_owner_review": false,
+              "require_extra_approval_for_unattributed_changes": true,
+              "require_last_push_approval": false,
+              "required_approving_review_count": 0,
+              "required_review_thread_resolution": false,
+              "required_reviewers": []
+            },
+            "type": "pull_request"
+          }
+        ],
+        "source": "rknightion/opnsense2otel",
+        "source_type": "Repository",
+        "target": "branch",
+        "updated_at": "2026-06-28T23:05:31.989+01:00"
+      }
+    ],
+    "security_and_analysis": {
+      "dependabot_security_updates": "disabled",
+      "secret_scanning": "enabled",
+      "secret_scanning_non_provider_patterns": "disabled",
+      "secret_scanning_push_protection": "enabled",
+      "secret_scanning_validity_checks": "disabled"
+    },
+    "settings": {
+      "allow_auto_merge": true,
+      "allow_merge_commit": true,
+      "allow_rebase_merge": true,
+      "allow_squash_merge": true,
+      "allow_update_branch": true,
+      "archived": false,
+      "delete_branch_on_merge": true,
+      "has_discussions": true,
+      "has_issues": true,
+      "has_projects": true,
+      "has_wiki": true,
+      "web_commit_signoff_required": true
+    },
+    "visibility": "public",
+    "vulnerability_alerts": true
+  },
+  {
+    "actions_permissions": {
+      "allowed_actions": "all",
+      "enabled": true,
+      "sha_pinning_required": false
+    },
+    "actions_workflow_perms": {
+      "can_approve_pull_request_reviews": false,
+      "default_workflow_permissions": "read"
+    },
+    "automated_security_fixes": false,
+    "default_branch": "main",
+    "has_dependabot_yml": false,
+    "has_renovate_json": true,
+    "license": "GPL-3.0",
+    "repo": "rknightion/paperless-ngx-dedupe",
+    "rulesets": [
+      {
+        "_links": {
+          "html": {
+            "href": "https://github.com/rknightion/paperless-ngx-dedupe/rules/7727792"
+          },
+          "self": {
+            "href": "https://api.github.com/repos/rknightion/paperless-ngx-dedupe/rulesets/7727792"
+          }
+        },
+        "bypass_actors": [
+          {
+            "actor_id": 5,
+            "actor_type": "RepositoryRole",
+            "bypass_mode": "always"
+          }
+        ],
+        "conditions": {
+          "ref_name": {
+            "exclude": [],
+            "include": [
+              "~DEFAULT_BRANCH"
+            ]
+          }
+        },
+        "created_at": "2025-08-28T10:48:57.880+01:00",
+        "current_user_can_bypass": "always",
+        "enforcement": "active",
+        "id": 7727792,
+        "name": "main",
+        "node_id": "RRS_lACqUmVwb3NpdG9yec495UjQzgB16rA",
+        "rules": [
+          {
+            "type": "deletion"
+          },
+          {
+            "type": "non_fast_forward"
+          },
+          {
+            "parameters": {
+              "do_not_enforce_on_create": false,
+              "required_status_checks": [
+                {
+                  "context": "ci-success",
+                  "integration_id": 15368
+                }
+              ],
+              "strict_required_status_checks_policy": false
+            },
+            "type": "required_status_checks"
+          },
+          {
+            "parameters": {
+              "allowed_merge_methods": [
+                "merge",
+                "squash",
+                "rebase"
+              ],
+              "dismiss_stale_reviews_on_push": false,
+              "require_code_owner_review": false,
+              "require_extra_approval_for_unattributed_changes": true,
+              "require_last_push_approval": false,
+              "required_approving_review_count": 0,
+              "required_review_thread_resolution": false,
+              "required_reviewers": []
+            },
+            "type": "pull_request"
+          }
+        ],
+        "source": "rknightion/paperless-ngx-dedupe",
+        "source_type": "Repository",
+        "target": "branch",
+        "updated_at": "2026-06-28T23:05:34.545+01:00"
+      }
+    ],
+    "security_and_analysis": {
+      "dependabot_security_updates": "disabled",
+      "secret_scanning": "enabled",
+      "secret_scanning_non_provider_patterns": "disabled",
+      "secret_scanning_push_protection": "enabled",
+      "secret_scanning_validity_checks": "disabled"
+    },
+    "settings": {
+      "allow_auto_merge": true,
+      "allow_merge_commit": true,
+      "allow_rebase_merge": true,
+      "allow_squash_merge": true,
+      "allow_update_branch": false,
+      "archived": false,
+      "delete_branch_on_merge": true,
+      "has_discussions": true,
+      "has_issues": true,
+      "has_projects": true,
+      "has_wiki": true,
+      "web_commit_signoff_required": false
+    },
+    "visibility": "public",
+    "vulnerability_alerts": true
+  },
+  {
+    "actions_permissions": {
+      "allowed_actions": "all",
+      "enabled": true,
+      "sha_pinning_required": false
+    },
+    "actions_workflow_perms": {
+      "can_approve_pull_request_reviews": false,
+      "default_workflow_permissions": "read"
+    },
+    "automated_security_fixes": true,
+    "default_branch": "main",
+    "has_dependabot_yml": false,
+    "has_renovate_json": true,
+    "license": "NOASSERTION",
+    "repo": "rknightion/polylens2otel",
+    "rulesets": [],
+    "security_and_analysis": {
+      "dependabot_security_updates": "enabled",
+      "secret_scanning": "enabled",
+      "secret_scanning_non_provider_patterns": "disabled",
+      "secret_scanning_push_protection": "enabled",
+      "secret_scanning_validity_checks": "disabled"
+    },
+    "settings": {
+      "allow_auto_merge": false,
+      "allow_merge_commit": true,
+      "allow_rebase_merge": true,
+      "allow_squash_merge": true,
+      "allow_update_branch": false,
+      "archived": false,
+      "delete_branch_on_merge": false,
+      "has_discussions": false,
+      "has_issues": true,
+      "has_projects": true,
+      "has_wiki": false,
+      "web_commit_signoff_required": false
+    },
+    "visibility": "public",
+    "vulnerability_alerts": true
+  },
+  {
+    "actions_permissions": {
+      "allowed_actions": "all",
+      "enabled": true,
+      "sha_pinning_required": false
+    },
+    "actions_workflow_perms": {
+      "can_approve_pull_request_reviews": false,
+      "default_workflow_permissions": "read"
+    },
+    "automated_security_fixes": false,
+    "default_branch": "main",
+    "has_dependabot_yml": false,
+    "has_renovate_json": true,
+    "license": null,
+    "repo": "rknightion/profilarr",
+    "rulesets": [
+      {
+        "_links": {
+          "html": {
+            "href": "https://github.com/rknightion/profilarr/rules/18229720"
+          },
+          "self": {
+            "href": "https://api.github.com/repos/rknightion/profilarr/rulesets/18229720"
+          }
+        },
+        "bypass_actors": [
+          {
+            "actor_id": 5,
+            "actor_type": "RepositoryRole",
+            "bypass_mode": "always"
+          }
+        ],
+        "conditions": {
+          "ref_name": {
+            "exclude": [],
+            "include": [
+              "~DEFAULT_BRANCH"
+            ]
+          }
+        },
+        "created_at": "2026-06-28T19:09:42.038+01:00",
+        "current_user_can_bypass": "always",
+        "enforcement": "active",
+        "id": 18229720,
+        "name": "main",
+        "node_id": "RRS_lACqUmVwb3NpdG9yec5EUKbBzgEWKdg",
+        "rules": [
+          {
+            "type": "deletion"
+          },
+          {
+            "type": "non_fast_forward"
+          },
+          {
+            "parameters": {
+              "do_not_enforce_on_create": false,
+              "required_status_checks": [
+                {
+                  "context": "ci-success",
+                  "integration_id": 15368
+                }
+              ],
+              "strict_required_status_checks_policy": false
+            },
+            "type": "required_status_checks"
+          },
+          {
+            "parameters": {
+              "allowed_merge_methods": [
+                "merge",
+                "squash",
+                "rebase"
+              ],
+              "dismiss_stale_reviews_on_push": false,
+              "require_code_owner_review": false,
+              "require_extra_approval_for_unattributed_changes": true,
+              "require_last_push_approval": false,
+              "required_approving_review_count": 0,
+              "required_review_thread_resolution": false,
+              "required_reviewers": []
+            },
+            "type": "pull_request"
+          }
+        ],
+        "source": "rknightion/profilarr",
+        "source_type": "Repository",
+        "target": "branch",
+        "updated_at": "2026-06-28T23:05:39.361+01:00"
+      }
+    ],
+    "security_and_analysis": {
+      "dependabot_security_updates": "disabled",
+      "secret_scanning": "enabled",
+      "secret_scanning_non_provider_patterns": "disabled",
+      "secret_scanning_push_protection": "enabled",
+      "secret_scanning_validity_checks": "disabled"
+    },
+    "settings": {
+      "allow_auto_merge": true,
+      "allow_merge_commit": true,
+      "allow_rebase_merge": true,
+      "allow_squash_merge": true,
+      "allow_update_branch": false,
+      "archived": false,
+      "delete_branch_on_merge": true,
+      "has_discussions": false,
+      "has_issues": true,
+      "has_projects": true,
+      "has_wiki": false,
+      "web_commit_signoff_required": false
+    },
+    "visibility": "public",
+    "vulnerability_alerts": true
+  },
+  {
+    "actions_permissions": {
+      "allowed_actions": "all",
+      "enabled": true,
+      "sha_pinning_required": false
+    },
+    "actions_workflow_perms": {
+      "can_approve_pull_request_reviews": false,
+      "default_workflow_permissions": "read"
+    },
+    "automated_security_fixes": false,
+    "default_branch": "main",
+    "has_dependabot_yml": false,
+    "has_renovate_json": true,
+    "license": "AGPL-3.0",
+    "repo": "rknightion/rfc6035-2otel",
+    "rulesets": [],
+    "security_and_analysis": {
+      "dependabot_security_updates": "disabled",
+      "secret_scanning": "enabled",
+      "secret_scanning_non_provider_patterns": "disabled",
+      "secret_scanning_push_protection": "enabled",
+      "secret_scanning_validity_checks": "disabled"
+    },
+    "settings": {
+      "allow_auto_merge": false,
+      "allow_merge_commit": true,
+      "allow_rebase_merge": true,
+      "allow_squash_merge": true,
+      "allow_update_branch": false,
+      "archived": false,
+      "delete_branch_on_merge": false,
+      "has_discussions": false,
+      "has_issues": true,
+      "has_projects": true,
+      "has_wiki": true,
+      "web_commit_signoff_required": false
+    },
+    "visibility": "public",
+    "vulnerability_alerts": true
+  },
+  {
+    "actions_permissions": {
+      "allowed_actions": "all",
+      "enabled": true,
+      "sha_pinning_required": false
+    },
+    "actions_workflow_perms": {
+      "can_approve_pull_request_reviews": false,
+      "default_workflow_permissions": "read"
+    },
+    "automated_security_fixes": false,
+    "default_branch": "main",
+    "has_dependabot_yml": false,
+    "has_renovate_json": true,
+    "license": "AGPL-3.0",
+    "repo": "rknightion/sagemcom-f3896-py",
+    "rulesets": [
+      {
+        "_links": {
+          "html": {
+            "href": "https://github.com/rknightion/sagemcom-f3896-py/rules/14645588"
+          },
+          "self": {
+            "href": "https://api.github.com/repos/rknightion/sagemcom-f3896-py/rulesets/14645588"
+          }
+        },
+        "bypass_actors": [
+          {
+            "actor_id": 5,
+            "actor_type": "RepositoryRole",
+            "bypass_mode": "always"
+          }
+        ],
+        "conditions": {
+          "ref_name": {
+            "exclude": [],
+            "include": [
+              "~DEFAULT_BRANCH"
+            ]
+          }
+        },
+        "created_at": "2026-04-02T18:50:31.403+01:00",
+        "current_user_can_bypass": "always",
+        "enforcement": "active",
+        "id": 14645588,
+        "name": "main",
+        "node_id": "RRS_lACqUmVwb3NpdG9yec5Hga1mzgDfeVQ",
+        "rules": [
+          {
+            "type": "deletion"
+          },
+          {
+            "type": "non_fast_forward"
+          },
+          {
+            "parameters": {
+              "do_not_enforce_on_create": false,
+              "required_status_checks": [
+                {
+                  "context": "ci-success",
+                  "integration_id": 15368
+                }
+              ],
+              "strict_required_status_checks_policy": false
+            },
+            "type": "required_status_checks"
+          },
+          {
+            "parameters": {
+              "allowed_merge_methods": [
+                "merge",
+                "squash",
+                "rebase"
+              ],
+              "dismiss_stale_reviews_on_push": false,
+              "require_code_owner_review": false,
+              "require_extra_approval_for_unattributed_changes": true,
+              "require_last_push_approval": false,
+              "required_approving_review_count": 0,
+              "required_review_thread_resolution": false,
+              "required_reviewers": []
+            },
+            "type": "pull_request"
+          }
+        ],
+        "source": "rknightion/sagemcom-f3896-py",
+        "source_type": "Repository",
+        "target": "branch",
+        "updated_at": "2026-06-28T23:05:42.054+01:00"
+      }
+    ],
+    "security_and_analysis": {
+      "dependabot_security_updates": "disabled",
+      "secret_scanning": "enabled",
+      "secret_scanning_non_provider_patterns": "disabled",
+      "secret_scanning_push_protection": "enabled",
+      "secret_scanning_validity_checks": "disabled"
+    },
+    "settings": {
+      "allow_auto_merge": true,
+      "allow_merge_commit": true,
+      "allow_rebase_merge": true,
+      "allow_squash_merge": true,
+      "allow_update_branch": false,
+      "archived": false,
+      "delete_branch_on_merge": true,
+      "has_discussions": false,
+      "has_issues": true,
+      "has_projects": false,
+      "has_wiki": false,
+      "web_commit_signoff_required": false
+    },
+    "visibility": "public",
+    "vulnerability_alerts": true
+  },
+  {
+    "actions_permissions": {
+      "allowed_actions": "all",
+      "enabled": true,
+      "sha_pinning_required": false
+    },
+    "actions_workflow_perms": {
+      "can_approve_pull_request_reviews": false,
+      "default_workflow_permissions": "read"
+    },
+    "automated_security_fixes": false,
+    "default_branch": "main",
+    "has_dependabot_yml": false,
+    "has_renovate_json": true,
+    "license": "AGPL-3.0",
+    "repo": "rknightion/sf2loki",
+    "rulesets": [
+      {
+        "_links": {
+          "html": {
+            "href": "https://github.com/rknightion/sf2loki/rules/18368538"
+          },
+          "self": {
+            "href": "https://api.github.com/repos/rknightion/sf2loki/rulesets/18368538"
+          }
+        },
+        "bypass_actors": [
+          {
+            "actor_id": 5,
+            "actor_type": "RepositoryRole",
+            "bypass_mode": "always"
+          }
+        ],
+        "conditions": {
+          "ref_name": {
+            "exclude": [],
+            "include": [
+              "~DEFAULT_BRANCH"
+            ]
+          }
+        },
+        "created_at": "2026-07-01T09:17:38.965+01:00",
+        "current_user_can_bypass": "always",
+        "enforcement": "active",
+        "id": 18368538,
+        "name": "main",
+        "node_id": "RRS_lACqUmVwb3NpdG9yec5Mm67rzgEYSBo",
+        "rules": [
+          {
+            "type": "deletion"
+          },
+          {
+            "type": "non_fast_forward"
+          },
+          {
+            "parameters": {
+              "allowed_merge_methods": [
+                "merge",
+                "squash",
+                "rebase"
+              ],
+              "dismiss_stale_reviews_on_push": false,
+              "require_code_owner_review": false,
+              "require_extra_approval_for_unattributed_changes": true,
+              "require_last_push_approval": false,
+              "required_approving_review_count": 0,
+              "required_review_thread_resolution": false,
+              "required_reviewers": []
+            },
+            "type": "pull_request"
+          },
+          {
+            "parameters": {
+              "do_not_enforce_on_create": false,
+              "required_status_checks": [
+                {
+                  "context": "ci-success",
+                  "integration_id": 15368
+                }
+              ],
+              "strict_required_status_checks_policy": false
+            },
+            "type": "required_status_checks"
+          }
+        ],
+        "source": "rknightion/sf2loki",
+        "source_type": "Repository",
+        "target": "branch",
+        "updated_at": "2026-07-01T09:17:39.045+01:00"
+      }
+    ],
+    "security_and_analysis": {
+      "dependabot_security_updates": "disabled",
+      "secret_scanning": "disabled",
+      "secret_scanning_non_provider_patterns": "disabled",
+      "secret_scanning_push_protection": "disabled",
+      "secret_scanning_validity_checks": "disabled"
+    },
+    "settings": {
+      "allow_auto_merge": true,
+      "allow_merge_commit": true,
+      "allow_rebase_merge": true,
+      "allow_squash_merge": true,
+      "allow_update_branch": false,
+      "archived": false,
+      "delete_branch_on_merge": true,
+      "has_discussions": false,
+      "has_issues": true,
+      "has_projects": true,
+      "has_wiki": false,
+      "web_commit_signoff_required": false
+    },
+    "visibility": "public",
+    "vulnerability_alerts": true
+  },
+  {
+    "actions_permissions": {
+      "allowed_actions": "all",
+      "enabled": true,
+      "sha_pinning_required": false
+    },
+    "actions_workflow_perms": {
+      "can_approve_pull_request_reviews": false,
+      "default_workflow_permissions": "read"
+    },
+    "automated_security_fixes": false,
+    "default_branch": "main",
+    "has_dependabot_yml": false,
+    "has_renovate_json": true,
+    "license": "AGPL-3.0",
+    "repo": "rknightion/synthkit",
+    "rulesets": [
+      {
+        "_links": {
+          "html": {
+            "href": "https://github.com/rknightion/synthkit/rules/18270473"
+          },
+          "self": {
+            "href": "https://api.github.com/repos/rknightion/synthkit/rulesets/18270473"
+          }
+        },
+        "bypass_actors": [
+          {
+            "actor_id": 5,
+            "actor_type": "RepositoryRole",
+            "bypass_mode": "always"
+          }
+        ],
+        "conditions": {
+          "ref_name": {
+            "exclude": [],
+            "include": [
+              "~DEFAULT_BRANCH"
+            ]
+          }
+        },
+        "created_at": "2026-06-29T17:23:23.112+01:00",
+        "current_user_can_bypass": "always",
+        "enforcement": "active",
+        "id": 18270473,
+        "name": "main",
+        "node_id": "RRS_lACqUmVwb3NpdG9yec5MiVZPzgEWyQk",
+        "rules": [
+          {
+            "type": "deletion"
+          },
+          {
+            "type": "non_fast_forward"
+          },
+          {
+            "parameters": {
+              "do_not_enforce_on_create": false,
+              "required_status_checks": [
+                {
+                  "context": "ci-success",
+                  "integration_id": 15368
+                }
+              ],
+              "strict_required_status_checks_policy": false
+            },
+            "type": "required_status_checks"
+          },
+          {
+            "parameters": {
+              "allowed_merge_methods": [
+                "merge",
+                "squash",
+                "rebase"
+              ],
+              "dismiss_stale_reviews_on_push": false,
+              "require_code_owner_review": false,
+              "require_extra_approval_for_unattributed_changes": true,
+              "require_last_push_approval": false,
+              "required_approving_review_count": 0,
+              "required_review_thread_resolution": false,
+              "required_reviewers": []
+            },
+            "type": "pull_request"
+          }
+        ],
+        "source": "rknightion/synthkit",
+        "source_type": "Repository",
+        "target": "branch",
+        "updated_at": "2026-06-29T17:23:23.209+01:00"
+      }
+    ],
+    "security_and_analysis": {
+      "dependabot_security_updates": "disabled",
+      "secret_scanning": "enabled",
+      "secret_scanning_non_provider_patterns": "disabled",
+      "secret_scanning_push_protection": "enabled",
+      "secret_scanning_validity_checks": "disabled"
+    },
+    "settings": {
+      "allow_auto_merge": true,
+      "allow_merge_commit": true,
+      "allow_rebase_merge": true,
+      "allow_squash_merge": true,
+      "allow_update_branch": false,
+      "archived": false,
+      "delete_branch_on_merge": true,
+      "has_discussions": false,
+      "has_issues": true,
+      "has_projects": true,
+      "has_wiki": false,
+      "web_commit_signoff_required": false
+    },
+    "visibility": "public",
+    "vulnerability_alerts": true
+  },
+  {
+    "actions_permissions": {
+      "allowed_actions": "all",
+      "enabled": true,
+      "sha_pinning_required": false
+    },
+    "actions_workflow_perms": {
+      "can_approve_pull_request_reviews": false,
+      "default_workflow_permissions": "read"
+    },
+    "automated_security_fixes": false,
+    "default_branch": "main",
+    "has_dependabot_yml": false,
+    "has_renovate_json": true,
+    "license": "Apache-2.0",
+    "repo": "rknightion/tailscale2otel",
+    "rulesets": [
+      {
+        "_links": {
+          "html": {
+            "href": "https://github.com/rknightion/tailscale2otel/rules/17263897"
+          },
+          "self": {
+            "href": "https://api.github.com/repos/rknightion/tailscale2otel/rulesets/17263897"
+          }
+        },
+        "bypass_actors": [
+          {
+            "actor_id": 5,
+            "actor_type": "RepositoryRole",
+            "bypass_mode": "always"
+          }
+        ],
+        "conditions": {
+          "ref_name": {
+            "exclude": [],
+            "include": [
+              "~DEFAULT_BRANCH"
+            ]
+          }
+        },
+        "created_at": "2026-06-04T12:17:15.315+01:00",
+        "current_user_can_bypass": "always",
+        "enforcement": "active",
+        "id": 17263897,
+        "name": "main",
+        "node_id": "RRS_lACqUmVwb3NpdG9yec5K8_mSzgEHbRk",
+        "rules": [
+          {
+            "type": "deletion"
+          },
+          {
+            "type": "non_fast_forward"
+          },
+          {
+            "parameters": {
+              "allowed_merge_methods": [
+                "merge",
+                "squash",
+                "rebase"
+              ],
+              "dismiss_stale_reviews_on_push": false,
+              "require_code_owner_review": false,
+              "require_extra_approval_for_unattributed_changes": true,
+              "require_last_push_approval": false,
+              "required_approving_review_count": 0,
+              "required_review_thread_resolution": false,
+              "required_reviewers": []
+            },
+            "type": "pull_request"
+          },
+          {
+            "parameters": {
+              "do_not_enforce_on_create": false,
+              "required_status_checks": [
+                {
+                  "context": "ci-success",
+                  "integration_id": 15368
+                },
+                {
+                  "context": "helm-success",
+                  "integration_id": 15368
+                }
+              ],
+              "strict_required_status_checks_policy": false
+            },
+            "type": "required_status_checks"
+          }
+        ],
+        "source": "rknightion/tailscale2otel",
+        "source_type": "Repository",
+        "target": "branch",
+        "updated_at": "2026-06-28T23:05:35.978+01:00"
+      }
+    ],
+    "security_and_analysis": {
+      "dependabot_security_updates": "disabled",
+      "secret_scanning": "enabled",
+      "secret_scanning_non_provider_patterns": "disabled",
+      "secret_scanning_push_protection": "enabled",
+      "secret_scanning_validity_checks": "disabled"
+    },
+    "settings": {
+      "allow_auto_merge": true,
+      "allow_merge_commit": true,
+      "allow_rebase_merge": true,
+      "allow_squash_merge": true,
+      "allow_update_branch": false,
+      "archived": false,
+      "delete_branch_on_merge": true,
+      "has_discussions": false,
+      "has_issues": true,
+      "has_projects": true,
+      "has_wiki": false,
+      "web_commit_signoff_required": false
+    },
+    "visibility": "public",
+    "vulnerability_alerts": true
+  },
+  {
+    "actions_permissions": {
+      "allowed_actions": "all",
+      "enabled": true,
+      "sha_pinning_required": false
+    },
+    "actions_workflow_perms": {
+      "can_approve_pull_request_reviews": false,
+      "default_workflow_permissions": "read"
+    },
+    "automated_security_fixes": false,
+    "default_branch": "main",
+    "has_dependabot_yml": false,
+    "has_renovate_json": true,
+    "license": "GPL-3.0",
+    "repo": "rknightion/transceiver-exporter",
+    "rulesets": [
+      {
+        "_links": {
+          "html": {
+            "href": "https://github.com/rknightion/transceiver-exporter/rules/18473854"
+          },
+          "self": {
+            "href": "https://api.github.com/repos/rknightion/transceiver-exporter/rulesets/18473854"
+          }
+        },
+        "bypass_actors": [
+          {
+            "actor_id": 5,
+            "actor_type": "RepositoryRole",
+            "bypass_mode": "always"
+          }
+        ],
+        "conditions": {
+          "ref_name": {
+            "exclude": [],
+            "include": [
+              "~DEFAULT_BRANCH"
+            ]
+          }
+        },
+        "created_at": "2026-07-03T11:29:07.798+01:00",
+        "current_user_can_bypass": "always",
+        "enforcement": "active",
+        "id": 18473854,
+        "name": "main",
+        "node_id": "RRS_lACqUmVwb3NpdG9yec5EOInjzgEZ434",
+        "rules": [
+          {
+            "type": "deletion"
+          },
+          {
+            "type": "non_fast_forward"
+          },
+          {
+            "parameters": {
+              "allowed_merge_methods": [
+                "merge",
+                "squash",
+                "rebase"
+              ],
+              "dismiss_stale_reviews_on_push": false,
+              "require_code_owner_review": false,
+              "require_extra_approval_for_unattributed_changes": true,
+              "require_last_push_approval": false,
+              "required_approving_review_count": 0,
+              "required_review_thread_resolution": false,
+              "required_reviewers": []
+            },
+            "type": "pull_request"
+          },
+          {
+            "parameters": {
+              "do_not_enforce_on_create": false,
+              "required_status_checks": [
+                {
+                  "context": "ci-success",
+                  "integration_id": 15368
+                }
+              ],
+              "strict_required_status_checks_policy": false
+            },
+            "type": "required_status_checks"
+          }
+        ],
+        "source": "rknightion/transceiver-exporter",
+        "source_type": "Repository",
+        "target": "branch",
+        "updated_at": "2026-07-03T11:29:07.893+01:00"
+      }
+    ],
+    "security_and_analysis": {
+      "dependabot_security_updates": "disabled",
+      "secret_scanning": "enabled",
+      "secret_scanning_non_provider_patterns": "disabled",
+      "secret_scanning_push_protection": "enabled",
+      "secret_scanning_validity_checks": "disabled"
+    },
+    "settings": {
+      "allow_auto_merge": true,
+      "allow_merge_commit": true,
+      "allow_rebase_merge": true,
+      "allow_squash_merge": true,
+      "allow_update_branch": true,
+      "archived": false,
+      "delete_branch_on_merge": true,
+      "has_discussions": false,
+      "has_issues": true,
+      "has_projects": true,
+      "has_wiki": true,
+      "web_commit_signoff_required": true
+    },
+    "visibility": "public",
+    "vulnerability_alerts": true
+  }
+]
