@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.9.11](https://github.com/rknightion/.github/compare/v1.9.10...v1.9.11) (2026-08-29)
+
+
+### Miscellaneous
+
+* **backlog:** wire the fleet migration ordering into this task ([ce2749f](https://github.com/rknightion/.github/commit/ce2749f15452f38f51bbfa71836b6927bb05336a))
+
 ## [1.9.10](https://github.com/rknightion/.github/compare/v1.9.9...v1.9.10) (2026-08-29)
 
 
