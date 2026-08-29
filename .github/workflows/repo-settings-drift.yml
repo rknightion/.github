@@ -13,13 +13,9 @@
 # a decision to take explicitly, not a side effect of adding a workflow.
 name: repo-settings-drift
 
-# workflow_dispatch ONLY, deliberately. The broker permission set named below
-# does not exist yet -- it has to be provisioned per the CI-SECRETS runbook
-# (permission set + ACL policy + JWT role) before this can run. A weekly cron
-# against a missing permission set is a workflow that fails every Monday and
-# gets muted, which is worse than one that has not been switched on. Add the
-# schedule in the same change that provisions the role.
 on:
+  schedule:
+    - cron: "41 6 * * 1"
   workflow_dispatch: {}
 
 permissions:
@@ -55,9 +51,12 @@ jobs:
         id: token
         uses: ./.github/actions/broker-token
         with:
-          # NOT YET PROVISIONED -- see the note on `on:` above.
-          # Needs `administration: read` and `metadata: read` on every public
-          # rknightion repo. Read-only: this workflow never writes a setting.
+          # administration:read + metadata:read, installation-scoped, nothing
+          # else. Provisioned 2026-08-29: permission set fleet-settings-read,
+          # policy gha-fleet-settings-read, JWT role fleet-settings-read pinned
+          # to this repo on refs/heads/main. The set deliberately does NOT
+          # enumerate repositories -- see the policy comment for why an
+          # enumerated list would silently reduce audit coverage.
           permission-set: fleet-settings-read
 
       - name: Report drift
