@@ -29,6 +29,24 @@ on:
         required: false
         type: string
         default: "release-please--branches--main"
+      sha:
+        description: >-
+          Commit to cut the RC from. Empty (the default) means `github.sha`,
+          which is correct under a `push:` trigger.
+
+          A caller on `workflow_run:` MUST pass
+          `github.event.workflow_run.head_sha`. Under that event `github.sha`
+          resolves to the DEFAULT BRANCH HEAD, not the commit CI actually ran
+          on, so on rapid pushes it races ahead and would tag the wrong commit.
+          `workflow_run.head_sha` is the commit the triggering run tested.
+
+          Passing this also means CI has ALREADY concluded green -- that is what
+          fired the event -- so the wait-for-ci poll below is skipped entirely
+          instead of holding a runner slot for up to 45 minutes waiting for a
+          check that has already passed.
+        required: false
+        type: string
+        default: ""
       ci-check-name:
         description: "Name of the aggregate check that must be green before an RC is cut."
         required: false
@@ -92,6 +110,9 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
+          # Under workflow_run the default ref is the default-branch HEAD, which
+          # is NOT the commit CI ran on. Pin it explicitly.
+          ref: ${{ inputs.sha || github.sha }}
           fetch-depth: 0
           persist-credentials: false
 
@@ -165,13 +186,21 @@ jobs:
           version: ${{ steps.decide.outputs.version }}
           tags: ${{ steps.decide.outputs.tags }}
 
-  # Only candidate code that actually passed CI. Polls the aggregate check for
-  # THIS commit -- github.sha is guaranteed to be the pushed commit, unlike
-  # workflow_run.head_sha which races ahead on rapid pushes.
+  # Only candidate code that actually passed CI.
+  #
+  # PUSH-TRIGGERED CALLERS ONLY. This job holds a full runner slot doing nothing
+  # but `sleep 30` for as long as CI takes -- measured across 110 real runs:
+  # median 7.2 min, mean 11.2 min, max 46.0 min, 20.6 runner-hours of pure
+  # polling. Under a saturated queue it is self-defeating, because the slot it
+  # occupies is one the CI run it is waiting for could have used; six of those
+  # 110 timed out at 45 minutes and cut no RC at all.
+  #
+  # A caller on `workflow_run:` passes `sha` and skips this entirely: the event
+  # only fires once CI has concluded, so there is nothing left to wait for.
   wait-for-ci:
     name: wait-for-ci
     needs: guard
-    if: needs.guard.outputs.should_release == 'true'
+    if: needs.guard.outputs.should_release == 'true' && inputs.sha == ''
     runs-on: ubuntu-24.04
     timeout-minutes: 60
     permissions:
@@ -185,7 +214,7 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           REPO: ${{ github.repository }}
-          SHA: ${{ github.sha }}
+          SHA: ${{ inputs.sha || github.sha }}
           CHECK: ${{ inputs.ci-check-name }}
           ATTEMPTS: ${{ inputs.poll-attempts }}
         run: |
@@ -239,7 +268,14 @@ jobs:
   tag:
     name: tag + prerelease
     needs: [guard, wait-for-ci]
-    if: needs.guard.outputs.should_release == 'true' && needs.wait-for-ci.outputs.proceed == 'true'
+    # `!cancelled()` is load-bearing: without it GitHub skips this job whenever a
+    # `needs:` was skipped, and wait-for-ci is skipped by design on a
+    # workflow_run caller. The two arms are the two trigger modes -- skipped
+    # means CI was already green before this workflow started.
+    if: >-
+      !cancelled()
+      && needs.guard.outputs.should_release == 'true'
+      && (needs.wait-for-ci.result == 'skipped' || needs.wait-for-ci.outputs.proceed == 'true')
     runs-on: ubuntu-24.04
     timeout-minutes: 10
     permissions:
@@ -258,6 +294,7 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
+          ref: ${{ inputs.sha || github.sha }}
           fetch-depth: 0
           persist-credentials: false
 
@@ -269,7 +306,7 @@ jobs:
           VERSION: ${{ needs.guard.outputs.version }}
           PREV: ${{ needs.guard.outputs.previous_tag }}
           PR: ${{ needs.guard.outputs.release_pr }}
-          SHA: ${{ github.sha }}
+          SHA: ${{ inputs.sha || github.sha }}
           REPO: ${{ github.repository }}
           IMAGE_REF: ${{ inputs.image-ref }}
         run: |
