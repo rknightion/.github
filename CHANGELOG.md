@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.15.1](https://github.com/rknightion/.github/compare/v1.15.0...v1.15.1) (2026-08-29)
+
+
+### Miscellaneous
+
+* **backlog:** open the parent task for the fleet justfile campaign ([1ee377f](https://github.com/rknightion/.github/commit/1ee377f1d46911a2e8b6d50241c634461aec794d))
+
 ## [1.15.0](https://github.com/rknightion/.github/compare/v1.14.0...v1.15.0) (2026-08-29)
 
 
