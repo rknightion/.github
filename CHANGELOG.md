@@ -1,5 +1,24 @@
 # Changelog
 
+## [1.13.0](https://github.com/rknightion/.github/compare/v1.12.0...v1.13.0) (2026-08-29)
+
+
+### Features
+
+* **fleet:** switch on the weekly repo-settings drift report ([908b3d6](https://github.com/rknightion/.github/commit/908b3d6d7937b437db5f835836cb5c85f7c3a8ee))
+
+
+### Bug Fixes
+
+* **fleet:** grant id-token: write so the broker can mint ([1ddef41](https://github.com/rknightion/.github/commit/1ddef41375c4ee91624c4435f41cc2ebbb813580))
+* **fleet:** park the drift cron until the App holds administration ([560656e](https://github.com/rknightion/.github/commit/560656ee53d475d7d4e7f096e13567600871e802))
+* **fleet:** pass Tailscale identity to the broker on a hosted runner ([0772de6](https://github.com/rknightion/.github/commit/0772de69029b54445a9549142148e0f46c4f2bd8))
+
+
+### Build & CI
+
+* **deps:** update actions/upload-artifact action to v7 ([#78](https://github.com/rknightion/.github/issues/78)) ([df98e2a](https://github.com/rknightion/.github/commit/df98e2a76d1e34e94e0f28e9583832c1536488f2))
+
 ## [1.12.0](https://github.com/rknightion/.github/compare/v1.11.0...v1.12.0) (2026-08-29)
 
 
