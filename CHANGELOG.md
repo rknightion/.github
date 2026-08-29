@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.10.0](https://github.com/rknightion/.github/compare/v1.9.11...v1.10.0) (2026-08-29)
+
+
+### Features
+
+* **ghcr-cleanup:** add runs-on and harden inputs for self-hosted callers ([9dd6053](https://github.com/rknightion/.github/commit/9dd6053b99d7d52d042f96acb1c7349ab9b9e817))
+
 ## [1.9.11](https://github.com/rknightion/.github/compare/v1.9.10...v1.9.11) (2026-08-29)
 
 
