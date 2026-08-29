@@ -4,7 +4,7 @@ title: Migrate the repo task surface to just and retire Makefiles and ad-hoc scr
 status: Done
 assignee: []
 created_date: '2026-08-28 19:06'
-updated_date: '2026-08-29 13:20'
+updated_date: '2026-08-29 15:51'
 labels:
   - 'wave:1-hub'
 dependencies: []
@@ -774,6 +774,8 @@ Self-CI integration was observed in CI run 33254250842 at 2e18e12d53516fb0480894
 Caller audit: public Git partial-clone sweep scanned 35 repositories with zero clone errors; 26 called this hub and no external workflow referenced just-check.yml yet.
 
 The scheduled privileged fleet settings report and its Python runtime remain byte-identical and deliberately unreferenced. CodeRabbit reviewed the justfile/action/reusable changes; the CI wiring and documentation/declarative-config changes were skipped as non-branching configuration.
+
+Completion audit at remote main 6f58a3c: just setup installed actionlint 1.7.12 and zizmor 1.29.0; just check passed with actionlint, the accepted two github-env findings under the documented non-gating zizmor policy, shellcheck, all 14 next-rc-tag cases, and the identifier sweep. just formatting, JSON dump, recipe listing, Makefile and stale-doc sweeps, protected-workflow byte comparison, Renovate JSON parse, and the 168-result live caller search passed. Exact-head CI run 33254859022 passed just check and ci-success.
 <!-- SECTION:NOTES:END -->
 
 ## Comments
@@ -824,4 +826,6 @@ Eleven of the 42 lanes arrived at this shape independently before it was ratifie
 
 <!-- SECTION:FINAL_SUMMARY:BEGIN -->
 Completed the just task-surface migration: added the pinned local gate and setup action, reusable just-check workflow, self-CI enforcement, Renovate tracking, agent contract, documentation, and Backlog definition of done. Verified locally and with successful self-CI run 33254250842.
+
+Final tracker reconciliation verified all ten acceptance criteria and all three Definition of Done items against remote main 6f58a3c and exact-head CI 33254859022.
 <!-- SECTION:FINAL_SUMMARY:END -->
