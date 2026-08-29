@@ -4,7 +4,9 @@ title: Migrate the repo task surface to just and retire Makefiles and ad-hoc scr
 status: To Do
 assignee: []
 created_date: '2026-08-28 19:06'
-labels: []
+updated_date: '2026-08-29 09:18'
+labels:
+  - 'wave:1-hub'
 dependencies: []
 priority: medium
 type: chore
@@ -745,3 +747,28 @@ Green at every step. Nothing is deleted at any step, because nothing in this rep
 - [ ] #2 zizmor .github/workflows/ .github/actions/ (the security audit ci.yml runs via .github/workflows/zizmor.yml)
 - [ ] #3 For a change to a reusable workflow's INPUTS or PERMISSIONS: check the callers across the fleet, not just this repo — `gh search code --owner rknightion 'uses: rknightion/.github'`
 <!-- DOD:END -->
+
+## Comments
+
+<!-- COMMENTS:BEGIN -->
+author: campaign-ordering
+created: 2026-08-29 09:18
+---
+## Fleet ordering — WAVE 1, the shared hub. Starts after the Wave 0 pilot (`sf2loki` / SFL-0073) lands.
+
+**Not because a hub release propagates downward — it does not.** Consumers pin the hub by SHA, so a change here reaches a caller only when that caller bumps its pin. This repo goes early for two other reasons: it becomes the reference implementation the other 40 repos copy, and any shared `setup-just` composite action would live here.
+
+**Verified, so you do not need to re-derive it:** no reusable workflow or composite action in either hub invokes `make` or a repo-level script, and no caller passes a build command through `binaries.yml`'s `pre-command` input. Migrating a child therefore never breaks a hub, and migrating a hub never breaks a child. The ordering is about leverage, not breakage.
+
+**Provisioning `just` in CI.** Which mechanism depends on the runner, and the two must not be mixed:
+
+| Runner | Mechanism |
+| --- | --- |
+| `arc-arm64` (m7kni self-hosted) | `just` is **baked into the runner image** by `m7kni/ci-tools` (`runner-image/Dockerfile`, `ARG JUST_VERSION`). Do **not** add `extractions/setup-just`, and delete the step if this repo already has one — it installs a second `just` earlier on `PATH` and turns the image pin into a lie. |
+| GitHub-hosted (all `rknightion` repos) | `extractions/setup-just`, SHA-pinned, with an explicit `just-version:`. |
+
+Both sides currently sit on **1.58.0** and are Renovate-managed. `ci-tools`' `Tool version drift` workflow fails if the Dockerfile `ARG` and the published image ever disagree, and lists any repo still carrying a second pin.
+
+**While you are in the workflow files, check the hub pin.** On 2026-08-29 Renovate was unfrozen for `rknightion/.github` in `m7kni/renovate-config` — it had been `enabled: false` on the mistaken belief that callers tracked `@main`, which froze the fleet across 19 different hub SHAs (v1.3.1 June → v1.9.7 August) so that no hub fix ever propagated. Bumps now arrive as one grouped, CI-gated, automerged PR per repo. **A `uses:` whose comment is not a real `# vX.Y.Z` still cannot be bumped** (it resolves to a digest-only update, which the fleet rules disable) — if you find one, repair the comment as part of this task.
+---
+<!-- COMMENTS:END -->
