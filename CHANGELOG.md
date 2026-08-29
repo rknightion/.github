@@ -1,5 +1,17 @@
 # Changelog
 
+## [1.11.0](https://github.com/rknightion/.github/compare/v1.10.1...v1.11.0) (2026-08-29)
+
+
+### Features
+
+* **auto-rc:** add sha input so callers can trigger on workflow_run ([ec685e0](https://github.com/rknightion/.github/commit/ec685e063babbaed1917883cfa8dd7f0a88d8533))
+
+
+### Miscellaneous
+
+* **backlog:** ratify ci as the sanctioned superset of check ([2802e25](https://github.com/rknightion/.github/commit/2802e25ea6be027d934f463608e65f0b9e95d5db))
+
 ## [1.10.1](https://github.com/rknightion/.github/compare/v1.10.0...v1.10.1) (2026-08-29)
 
 
