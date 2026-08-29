@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.12.0](https://github.com/rknightion/.github/compare/v1.11.0...v1.12.0) (2026-08-29)
+
+
+### Features
+
+* **fleet:** audit public repo settings and report drift ([9a79bbc](https://github.com/rknightion/.github/commit/9a79bbcb07aeb9e3d43b206e102801eed9f781ea))
+
 ## [1.11.0](https://github.com/rknightion/.github/compare/v1.10.1...v1.11.0) (2026-08-29)
 
 
