@@ -48,6 +48,24 @@ on:
         # without nesting, and cannot match main-<sha>, buildcache-* or an
         # -rc.N tag, because none of those are digits-and-dots throughout.
         default: '^(latest|main|v?[0-9.]+)$'
+      runs-on:
+        description: >-
+          Runner label for the prune job. Defaults to a GitHub-hosted runner,
+          which is free for the public rknightion repos. m7kni's repos are
+          PRIVATE, so a hosted runner there bills Actions minutes -- those
+          callers pass their self-hosted `arc-arm64` label instead. The action
+          is pure JS, so the runner's architecture does not matter.
+        required: false
+        type: string
+        default: 'ubuntu-24.04'
+      harden:
+        description: >-
+          Run step-security/harden-runner. MUST be false on a self-hosted
+          runner: no m7kni arc-arm64 workflow runs it, and harden-runner's
+          egress monitoring is built for GitHub-hosted Ubuntu images.
+        required: false
+        type: boolean
+        default: true
 
 permissions:
   contents: read
@@ -55,7 +73,7 @@ permissions:
 jobs:
   prune:
     name: prune ${{ inputs.packages }}
-    runs-on: ubuntu-24.04
+    runs-on: ${{ inputs.runs-on }}
     # 30 minutes is not enough for a FIRST prune. The action deletes one version
     # per API call, and an un-pruned repo accumulates ~6 versions per push to
     # main: graph2otel had 3,659 versions and its first real run was killed by a
@@ -72,6 +90,7 @@ jobs:
       packages: write # delete package versions
     steps:
       - name: Harden the runner (audit egress)
+        if: ${{ inputs.harden }}
         uses: step-security/harden-runner@05e31511f85b41b11d1cf0ef85d0992719546e2c # v2.21.0
         with:
           egress-policy: audit
