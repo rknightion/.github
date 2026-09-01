@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.18.1](https://github.com/rknightion/.github/compare/v1.18.0...v1.18.1) (2026-09-01)
+
+
+### Bug Fixes
+
+* **container-publish:** scan OCI layouts before push ([e17ff96](https://github.com/rknightion/.github/commit/e17ff969ee2273736a4d9dfc0e0d073a9a93848c))
+
 ## [1.18.0](https://github.com/rknightion/.github/compare/v1.17.1...v1.18.0) (2026-09-01)
 
 
