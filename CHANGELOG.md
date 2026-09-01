@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.18.0](https://github.com/rknightion/.github/compare/v1.17.1...v1.18.0) (2026-09-01)
+
+
+### Features
+
+* **ci:** gate publication on security severity (MDE-0003) ([240da9e](https://github.com/rknightion/.github/commit/240da9e373020bf3bed9264c5bead071e56d79aa))
+
 ## [1.17.1](https://github.com/rknightion/.github/compare/v1.17.0...v1.17.1) (2026-08-29)
 
 
