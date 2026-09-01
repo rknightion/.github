@@ -47,8 +47,8 @@ SHA-pinned and kept current by Renovate (`helpers:pinGitHubActionDigests`).
 
 | Workflow | Purpose |
 |---|---|
-| `codeql.yml` | CodeQL Advanced code scanning. Input `languages` = JSON array of `{language, build-mode}` matrix entries. Uses the shared `codeql/codeql-config.yml` (`security-extended`). |
-| `zizmor.yml` | GitHub Actions security audit (SARIF → Security tab). |
+| `codeql.yml` | CodeQL Advanced code scanning. `languages` selects the matrix; optional `ref`, `category-suffix`, and `fail-on-security-severity` inputs support pinned publication gates. The pinned reusable owns the configuration, query selection, and path exclusions; the CodeQL bundle and evolving `security-extended` suite remain upstream inputs. |
+| `zizmor.yml` | GitHub Actions security audit. Same-repo runs upload SARIF; fork PRs use annotations, so the scan still gates without forbidden Security-tab writes. |
 | `actionlint.yml` | GitHub Actions workflow correctness lint (non-gating). |
 | `dependency-review.yml` | PR dependency review; fails on newly introduced high-severity vulns. |
 | `docker-security.yml` | hadolint (Dockerfile lint) + Trivy fs scan (vuln/misconfig/secret), both SARIF, non-gating. |
@@ -58,6 +58,7 @@ SHA-pinned and kept current by Renovate (`helpers:pinGitHubActionDigests`).
 | `ghcr-cleanup.yml` | Multi-arch-safe GHCR retention: keeps every stable release, the newest 10 RCs, and 7 days of edge images. Dry-run by default. |
 | `just-check.yml` | Checks out the caller, installs a pinned `just`, and runs one recipe (default `check`). For repos whose whole gate is one recipe on one runner; anything needing a matrix or toolchain caching should use the `setup-just` composite action inside its own job instead. |
 | `fleet-release-sweep.yml` | Not reusable — runs here daily and reports every public repo's release PR state into the `Release train status` issue. |
+| `container-publish.yml` | Builds native OCI archives, blocks on HIGH/CRITICAL Trivy findings before any GHCR write, copies the exact scanned digests, then merges, signs, attests, generates SBOMs, and optionally publishes Helm. `trivy-ignore-file` points to a caller-owned reviewed exception file. |
 
 ### Example caller
 
@@ -75,7 +76,7 @@ jobs:
       packages: read
       actions: read
       contents: read
-    uses: rknightion/.github/.github/workflows/codeql.yml@main
+    uses: rknightion/.github/.github/workflows/codeql.yml@<release-sha> # vX.Y.Z
     with:
       languages: '[{"language":"python","build-mode":"none"},{"language":"actions","build-mode":"none"}]'
 ```
@@ -122,7 +123,8 @@ Add the badge to the repo README:
 | `bao-secret` | Read a KV v2 secret from OpenBao into masked env vars. |
 | `next-rc-tag` | Compute the next `vX.Y.Z-rc.N` tag for a pending release-please version. |
 
-## Shared CodeQL config (`codeql/codeql-config.yml`)
+## CodeQL policy
 
-Query suite `security-extended` + an `experimental` exclude filter + common
-`paths-ignore`. Referenced cross-repo via the `config-file:` input above.
+The reusable embeds the `security-extended` query suite, experimental-query exclusion, and common
+path exclusions. Keeping the policy inside the workflow means the caller's pinned SHA owns both the
+workflow logic and the query policy; no mutable `@main` configuration is fetched at runtime.

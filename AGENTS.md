@@ -30,7 +30,8 @@ zizmor into `.tools/` first; it is idempotent.
 
 `ci.yml` runs the same `just check` through `.github/workflows/just-check.yml`, and additionally
 dogfoods the `actionlint`, `zizmor` and `codeql` reusables against this repo so those reusables get
-tested at all. `ci-success` is the single required status check.
+tested at all. `ci-success` is the single required status check. CodeQL's query policy is embedded in
+the pinned reusable; do not restore a mutable cross-repository `config-file: ...@main` reference.
 
 zizmor runs with `--no-exit-codes` because CI's zizmor job is non-gating — findings go to the
 Security tab as SARIF. Removing that flag turns the gate red on findings this repo has already
