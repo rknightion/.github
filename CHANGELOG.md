@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.18.2](https://github.com/rknightion/.github/compare/v1.18.1...v1.18.2) (2026-09-02)
+
+
+### Bug Fixes
+
+* **codeql:** restore codeql-config.yml consumed by pinned callers ([09c52f4](https://github.com/rknightion/.github/commit/09c52f4a93141d95a4d5b1420d438861fe5640bb))
+
 ## [1.18.1](https://github.com/rknightion/.github/compare/v1.18.0...v1.18.1) (2026-09-01)
 
 
