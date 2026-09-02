@@ -1,0 +1,42 @@
+name: "rknightion standard CodeQL config"
+
+# Run the built-in default queries plus the security-extended suite: broader
+# security coverage than `default` while staying security-focused (avoids the
+# code-quality noise of `security-and-quality`). Tune individual noisy rules
+# below rather than switching whole suites.
+queries:
+  - uses: security-extended
+
+# Fleet-wide noise reduction.
+query-filters:
+  - exclude:
+      tags contain: experimental
+
+# NOTE: paths-ignore only affects interpreted languages and compiled languages
+# analyzed with build-mode: none (i.e. NOT go/swift autobuild). Harmless there.
+paths-ignore:
+  - '**/node_modules'
+  - '**/vendor'
+  - '**/third_party'
+  - '**/dist'
+  - '**/build'
+  - '**/*.min.js'
+  - '**/*.test.*'
+  - '**/*.spec.*'
+  - 'test'
+  - 'tests'
+  - 'docs'
+  - 'examples'
+
+# DO NOT DELETE THIS FILE.
+#
+# The reusable workflow at HEAD carries this config inline and no longer reads
+# it, but every caller still pinned at or below v1.17.1 resolves
+#   config-file: rknightion/.github/codeql/codeql-config.yml@main
+# at run time. A SHA pin on the reusable does NOT pin what that reusable itself
+# fetches from @main, so deleting this file breaks CodeQL initialization in every
+# such repository at once, with a Contents API 404 inside "Load language
+# configuration" and no other symptom.
+#
+# It did: removed 2026-09-01 22:27 in 240da9e3, and 16 repositories failed every
+# CodeQL run until this was restored. Retire it only once no caller references it.
