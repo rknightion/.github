@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.19.0](https://github.com/rknightion/.github/compare/v1.18.2...v1.19.0) (2026-09-04)
+
+
+### Features
+
+* **container-publish:** make the build-provenance attestation optional ([559e514](https://github.com/rknightion/.github/commit/559e51443a52dade98ffa65f85e20b95dfc80898))
+
 ## [1.18.2](https://github.com/rknightion/.github/compare/v1.18.1...v1.18.2) (2026-09-02)
 
 
