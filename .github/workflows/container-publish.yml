@@ -5,7 +5,7 @@ name: Container publish (reusable)
 # decides the tags. Uniform behaviour for every repo regardless of language:
 #   * per-arch NATIVE runners (amd64 + arm64), push-by-digest, manifest-list merge
 #     (no QEMU — emulated arm64 mis-resolves native wheels/libs)
-#   * cosign keyless signing + build-provenance attestation on the merged index
+#   * cosign keyless signing + build-provenance attestation on the merged index (attestation optional via the provenance input)
 #   * SBOM (SPDX + CycloneDX) via syft; attached to the GitHub Release on a release
 #   * optional Helm chart publish (OCI) — release version or main snapshot
 #   * Trivy scan -> caller Security tab
@@ -56,6 +56,10 @@ on:
         description: "Path to a reviewed Trivy YAML ignore file; empty accepts nothing"
         type: string
         default: ""
+      provenance:
+        description: "Generate a GitHub build-provenance attestation (private repositories need a plan that allows attestations; cosign signing is unaffected)"
+        type: boolean
+        default: true
       dockerhub-login:
         description: "Log in to Docker Hub for base-image pulls (needs DOCKERHUB_* secrets)"
         type: boolean
@@ -328,6 +332,7 @@ jobs:
         run: echo "${TAGS}" | xargs -I {} cosign sign --yes "{}@${DIGEST}"
 
       - name: Generate build-provenance attestation
+        if: inputs.provenance
         uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
         with:
           subject-name: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
