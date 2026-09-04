@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.20.0](https://github.com/rknightion/.github/compare/v1.19.0...v1.20.0) (2026-09-04)
+
+
+### Features
+
+* **container-publish:** make the Trivy SARIF upload optional ([3af08b0](https://github.com/rknightion/.github/commit/3af08b0c7515cd09ba5061377e1942e4a59dc671))
+
 ## [1.19.0](https://github.com/rknightion/.github/compare/v1.18.2...v1.19.0) (2026-09-04)
 
 
