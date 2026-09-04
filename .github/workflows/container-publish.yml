@@ -8,7 +8,7 @@ name: Container publish (reusable)
 #   * cosign keyless signing + build-provenance attestation on the merged index (attestation optional via the provenance input)
 #   * SBOM (SPDX + CycloneDX) via syft; attached to the GitHub Release on a release
 #   * optional Helm chart publish (OCI) — release version or main snapshot
-#   * Trivy scan -> caller Security tab
+#   * Trivy scan -> caller Security tab (SARIF upload optional via trivy-upload-sarif; the gate always runs)
 # Callers trigger on push:main (edge) + release-please workflow_call (release) +
 # workflow_dispatch + merge_group (build-only gate). Concurrency cancels superseded
 # EDGE builds but never a release publish.
@@ -56,6 +56,10 @@ on:
         description: "Path to a reviewed Trivy YAML ignore file; empty accepts nothing"
         type: string
         default: ""
+      trivy-upload-sarif:
+        description: "Upload the Trivy SARIF to code scanning; set false on a private repository whose plan has no code scanning, the HIGH/CRITICAL gate still runs"
+        type: boolean
+        default: true
       provenance:
         description: "Generate a GitHub build-provenance attestation (private repositories need a plan that allows attestations; cosign signing is unaffected)"
         type: boolean
@@ -188,7 +192,7 @@ jobs:
           trivyignores: ${{ inputs.trivy-ignore-file }}
 
       - name: Upload Trivy SARIF
-        if: inputs.trivy && hashFiles(format('trivy-{0}.sarif', env.PLATFORM_PAIR)) != ''
+        if: inputs.trivy && inputs.trivy-upload-sarif && hashFiles(format('trivy-{0}.sarif', env.PLATFORM_PAIR)) != ''
         uses: github/codeql-action/upload-sarif@cdf488f595d80d6e07e03d4674febd5ab45fa938 # v4.37.9
         with:
           sarif_file: trivy-${{ env.PLATFORM_PAIR }}.sarif
