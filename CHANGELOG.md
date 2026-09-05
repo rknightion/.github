@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.20.1](https://github.com/rknightion/.github/compare/v1.20.0...v1.20.1) (2026-09-05)
+
+
+### Miscellaneous
+
+* align CodeRabbit review configuration ([79f5bd8](https://github.com/rknightion/.github/commit/79f5bd8fd802ae788e6f279768688934b682ad66))
+
 ## [1.20.0](https://github.com/rknightion/.github/compare/v1.19.0...v1.20.0) (2026-09-04)
 
 
