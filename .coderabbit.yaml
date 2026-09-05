@@ -1,0 +1,35 @@
+# yaml-language-server: $schema=https://coderabbit.ai/integrations/schema.v2.json
+# Product-specific additions to the central CodeRabbit defaults.
+# Keep inheritance enabled; shared review policy lives in the owner/coderabbit repository.
+inheritance: true
+reviews:
+  path_instructions:
+  - path: .github/workflows/*.{yaml,yml}
+    instructions: >-
+      Treat every workflow_call input, secret, permission requirement, output, job name, runner choice
+      and default as a versioned public interface used from other repositories. Derive startup permissions
+      from all called jobs even when a job may skip. Preserve release versus edge concurrency, tested-ref
+      checkout, native architecture behaviour, and caller-context Security uploads. Consumers pin workflow
+      files by SHA but any config-file or script fetched from this repository's main branch is live fleet
+      state; identify pinned releases that still resolve a moved or deleted path. Use representative linked
+      consumers to test input, permission and language assumptions, and state which caller pin receives
+      a fix.
+  - path: .github/actions/**
+    instructions: >-
+      Review composite actions in the caller's runner and trust context. Treat inputs, outputs, shell
+      requirements and filesystem side effects as public interfaces; validate untrusted input quoting,
+      cross-platform execution, credential persistence, and compatibility with existing linked callers.
+knowledge_base:
+  linked_repositories:
+  - repository: rknightion/paperless-ngx-dedupe
+    instructions: >-
+      Representative container-publish consumer with a pinned shared release; use it to assess input/default
+      compatibility, permissions and whether fixes require a caller pin bump.
+  - repository: rknightion/sagemcom-f3896-py
+    instructions: >-
+      Representative Python consumer of both CodeQL and container publishing; use its callers to verify
+      permissions, Docker/Helm inputs and current shared release compatibility.
+  - repository: rknightion/grotTrack
+    instructions: >-
+      Representative Swift CodeQL consumer; use it to validate macOS runner selection, autobuild assumptions,
+      permissions and CodeQL category behaviour.
