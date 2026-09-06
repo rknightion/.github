@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.21.0](https://github.com/rknightion/.github/compare/v1.20.1...v1.21.0) (2026-09-06)
+
+
+### Features
+
+* **container-publish:** allow a caller to name the image ([db2707e](https://github.com/rknightion/.github/commit/db2707eeb563706efc1b92ec969df0aba0193e02))
+
 ## [1.20.1](https://github.com/rknightion/.github/compare/v1.20.0...v1.20.1) (2026-09-05)
 
 
