@@ -21,6 +21,12 @@ reviews:
       cross-platform execution, credential persistence, and compatibility with existing linked callers.
 knowledge_base:
   linked_repositories:
+  - repository: rknightion/openbao-plugin-secrets-github
+    instructions: >-
+      Live API dependency. actions/broker-token POSTs to this plugin's token/<permission-set> route and
+      parses data.token, data.repositories, data.permissions and data.expires_at. Check a route,
+      response field or auth-flow change there against that action's request and parsing, and the
+      reverse.
   - repository: rknightion/paperless-ngx-dedupe
     instructions: >-
       Representative container-publish consumer with a pinned shared release; use it to assess input/default
