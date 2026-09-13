@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.21.1](https://github.com/rknightion/.github/compare/v1.21.0...v1.21.1) (2026-09-13)
+
+
+### Miscellaneous
+
+* **reviews:** declare linked repositories for cross-repo review context ([30d6013](https://github.com/rknightion/.github/commit/30d601368f5621eba649081dbfb92691bcf24768))
+
 ## [1.21.0](https://github.com/rknightion/.github/compare/v1.20.1...v1.21.0) (2026-09-06)
 
 
