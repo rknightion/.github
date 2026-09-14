@@ -2,9 +2,8 @@ project_name: ".github"
 default_status: "To Do"
 statuses: ["To Do", "In Progress", "Parked", "Done"]
 definition_of_done:
-  - "actionlint (from the repo root; the same lint ci.yml runs via .github/workflows/actionlint.yml)"
-  - "zizmor .github/workflows/ .github/actions/ (the security audit ci.yml runs via .github/workflows/zizmor.yml)"
-  - "For a change to a reusable workflow's INPUTS or PERMISSIONS: check the callers across the fleet, not just this repo — `gh search code --owner rknightion 'uses: rknightion/.github'`"
+  - "just check (fmt-check + lint + test + pii-check; the same gate ci.yml enforces via .github/workflows/just-check.yml)"
+  - "For a change to a reusable workflow's INPUTS or PERMISSIONS: check the callers across the fleet, not just this repo — `just callers`"
 labels: []
 date_format: yyyy-mm-dd
 max_column_width: 20

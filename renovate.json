@@ -1,6 +1,6 @@
 {
   "$schema": "https://docs.renovatebot.com/renovate-schema.json",
-  "description": "Fleet policy (SHA pinning, immutable Action digests, cooldown, automerge) is inherited from the self-hosted Renovate admin config (rknightion/renovate-config config.js) via autodiscover. Only the repo-specific GoReleaser-version tracker lives here.",
+  "description": "Fleet policy (SHA pinning, immutable Action digests, cooldown, automerge) is inherited from the self-hosted Renovate admin config (rknightion/renovate-config config.js) via autodiscover. Only repo-specific version trackers live here.",
   "packageRules": [
     {
       "description": "This is a shared-workflows hub: consumers pin the reusables to release SHAs and pick up bumps only when a new release lands. So dependency updates here must cut a release. Renovate's default `chore(deps)` maps to a hidden changelog section, and release-please treats an all-hidden commit set as non-releasing, so those merges never open the release PR. Commit them as `build(deps)` instead - a non-hidden, releasable type (Build & CI section) - so each bump proactively updates the release PR and is visible in the changelog. Repo-scoped on purpose; app repos keep the fleet `chore` default.",
@@ -12,11 +12,20 @@
   "customManagers": [
     {
       "customType": "regex",
-      "description": "Track the GoReleaser CLI version pinned as the binaries.yml goreleaser-version input default.",
-      "managerFilePatterns": ["/^\\.github/workflows/binaries\\.yml$/"],
+      "description": "Track the GoReleaser CLI and just versions pinned as workflow or composite-action input defaults.",
+      "managerFilePatterns": ["/^\\.github/workflows/binaries\\.yml$/", "/^\\.github/workflows/just-check\\.yml$/", "/^\\.github/actions/setup-just/action\\.yml$/"],
       "matchStrings": [
         "# renovate: datasource=(?<datasource>\\S+) depName=(?<depName>\\S+)\\s+default:\\s*\"(?<currentValue>[^\"]+)\""
       ]
+    },
+    {
+      "customType": "regex",
+      "description": "Track the actionlint and zizmor versions pinned in the justfile.",
+      "managerFilePatterns": ["/^justfile$/"],
+      "matchStrings": [
+        "# renovate: datasource=(?<datasource>\\S+) depName=(?<depName>\\S+)\\s+\\w+ := \"(?<currentValue>[^\"]+)\""
+      ],
+      "extractVersion": "^v?(?<version>.+)$"
     }
   ]
 }

@@ -3,7 +3,7 @@ name: CodeQL (reusable)
 # Reusable CodeQL Advanced workflow for the rknightion fleet. Callers pass a JSON
 # array of {language, build-mode} matrix entries. Results upload to the caller
 # repo's Security tab (reusable workflows run in the caller's context). Shared
-# query/noise policy lives in codeql/codeql-config.yml in this repo.
+# query/noise policy is embedded here so a caller's pinned workflow SHA owns it.
 
 on:
   workflow_call:
@@ -12,6 +12,21 @@ on:
         description: 'JSON array of CodeQL matrix include entries, e.g. [{"language":"python","build-mode":"none"}]'
         required: true
         type: string
+      ref:
+        description: "Repository ref to analyze; empty uses the triggering SHA"
+        required: false
+        type: string
+        default: ""
+      category-suffix:
+        description: "Suffix appended to each CodeQL analysis category"
+        required: false
+        type: string
+        default: ""
+      fail-on-security-severity:
+        description: "Fail on CodeQL security severity: none, high, or critical"
+        required: false
+        type: string
+        default: "none"
 
 permissions: {}
 
@@ -45,20 +60,115 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
+          ref: ${{ inputs.ref || github.sha }}
           persist-credentials: false
+
+      - name: Resolve analyzed revision
+        id: revision
+        env:
+          INPUT_REF: ${{ inputs.ref }}
+          TRIGGER_REF: ${{ github.ref }}
+          TRIGGER_SHA: ${{ github.sha }}
+        run: |
+          sha=$(git rev-parse HEAD)
+          if [[ -z "${INPUT_REF}" ]]; then
+            ref="${TRIGGER_REF}"
+          elif [[ "${INPUT_REF}" =~ ^[0-9a-f]{40}$ ]]; then
+            if [[ "${INPUT_REF}" != "${TRIGGER_SHA}" || "${sha}" != "${TRIGGER_SHA}" ]]; then
+              echo "An explicit SHA must match the triggering revision" >&2
+              exit 1
+            fi
+            ref="${TRIGGER_REF}"
+          elif [[ "${INPUT_REF}" == refs/* ]]; then
+            ref="${INPUT_REF}"
+          elif git show-ref --verify --quiet "refs/tags/${INPUT_REF}"; then
+            ref="refs/tags/${INPUT_REF}"
+          elif git show-ref --verify --quiet "refs/heads/${INPUT_REF}"; then
+            ref="refs/heads/${INPUT_REF}"
+          else
+            echo "Cannot resolve analyzed ref: ${INPUT_REF}" >&2
+            exit 1
+          fi
+          echo "sha=${sha}" >> "$GITHUB_OUTPUT"
+          echo "ref=${ref}" >> "$GITHUB_OUTPUT"
 
       - name: Initialize CodeQL
         uses: github/codeql-action/init@cdf488f595d80d6e07e03d4674febd5ab45fa938 # v4.37.9
         with:
           languages: ${{ matrix.language }}
           build-mode: ${{ matrix.build-mode }}
-          config-file: rknightion/.github/codeql/codeql-config.yml@main
+          config: |
+            name: "rknightion standard CodeQL config"
+            queries:
+              - uses: security-extended
+            query-filters:
+              - exclude:
+                  tags contain: experimental
+            paths-ignore:
+              - '**/node_modules'
+              - '**/vendor'
+              - '**/third_party'
+              - '**/dist'
+              - '**/build'
+              - '**/*.min.js'
+              - '**/*.test.*'
+              - '**/*.spec.*'
+              - 'test'
+              - 'tests'
+              - 'docs'
+              - 'examples'
 
       - name: Autobuild
         if: matrix.build-mode == 'autobuild'
         uses: github/codeql-action/autobuild@cdf488f595d80d6e07e03d4674febd5ab45fa938 # v4.37.9
 
       - name: Perform CodeQL Analysis
+        id: analyze
         uses: github/codeql-action/analyze@cdf488f595d80d6e07e03d4674febd5ab45fa938 # v4.37.9
         with:
-          category: "/language:${{ matrix.language }}"
+          category: "/language:${{ matrix.language }}${{ inputs.category-suffix }}"
+          output: ${{ runner.temp }}/codeql-results
+          upload: always
+          ref: ${{ steps.revision.outputs.ref }}
+          sha: ${{ steps.revision.outputs.sha }}
+
+      - name: Enforce CodeQL security-severity threshold
+        if: inputs.fail-on-security-severity != 'none'
+        env:
+          SARIF_DIR: ${{ steps.analyze.outputs.sarif-output }}
+          THRESHOLD: ${{ inputs.fail-on-security-severity }}
+        run: |
+          python3 - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+
+          thresholds = {"high": 7.0, "critical": 9.0}
+          threshold_name = os.environ["THRESHOLD"]
+          if threshold_name not in thresholds:
+              raise SystemExit(f"invalid CodeQL security threshold: {threshold_name}")
+
+          findings = []
+          for path in sorted(Path(os.environ["SARIF_DIR"]).glob("*.sarif")):
+              payload = json.loads(path.read_text(encoding="utf-8"))
+              for run in payload.get("runs", []):
+                  rules = run.get("tool", {}).get("driver", {}).get("rules", [])
+                  by_id = {rule.get("id"): rule for rule in rules}
+                  for result in run.get("results", []):
+                      rule = by_id.get(result.get("ruleId"), {})
+                      index = result.get("ruleIndex")
+                      if isinstance(index, int) and 0 <= index < len(rules):
+                          rule = rules[index]
+                      score = rule.get("properties", {}).get("security-severity")
+                      try:
+                          numeric_score = float(score)
+                      except (TypeError, ValueError):
+                          continue
+                      if numeric_score >= thresholds[threshold_name]:
+                          findings.append((result.get("ruleId", "unknown"), numeric_score))
+
+          if findings:
+              for rule_id, score in findings:
+                  print(f"CodeQL finding at or above {threshold_name}: {rule_id} ({score})")
+              raise SystemExit(1)
+          PY

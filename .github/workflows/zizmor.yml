@@ -18,10 +18,6 @@ concurrency:
 jobs:
   zizmor:
     name: Run zizmor
-    # SARIF upload needs security-events: write, which GitHub does not grant to
-    # pull_request runs from forks (the upload would 403 and fail the job). Run
-    # on push + same-repo PRs only; fork PRs are re-scanned after merge on push.
-    if: ${{ github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository }}
     runs-on: ubuntu-latest
     timeout-minutes: 15
     permissions:
@@ -60,3 +56,7 @@ jobs:
 
       - name: Run zizmor
         uses: zizmorcore/zizmor-action@3dc1ecc9bcb9e94e9b2c709687979e1298497054 # v0.6.2
+        with:
+          version: 1.29.0
+          advanced-security: ${{ github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository }}
+          annotations: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name != github.repository }}

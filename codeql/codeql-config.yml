@@ -27,3 +27,16 @@ paths-ignore:
   - 'tests'
   - 'docs'
   - 'examples'
+
+# DO NOT DELETE THIS FILE.
+#
+# The reusable workflow at HEAD carries this config inline and no longer reads
+# it, but every caller still pinned at or below v1.17.1 resolves
+#   config-file: rknightion/.github/codeql/codeql-config.yml@main
+# at run time. A SHA pin on the reusable does NOT pin what that reusable itself
+# fetches from @main, so deleting this file breaks CodeQL initialization in every
+# such repository at once, with a Contents API 404 inside "Load language
+# configuration" and no other symptom.
+#
+# It did: removed 2026-09-01 22:27 in 240da9e3, and 16 repositories failed every
+# CodeQL run until this was restored. Retire it only once no caller references it.

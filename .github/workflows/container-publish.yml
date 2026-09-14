@@ -5,10 +5,10 @@ name: Container publish (reusable)
 # decides the tags. Uniform behaviour for every repo regardless of language:
 #   * per-arch NATIVE runners (amd64 + arm64), push-by-digest, manifest-list merge
 #     (no QEMU — emulated arm64 mis-resolves native wheels/libs)
-#   * cosign keyless signing + build-provenance attestation on the merged index
+#   * cosign keyless signing + build-provenance attestation on the merged index (attestation optional via the provenance input)
 #   * SBOM (SPDX + CycloneDX) via syft; attached to the GitHub Release on a release
 #   * optional Helm chart publish (OCI) — release version or main snapshot
-#   * Trivy scan -> caller Security tab
+#   * Trivy scan -> caller Security tab (SARIF upload optional via trivy-upload-sarif; the gate always runs)
 # Callers trigger on push:main (edge) + release-please workflow_call (release) +
 # workflow_dispatch + merge_group (build-only gate). Concurrency cancels superseded
 # EDGE builds but never a release publish.
@@ -18,6 +18,10 @@ on:
     inputs:
       release-tag:
         description: "Release tag (vX.Y.Z) when invoked by release-please; empty for edge builds"
+        type: string
+        default: ""
+      image-name:
+        description: "Image repository under ghcr.io/<owner>; empty publishes <owner>/<repo>"
         type: string
         default: ""
       dockerfile:
@@ -52,6 +56,18 @@ on:
         description: "Run Trivy scan and upload SARIF"
         type: boolean
         default: true
+      trivy-ignore-file:
+        description: "Path to a reviewed Trivy YAML ignore file; empty accepts nothing"
+        type: string
+        default: ""
+      trivy-upload-sarif:
+        description: "Upload the Trivy SARIF to code scanning; set false on a private repository whose plan has no code scanning, the HIGH/CRITICAL gate still runs"
+        type: boolean
+        default: true
+      provenance:
+        description: "Generate a GitHub build-provenance attestation (private repositories need a plan that allows attestations; cosign signing is unaffected)"
+        type: boolean
+        default: true
       dockerhub-login:
         description: "Log in to Docker Hub for base-image pulls (needs DOCKERHUB_* secrets)"
         type: boolean
@@ -74,12 +90,12 @@ permissions: {}
 
 concurrency:
   # Cancel superseded EDGE builds (no release tag); NEVER cancel a release publish.
-  group: container-publish-${{ github.workflow }}-${{ github.ref }}-${{ inputs.release-tag }}
+  group: container-publish-${{ github.workflow }}-${{ github.ref }}-${{ inputs.release-tag }}${{ inputs.image-name && format('-{0}', inputs.image-name) || '' }}
   cancel-in-progress: ${{ inputs.release-tag == '' }}
 
 env:
   REGISTRY: ghcr.io
-  IMAGE_NAME: ${{ github.repository }}
+  IMAGE_NAME: ${{ inputs.image-name && format('{0}/{1}', github.repository_owner, inputs.image-name) || github.repository }}
 
 jobs:
   build:
@@ -89,6 +105,7 @@ jobs:
     permissions:
       contents: read
       packages: write
+      security-events: write
     strategy:
       fail-fast: false
       matrix:
@@ -140,13 +157,6 @@ jobs:
         with:
           images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
 
-      - name: Log in to GHCR
-        uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4.6.0
-        with:
-          registry: ${{ env.REGISTRY }}
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-
       - name: Log in to Docker Hub (base-image pulls)
         if: inputs.dockerhub-login
         uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4.6.0
@@ -154,7 +164,7 @@ jobs:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
-      - name: Build and push by digest
+      - name: Build OCI layout
         id: build
         uses: docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a # v7.3.0
         with:
@@ -162,18 +172,67 @@ jobs:
           file: ${{ inputs.context }}/${{ inputs.dockerfile }}
           platforms: ${{ matrix.platform }}
           labels: ${{ steps.meta.outputs.labels }}
-          outputs: ${{ github.event_name != 'merge_group' && format('type=image,name={0}/{1},push-by-digest=true,name-canonical=true,push=true', env.REGISTRY, env.IMAGE_NAME) || 'type=cacheonly' }}
-          cache-from: |
-            type=registry,ref=${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:buildcache-${{ env.PLATFORM_PAIR }}
-            type=gha,scope=${{ env.PLATFORM_PAIR }}
-          cache-to: |
-            type=registry,ref=${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:buildcache-${{ env.PLATFORM_PAIR }},mode=max
-            type=gha,scope=${{ env.PLATFORM_PAIR }},mode=max
+          outputs: type=oci,dest=${{ runner.temp }}/image-${{ env.PLATFORM_PAIR }},tar=false
+          cache-from: type=gha,scope=${{ inputs.image-name && format('{0}-', inputs.image-name) || '' }}${{ env.PLATFORM_PAIR }}
+          cache-to: type=gha,scope=${{ inputs.image-name && format('{0}-', inputs.image-name) || '' }}${{ env.PLATFORM_PAIR }},mode=max
           provenance: false
           sbom: false
           build-args: |
             ${{ inputs.build-args }}
             VERSION=${{ env.COMPUTED_VERSION }}
+
+      - name: Run Trivy vulnerability scanner
+        id: trivy
+        if: inputs.trivy
+        continue-on-error: true
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+        with:
+          input: ${{ runner.temp }}/image-${{ env.PLATFORM_PAIR }}
+          format: sarif
+          output: trivy-${{ env.PLATFORM_PAIR }}.sarif
+          severity: CRITICAL,HIGH
+          exit-code: "1"
+          limit-severities-for-sarif: true
+          trivyignores: ${{ inputs.trivy-ignore-file }}
+
+      - name: Upload Trivy SARIF
+        if: inputs.trivy && inputs.trivy-upload-sarif && hashFiles(format('trivy-{0}.sarif', env.PLATFORM_PAIR)) != ''
+        uses: github/codeql-action/upload-sarif@cdf488f595d80d6e07e03d4674febd5ab45fa938 # v4.37.9
+        with:
+          sarif_file: trivy-${{ env.PLATFORM_PAIR }}.sarif
+          category: trivy-image-${{ inputs.image-name && format('{0}-', inputs.image-name) || '' }}${{ env.PLATFORM_PAIR }}
+
+      - name: Enforce Trivy security gate
+        if: inputs.trivy && steps.trivy.outcome == 'failure'
+        run: |
+          echo "Trivy reported a scanner error or an unaccepted HIGH/CRITICAL finding" >&2
+          exit 1
+
+      - name: Install ORAS
+        if: github.event_name != 'merge_group' && success()
+        uses: oras-project/setup-oras@1d808f7d7f6995cc68b7bf507bfe5c5446e1dc9d # v2.0.1
+        with:
+          version: 1.3.3
+
+      - name: Log in to GHCR
+        if: github.event_name != 'merge_group' && success()
+        uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4.6.0
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Publish scanned digest
+        if: github.event_name != 'merge_group' && success()
+        env:
+          BUILD_DIGEST: ${{ steps.build.outputs.digest }}
+          PLATFORM_PAIR: ${{ env.PLATFORM_PAIR }}
+          REGISTRY: ${{ env.REGISTRY }}
+          IMAGE_NAME: ${{ env.IMAGE_NAME }}
+        run: |
+          oras cp --from-oci-layout \
+            "${RUNNER_TEMP}/image-${PLATFORM_PAIR}@${BUILD_DIGEST}" \
+            "${REGISTRY}/${IMAGE_NAME}@${BUILD_DIGEST}"
 
       - name: Export digest
         if: github.event_name != 'merge_group'
@@ -187,7 +246,8 @@ jobs:
         if: github.event_name != 'merge_group'
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
-          name: digests-${{ env.PLATFORM_PAIR }}
+          # Keep named images outside the legacy digests-* download namespace.
+          name: ${{ inputs.image-name && format('image-{0}-', inputs.image-name) || '' }}digests-${{ env.PLATFORM_PAIR }}
           path: ${{ runner.temp }}/digests/*
           if-no-files-found: error
           retention-days: 1
@@ -203,7 +263,6 @@ jobs:
       packages: write
       id-token: write         # cosign keyless + provenance attestation
       attestations: write
-      security-events: write  # Trivy SARIF
     outputs:
       digest: ${{ steps.digest.outputs.digest }}
       version: ${{ steps.meta.outputs.version }}
@@ -217,7 +276,7 @@ jobs:
         uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         with:
           path: ${{ runner.temp }}/digests
-          pattern: digests-*
+          pattern: ${{ inputs.image-name && format('image-{0}-digests-*', inputs.image-name) || 'digests-*' }}
           merge-multiple: true
 
       - name: Set up Docker Buildx
@@ -282,6 +341,7 @@ jobs:
         run: echo "${TAGS}" | xargs -I {} cosign sign --yes "{}@${DIGEST}"
 
       - name: Generate build-provenance attestation
+        if: inputs.provenance
         uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
         with:
           subject-name: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
@@ -308,22 +368,6 @@ jobs:
         run: |
           name="${IMAGE##*/}"
           gh release upload "${RELEASE_TAG}" "${name}.spdx.json" "${name}.cdx.json" --clobber
-
-      - name: Run Trivy vulnerability scanner
-        if: inputs.trivy
-        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
-        with:
-          image-ref: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}@${{ steps.digest.outputs.digest }}
-          format: sarif
-          output: trivy-results.sarif
-          severity: CRITICAL,HIGH
-
-      - name: Upload Trivy SARIF
-        if: inputs.trivy
-        uses: github/codeql-action/upload-sarif@cdf488f595d80d6e07e03d4674febd5ab45fa938 # v4.37.9
-        with:
-          sarif_file: trivy-results.sarif
-          category: trivy-image
 
   helm:
     name: helm publish
