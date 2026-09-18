@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.22.0](https://github.com/rknightion/.github/compare/v1.21.1...v1.22.0) (2026-09-18)
+
+
+### Features
+
+* **ghcr-cleanup:** prune dev chart versions and allow a wider edge pattern ([9e53abf](https://github.com/rknightion/.github/commit/9e53abfae2695d99f601f8fd692eed9b1cc10038))
+
 ## [1.21.1](https://github.com/rknightion/.github/compare/v1.21.0...v1.21.1) (2026-09-13)
 
 
