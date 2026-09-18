@@ -33,6 +33,37 @@ on:
         required: false
         type: string
         default: "7 days"
+      edge-tags:
+        description: >-
+          Regex of edge tags produced by ordinary pushes to main. The default
+          matches the fleet convention `main-<sha>`. A repo that also publishes
+          a suffixed variant of the same commit (portina pushes
+          `main-<sha>-render` alongside `main-<sha>`) must widen this, or that
+          variant matches no rule and is never pruned.
+        required: false
+        type: string
+        default: '^main-[0-9a-f]+$'
+      dev-chart-tags:
+        description: >-
+          Regex of throwaway dev versions published on every push to main.
+          Defaults to the Helm OCI convention `0.0.0-main.t<epoch>.g<sha>`,
+          which matches NO other rule here: it is not `main-<sha>`, not
+          `buildcache-*`, not `-rc.N`, and the protected-tags regex does not
+          cover it because it is not digits-and-dots throughout. Left unpruned
+          these dominate a chart package -- charts/tailscale2otel was 568 of
+          2,129 versions, and each drags a cosign signature and an attestation
+          with it. Set to a regex matching nothing to disable.
+        required: false
+        type: string
+        default: '^0\.0\.0-main\..*$'
+      dev-chart-older-than:
+        description: >-
+          Delete dev chart versions older than this. Deliberately longer than
+          edge-older-than: a Helm release may be pinned to one of these, so the
+          window is wide enough to notice before the artifact goes.
+        required: false
+        type: string
+        default: "30 days"
       protected-tags:
         description: >-
           Regex of tags that must NEVER be pruned, whatever other rule matches.
@@ -118,9 +149,25 @@ jobs:
           token: ${{ github.token }}
           packages: ${{ inputs.packages }}
           use-regex: true
-          delete-tags: '^main-[0-9a-f]+$'
+          delete-tags: ${{ inputs.edge-tags }}
           exclude-tags: ${{ inputs.protected-tags }}
           older-than: ${{ inputs.edge-older-than }}
+          delete-orphaned-images: true
+          validate: true
+          dry-run: ${{ inputs.dry-run }}
+
+      # Dev chart versions from pushes to main. The chart equivalent of the edge
+      # images above, and the single biggest retention leak before this step
+      # existed: nothing else here matches `0.0.0-main.t<epoch>.g<sha>`.
+      - name: Prune old dev chart versions
+        uses: dataaxiom/ghcr-cleanup-action@d52806a0dc70b430571a37da1fde39733ffd640f # v1.2.2
+        with:
+          token: ${{ github.token }}
+          packages: ${{ inputs.packages }}
+          use-regex: true
+          delete-tags: ${{ inputs.dev-chart-tags }}
+          exclude-tags: ${{ inputs.protected-tags }}
+          older-than: ${{ inputs.dev-chart-older-than }}
           delete-orphaned-images: true
           validate: true
           dry-run: ${{ inputs.dry-run }}
