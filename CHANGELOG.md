@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.23.0](https://github.com/rknightion/.github/compare/v1.22.0...v1.23.0) (2026-09-20)
+
+
+### Features
+
+* **actionlint:** support self-hosted runners ([6c07aa3](https://github.com/rknightion/.github/commit/6c07aa37c746a4a9a89f80852d5f8c2cc82e948d))
+
 ## [1.22.0](https://github.com/rknightion/.github/compare/v1.21.1...v1.22.0) (2026-09-18)
 
 
