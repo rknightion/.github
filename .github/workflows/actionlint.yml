@@ -6,7 +6,20 @@ name: actionlint (reusable)
 # upload SARIF. actionlint and its Linux artifact checksum are pinned here.
 
 on:
-  workflow_call: {}
+  workflow_call:
+    inputs:
+      runs-on:
+        description: "Runner label. Self-hosted callers must also set harden to false."
+        required: false
+        type: string
+        default: "ubuntu-latest"
+      harden:
+        description: >-
+          Run step-security/harden-runner. MUST be false on a self-hosted runner:
+          it is Enterprise-tier there and needs an agent on the runner host.
+        required: false
+        type: boolean
+        default: true
 
 permissions: {}
 
@@ -20,12 +33,13 @@ concurrency:
 jobs:
   actionlint:
     name: Run actionlint
-    runs-on: ubuntu-latest
+    runs-on: ${{ inputs.runs-on }}
     timeout-minutes: 10
     permissions:
       contents: read
     steps:
       - name: Harden the runner (audit egress)
+        if: ${{ inputs.harden }}
         uses: step-security/harden-runner@05e31511f85b41b11d1cf0ef85d0992719546e2c # v2.21.0
         with:
           egress-policy: audit
@@ -36,21 +50,39 @@ jobs:
           persist-credentials: false
 
       - name: Run actionlint
+        shell: bash
         env:
           ACTIONLINT_VERSION: 1.7.12
           ACTIONLINT_LINUX_AMD64_SHA256: 8aca8db96f1b94770f1b0d72b6dddcb1ebb8123cb3712530b08cc387b349a3d8
+          RUNNER_ARCH: ${{ runner.arch }}
+          RUNNER_OS: ${{ runner.os }}
         run: |
-          archive="actionlint_${ACTIONLINT_VERSION}_linux_amd64.tar.gz"
-          curl \
-            --retry 5 \
-            --retry-all-errors \
-            --retry-delay 2 \
-            --fail \
-            --show-error \
-            --silent \
-            --location \
-            --output "${archive}" \
-            "https://github.com/rhysd/actionlint/releases/download/v${ACTIONLINT_VERSION}/${archive}"
-          printf '%s  %s\n' "${ACTIONLINT_LINUX_AMD64_SHA256}" "${archive}" | sha256sum --check --strict
-          tar -xzf "${archive}" actionlint
-          ./actionlint -color
+          if command -v actionlint >/dev/null 2>&1; then
+            installed_version="$(actionlint -version | sed -n '1{s/^v//;p}')"
+            if [ "${installed_version}" != "${ACTIONLINT_VERSION}" ]; then
+              printf 'actionlint version mismatch: installed=%s expected=%s\n' \
+                "${installed_version:-<unknown>}" "${ACTIONLINT_VERSION}" >&2
+              exit 1
+            fi
+            actionlint -color
+          else
+            if [ "${RUNNER_OS}" != "Linux" ] || [ "${RUNNER_ARCH}" != "X64" ]; then
+              printf 'actionlint is not on PATH and no fallback artifact exists for os=%s arch=%s\n' \
+                "${RUNNER_OS}" "${RUNNER_ARCH}" >&2
+              exit 1
+            fi
+            archive="actionlint_${ACTIONLINT_VERSION}_linux_amd64.tar.gz"
+            curl \
+              --retry 5 \
+              --retry-all-errors \
+              --retry-delay 2 \
+              --fail \
+              --show-error \
+              --silent \
+              --location \
+              --output "${archive}" \
+              "https://github.com/rhysd/actionlint/releases/download/v${ACTIONLINT_VERSION}/${archive}"
+            printf '%s  %s\n' "${ACTIONLINT_LINUX_AMD64_SHA256}" "${archive}" | sha256sum --check --strict
+            tar -xzf "${archive}" actionlint
+            ./actionlint -color
+          fi
