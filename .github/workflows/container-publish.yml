@@ -60,6 +60,10 @@ on:
         description: "Path to a reviewed Trivy YAML ignore file; empty accepts nothing"
         type: string
         default: ""
+      trivy-ignore-unfixed:
+        description: "Ignore Trivy vulnerabilities without a fix available for the scanned distribution; filtered findings are also omitted from SARIF"
+        type: boolean
+        default: false
       trivy-upload-sarif:
         description: "Upload the Trivy SARIF to code scanning; set false on a private repository whose plan has no code scanning, the HIGH/CRITICAL gate still runs"
         type: boolean
@@ -185,6 +189,8 @@ jobs:
         id: trivy
         if: inputs.trivy
         continue-on-error: true
+        env:
+          TRIVY_IGNORE_UNFIXED: ${{ inputs.trivy-ignore-unfixed }}
         uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
         with:
           input: ${{ runner.temp }}/image-${{ env.PLATFORM_PAIR }}
@@ -194,6 +200,7 @@ jobs:
           exit-code: "1"
           limit-severities-for-sarif: true
           trivyignores: ${{ inputs.trivy-ignore-file }}
+          ignore-unfixed: ${{ inputs.trivy-ignore-unfixed }}
 
       - name: Upload Trivy SARIF
         if: inputs.trivy && inputs.trivy-upload-sarif && hashFiles(format('trivy-{0}.sarif', env.PLATFORM_PAIR)) != ''
