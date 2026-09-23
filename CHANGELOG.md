@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.24.0](https://github.com/rknightion/.github/compare/v1.23.0...v1.24.0) (2026-09-23)
+
+
+### Features
+
+* **container-publish:** add opt-in for unfixed Trivy findings ([e937a74](https://github.com/rknightion/.github/commit/e937a74cdf1ef5bc95664b8302c3f80148e90f35))
+
 ## [1.23.0](https://github.com/rknightion/.github/compare/v1.22.0...v1.23.0) (2026-09-20)
 
 
