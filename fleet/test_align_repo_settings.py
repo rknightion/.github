@@ -69,7 +69,8 @@ class NestedActions(unittest.TestCase):
         f"aquasecurity/setup-trivy@{SHA}": "runs:\n  using: composite\n",
         WF: "jobs:\n  a:\n    uses: ./.github/workflows/child.yml\n  b:\n    steps:\n      - uses: ./workspace-action\n",
         f"rknightion/.github/.github/workflows/child.yml@{SHA}": f"jobs:\n  a:\n    steps:\n      - uses: deep/one@{SHA}\n",
-        f"deep/one@{SHA}": f"runs:\n  steps:\n    - uses: deeper/two@{SHA}\n",
+        f"deep/one@{SHA}": f"runs:\n  steps:\n    - uses: deeper/two@{SHA}\n    - uses: $/sub\n",
+        f"deep/one/sub@{SHA}": "runs:\n  using: node24\n",
         f"deeper/two@{SHA}": "runs:\n  using: node24\n",
     }
 
@@ -79,8 +80,13 @@ class NestedActions(unittest.TestCase):
     def test_expands_composites_and_reusables_recursively(self):
         got, unreadable = align.expand_nested({f"aquasecurity/trivy-action@{SHA}", self.WF, "./x"}, self.nested_of)
         self.assertEqual(got, {f"aquasecurity/setup-trivy@{SHA}", f"rknightion/.github/.github/workflows/child.yml@{SHA}",
-                               f"deep/one@{SHA}", f"deeper/two@{SHA}"})
+                               f"deep/one@{SHA}", f"deeper/two@{SHA}", f"deep/one/sub@{SHA}"})
         self.assertEqual(unreadable, set())
+
+    def test_self_repository_syntax_is_own_repo(self):
+        self.assertTrue(align.action_allowed("$/.github/actions/setup", STD["actions_allowlist"]))
+        self.assertEqual(align.unpinned({"$/.github/actions/setup"}), [])
+        self.assertEqual(align.expand_nested({"$/.github/actions/setup"}, self.nested_of), (set(), set()))
 
     def test_unreadable_is_reported_not_assumed_empty(self):
         self.assertEqual(align.expand_nested({f"private/thing@{SHA}"}, self.nested_of), (set(), {f"private/thing@{SHA}"}))

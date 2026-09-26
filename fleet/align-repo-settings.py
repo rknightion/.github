@@ -162,7 +162,7 @@ GITHUB_OWNED = ("actions/", "github/")
 
 def action_allowed(uses: str, allow: dict) -> bool:
     """Would `uses:` run under the selected-actions policy?"""
-    if uses.startswith("./"):
+    if uses.startswith(("./", "$/")):  # the caller's own checkout or own repository
         return True
     if allow["github_owned_allowed"] and uses.startswith(GITHUB_OWNED):
         return True
@@ -189,7 +189,7 @@ def unpinned(uses: set[str]) -> list[str]:
     """Action refs the SHA-pinning policy would reject. Local actions and reusable workflows are exempt."""
     out = []
     for u in uses:
-        if u.startswith("./") or "/.github/workflows/" in u:
+        if u.startswith(("./", "$/")) or "/.github/workflows/" in u:
             continue
         if u.startswith("docker://"):
             if "@sha256:" not in u:
@@ -202,12 +202,12 @@ def unpinned(uses: set[str]) -> list[str]:
 
 def uses_in(text: str) -> set[str]:
     return {u for u in USES_RE.findall(text)
-            if not u.startswith("${{") and (u.startswith(("./", "docker://")) or "/" in u)}
+            if not u.startswith("${{") and (u.startswith(("./", "$/", "docker://")) or "/" in u)}
 
 
 def remote_target(uses: str) -> tuple[str, str, list[str]] | None:
     """(owner/repo, ref, candidate file paths) for a remote action or reusable workflow."""
-    if uses.startswith(("./", "docker://")) or "@" not in uses:
+    if uses.startswith(("./", "$/", "docker://")) or "@" not in uses:
         return None
     name, _, ref = uses.partition("@")
     parts = name.split("/")
@@ -235,7 +235,9 @@ def expand_nested(uses: set[str], nested_of) -> tuple[set[str], set[str]]:
             continue
         repo, ref, paths = remote_target(u)
         for n in found:
-            if n.startswith("./"):
+            if n.startswith("$/"):  # self-repository syntax: the repo holding this file, same ref
+                n = f"{repo}/{n[2:]}@{ref}"
+            elif n.startswith("./"):
                 # Only a reusable-workflow call resolves in the calling workflow's repo; a `./` action
                 # resolves in the caller's checkout, which the caller's own scan already covers.
                 if not (paths[0].startswith(".github/workflows/") and n.startswith("./.github/workflows/")):
@@ -440,13 +442,32 @@ class Aligner:
             status, body, _ = self.gh.call("GET", f"/repos/{repo}/contents/{path}?ref={q}")
             if status == 404:
                 continue
-            if status != 200 or body.get("encoding") != "base64":
+            if status == 403:  # an owner's IP allow list refuses App tokens; public files still read anonymously
+                text = self.raw_public(repo, ref, path)
+                if text is None:
+                    continue
+            elif status != 200 or body.get("encoding") != "base64":
                 raise ApiError("GET", f"/repos/{repo}/contents/{path}", status, body)
-            found = sorted(uses_in(base64.b64decode(body["content"]).decode(errors="replace")))
+            else:
+                text = base64.b64decode(body["content"]).decode(errors="replace")
+            found = sorted(uses_in(text))
             if FULL_SHA.match(ref):  # immutable, safe to keep across runs
                 self.blob_cache[key] = found
             return found
         return None  # a Docker action, or a private repo this token cannot read
+
+    @staticmethod
+    def raw_public(repo: str, ref: str, path: str) -> str | None:
+        url = f"https://raw.githubusercontent.com/{repo}/{urllib.parse.quote(ref, safe='')}/{path}"
+        try:
+            with urllib.request.urlopen(url, timeout=30) as r:
+                return r.read().decode(errors="replace")
+        except urllib.error.HTTPError as e:
+            if e.code == 404:
+                return None
+            raise ApiError("GET", url, e.code, {"message": "raw fetch failed"}) from e
+        except (urllib.error.URLError, TimeoutError, ConnectionError) as e:
+            raise ApiError("GET", url, 0, {"message": f"raw fetch network: {e}"}) from e
 
     def wiki_has_pages(self, full: str) -> bool:
         url = f"https://github.com/{full}.wiki.git/info/refs?service=git-upload-pack"
@@ -530,8 +551,10 @@ class Aligner:
                 want["allowed_actions"] = perms["allowed_actions"]
         loose = unpinned(uses | nested)  # the pinning policy also rejects a tag-pinned nested action
         if loose and want.get("sha_pinning_required"):
+            # Enforced pinning fails the whole job at "Set up job", nested refs included, so it stays
+            # off until every ref is pinned; a repo already enforcing it is switched off, not left broken.
             self.finding(full, "actions-not-pinned", "SHA pinning not enforced; pin: " + ", ".join(loose))
-            want["sha_pinning_required"] = perms.get("sha_pinning_required")
+            want["sha_pinning_required"] = False
         if {k: perms.get(k) for k in want} != want:
             self.gh.write("PUT", f"/repos/{full}/actions/permissions", want)
             self.change(full, "actions", f"permissions -> {want}")

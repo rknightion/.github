@@ -76,7 +76,12 @@ under immutability.
 
 - Default `GITHUB_TOKEN` is read-only and cannot approve PRs.
 - Every action must be pinned to a full commit SHA (`sha_pinning_required`). Reusable workflows are
-  exempt by GitHub's design.
+  exempt by GitHub's design. **Enforcement reaches actions nested inside composite actions**
+  (verified 2026-09-26: autopi-ha's Bandit job failed on python-bandit-scan's own `@v3`/`@main`
+  refs), so the aligner checks nested refs too and switches pinning off on a repo where any ref,
+  nested or not, is unpinned, reporting `actions-not-pinned`. An org that already enforces pinning
+  (m7kni) overrides that; a new loose ref there breaks CI until the action is replaced.
+- `$/path` (self-repository syntax) counts as the repo's own action: always allowed, always pinned.
 - **Explicit allowlist** (`actions_allowlist`): GitHub-owned actions, the two `.github` hubs, and
   the named third-party actions the fleet actually uses. Adding an action means adding it here
   first. The aligner only applies the allowlist to a repo whose workflows are fully covered, and
