@@ -1,0 +1,330 @@
+{
+  "$comment": "Declared GitHub repo-settings standard for rknightion, m7kni and BroTEK-Solutions. Applied by fleet/align-repo-settings.py. REPO-SETTINGS-STANDARD.md explains every value.",
+  "version": 1,
+  "owners": {
+    "rknightion": {
+      "kind": "user"
+    },
+    "m7kni": {
+      "kind": "org",
+      "general": {
+        "web_commit_signoff_required": true
+      }
+    },
+    "BroTEK-Solutions": {
+      "kind": "org"
+    }
+  },
+  "skip": {
+    "forks": true,
+    "archived": true,
+    "repos": []
+  },
+  "scratch_repos": [
+    "m7kni/backpocket-fixture-alpha",
+    "m7kni/backpocket-fixture-beta",
+    "m7kni/cfw-otel-demo",
+    "rknightion/backpocket-live-proof"
+  ],
+  "ungated_repos": [
+    "m7kni/rkps-awsinfra",
+    "m7kni/portina-site",
+    "m7kni/agent-docs",
+    "m7kni/dmarc-reporties-docs"
+  ],
+  "required_check": {
+    "context": "ci-success",
+    "integration_id": 15368,
+    "lookback_commits": 30
+  },
+  "actions_allowlist": {
+    "github_owned_allowed": true,
+    "verified_allowed": false,
+    "patterns_allowed": [
+      "anchore/sbom-action/download-syft@*",
+      "anthropics/claude-code-action@*",
+      "apple-actions/import-codesign-certs@*",
+      "aquasecurity/trivy-action@*",
+      "astral-sh/setup-uv@*",
+      "aws-actions/amazon-ecr-login@*",
+      "aws-actions/configure-aws-credentials@*",
+      "azure/setup-helm@*",
+      "cloudflare/wrangler-action@*",
+      "codacy/codacy-coverage-reporter-action@*",
+      "codecov/codecov-action@*",
+      "crazy-max/ghaction-github-runtime@*",
+      "dataaxiom/ghcr-cleanup-action@*",
+      "davelosert/vitest-coverage-report-action@*",
+      "docker/build-push-action@*",
+      "docker/login-action@*",
+      "docker/metadata-action@*",
+      "docker/setup-buildx-action@*",
+      "docker/setup-qemu-action@*",
+      "dorny/test-reporter@*",
+      "extractions/setup-just@*",
+      "frenck/action-addon-linter@*",
+      "gitleaks/gitleaks-action@*",
+      "golangci/golangci-lint-action@*",
+      "googleapis/release-please-action@*",
+      "goreleaser/goreleaser-action@*",
+      "hacs/action@*",
+      "hadolint/hadolint-action@*",
+      "hashicorp/setup-terraform@*",
+      "helm/kind-action@*",
+      "home-assistant/actions/hassfest@*",
+      "home-assistant/actions/helpers/find-addons@*",
+      "home-assistant/actions/helpers/info@*",
+      "home-assistant/builder/actions/build-image@*",
+      "home-assistant/builder/actions/prepare-multi-arch-matrix@*",
+      "home-assistant/builder/actions/publish-multi-arch-manifest@*",
+      "losisin/helm-docs-github-action@*",
+      "losisin/helm-values-schema-json-action@*",
+      "m7kni/.github/*",
+      "opentofu/setup-opentofu@*",
+      "oras-project/setup-oras@*",
+      "ossf/scorecard-action@*",
+      "peter-evans/repository-dispatch@*",
+      "pnpm/action-setup@*",
+      "pypa/gh-action-pypi-publish@*",
+      "reproducible-containers/buildkit-cache-dance@*",
+      "rknightion/.github/*",
+      "runs-on/cache/restore@*",
+      "runs-on/cache/save@*",
+      "runs-on/cache@*",
+      "shundor/python-bandit-scan@*",
+      "sigstore/cosign-installer@*",
+      "softprops/action-gh-release@*",
+      "step-security/harden-runner@*",
+      "tailscale/github-action@*",
+      "terraform-linters/setup-tflint@*",
+      "updatecli/updatecli-action@*",
+      "zizmorcore/zizmor-action@*"
+    ]
+  },
+  "profiles": {
+    "oss": {
+      "general": {
+        "has_projects": false,
+        "has_downloads": false,
+        "has_wiki": false,
+        "has_discussions": false,
+        "allow_squash_merge": true,
+        "allow_merge_commit": false,
+        "allow_rebase_merge": false,
+        "squash_merge_commit_title": "PR_TITLE",
+        "squash_merge_commit_message": "BLANK",
+        "delete_branch_on_merge": true,
+        "allow_update_branch": true,
+        "pull_request_creation_policy": "all",
+        "has_issues": true,
+        "allow_forking": true,
+        "web_commit_signoff_required": false
+      },
+      "graphql": {
+        "hasSponsorshipsEnabled": false
+      },
+      "actions": {
+        "permissions": {
+          "enabled": true,
+          "allowed_actions": "selected",
+          "sha_pinning_required": true
+        },
+        "workflow": {
+          "default_workflow_permissions": "read",
+          "can_approve_pull_request_reviews": false
+        },
+        "cache": {
+          "max_cache_size_gb": 10,
+          "max_cache_retention_days": 14
+        },
+        "artifact_retention_days": 90,
+        "fork_pr_contributor_approval": "all_external_contributors"
+      },
+      "security": {
+        "security_and_analysis": {
+          "secret_scanning": "enabled",
+          "secret_scanning_push_protection": "enabled",
+          "secret_scanning_non_provider_patterns": "enabled"
+        },
+        "vulnerability_alerts": true,
+        "automated_security_fixes": false,
+        "private_vulnerability_reporting": true
+      },
+      "rulesets": {
+        "main": "auto",
+        "release_tags": true
+      }
+    },
+    "private": {
+      "general": {
+        "has_projects": false,
+        "has_downloads": false,
+        "has_wiki": false,
+        "has_discussions": false,
+        "allow_squash_merge": true,
+        "allow_merge_commit": false,
+        "allow_rebase_merge": false,
+        "squash_merge_commit_title": "PR_TITLE",
+        "squash_merge_commit_message": "BLANK",
+        "delete_branch_on_merge": true,
+        "allow_update_branch": true,
+        "pull_request_creation_policy": "all",
+        "has_issues": false
+      },
+      "graphql": {
+        "hasSponsorshipsEnabled": false
+      },
+      "actions": {
+        "permissions": {
+          "enabled": true,
+          "allowed_actions": "selected",
+          "sha_pinning_required": true
+        },
+        "workflow": {
+          "default_workflow_permissions": "read",
+          "can_approve_pull_request_reviews": false
+        },
+        "cache": {
+          "max_cache_size_gb": 10,
+          "max_cache_retention_days": 14
+        },
+        "artifact_retention_days": 90,
+        "fork_pr_workflows_private": {
+          "run_workflows_from_fork_pull_requests": false,
+          "send_write_tokens_to_workflows": false,
+          "send_secrets_and_variables": false,
+          "require_approval_for_fork_pr_workflows": false
+        }
+      },
+      "security": null,
+      "rulesets": {
+        "main": "auto",
+        "release_tags": true
+      }
+    },
+    "personal-private": {
+      "general": {
+        "has_projects": false,
+        "has_downloads": false,
+        "has_wiki": false,
+        "has_discussions": false,
+        "allow_squash_merge": true,
+        "allow_merge_commit": false,
+        "allow_rebase_merge": false,
+        "squash_merge_commit_title": "PR_TITLE",
+        "squash_merge_commit_message": "BLANK",
+        "delete_branch_on_merge": true,
+        "allow_update_branch": true,
+        "pull_request_creation_policy": "all",
+        "has_issues": false
+      },
+      "graphql": {
+        "hasSponsorshipsEnabled": false
+      },
+      "actions": {
+        "permissions": {
+          "enabled": true,
+          "allowed_actions": "selected",
+          "sha_pinning_required": true
+        },
+        "workflow": {
+          "default_workflow_permissions": "read",
+          "can_approve_pull_request_reviews": false
+        },
+        "cache": {
+          "max_cache_size_gb": 10,
+          "max_cache_retention_days": 14
+        },
+        "artifact_retention_days": 90
+      },
+      "security": null,
+      "rulesets": null
+    },
+    "scratch": {
+      "general": {
+        "has_projects": false,
+        "has_downloads": false,
+        "has_wiki": false,
+        "has_discussions": false,
+        "allow_squash_merge": true,
+        "allow_merge_commit": false,
+        "allow_rebase_merge": false,
+        "squash_merge_commit_title": "PR_TITLE",
+        "squash_merge_commit_message": "BLANK",
+        "delete_branch_on_merge": true,
+        "allow_update_branch": true,
+        "pull_request_creation_policy": "all",
+        "has_issues": false
+      },
+      "graphql": {
+        "hasSponsorshipsEnabled": false
+      },
+      "actions": {
+        "permissions": {
+          "enabled": true,
+          "allowed_actions": "selected",
+          "sha_pinning_required": true
+        },
+        "workflow": {
+          "default_workflow_permissions": "read",
+          "can_approve_pull_request_reviews": false
+        },
+        "cache": {
+          "max_cache_size_gb": 10,
+          "max_cache_retention_days": 14
+        },
+        "artifact_retention_days": 90
+      },
+      "security": null,
+      "rulesets": null
+    }
+  },
+  "rulesets": {
+    "main_name": "main",
+    "bypass_actors": [
+      {
+        "actor_type": "RepositoryRole",
+        "actor_id": 5,
+        "bypass_mode": "always"
+      }
+    ],
+    "allowed_merge_methods": [
+      "squash"
+    ],
+    "release_tags": {
+      "name": "release-tags",
+      "include": [
+        "refs/tags/v*"
+      ],
+      "rules": [
+        "deletion",
+        "update"
+      ]
+    }
+  },
+  "orgs": {
+    "m7kni": {
+      "actions": true,
+      "fork_pr_contributor_approval": "all_external_contributors",
+      "cache": {
+        "max_cache_size_gb": 10,
+        "max_cache_retention_days": 14
+      },
+      "code_security_configuration": {
+        "name": "brewmdm-org-config-1",
+        "set": {
+          "dependency_graph": "enabled",
+          "dependabot_alerts": "enabled"
+        }
+      }
+    },
+    "BroTEK-Solutions": {
+      "actions": true,
+      "fork_pr_contributor_approval": "all_external_contributors"
+    }
+  },
+  "cache_sweep": {
+    "closed_pull_refs": true,
+    "tag_ref_max_age_hours": 24
+  }
+}

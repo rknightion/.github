@@ -51,11 +51,12 @@ lint:
     zizmor --no-exit-codes .github/workflows/ .github/actions/
     shellcheck $(git ls-files '*.sh')
 
-# run the shell unit tests
+# run the shell and fleet aligner unit tests
 [group('check')]
 [no-exit-message]
 test:
     bash .github/actions/next-rc-tag/next-rc-tag_test.sh
+    python3 -m unittest discover -s fleet -p 'test_*.py'
 
 # fail if backlog/ carries an identifier (AGENTS.md rule)
 # Ignore only the task's literal documented scanner command, not any real match.
