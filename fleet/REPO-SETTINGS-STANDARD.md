@@ -100,7 +100,9 @@ under immutability.
 
 ## Security
 
-Public repos (all free): secret scanning, push protection and non-provider patterns on; Dependabot
+Public repos (all free): secret scanning and push protection on; non-provider patterns requested but
+**not available here**: GitHub returns 200 to the PATCH and leaves it disabled (verified 2026-09-26), so
+the aligner reads it back and reports `security-unavailable` once instead of re-applying it; Dependabot
 alerts on (Renovate's `vulnerabilityAlerts` reads them); Dependabot security updates off (Renovate
 raises the PRs); private vulnerability reporting on. Validity checks need a paid licence and stay
 off. Code scanning is the `codeql.yml` reusable, so default setup stays off.

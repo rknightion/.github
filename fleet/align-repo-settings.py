@@ -511,13 +511,22 @@ class Aligner:
         if diff:
             try:
                 self.gh.write("PATCH", f"/repos/{full}", {"security_and_analysis": diff})
-                for k, v in diff.items():
-                    self.change(full, "security", f"{k} -> {v['status']}")
             except ApiError as e:
-                if e.status == 422:
-                    self.finding(full, "security-unavailable", str(e))
-                else:
+                if e.status != 422:
                     raise
+                self.finding(full, "security-unavailable", str(e))
+                diff = {}
+            if diff and not self.gh.dry_run:
+                # GitHub accepts some of these with a 200 and silently ignores them (a setting that
+                # needs a licence the account lacks). Read back so they are reported, not re-applied.
+                after = self.gh.get(f"/repos/{full}")[1].get("security_and_analysis") or {}
+                for k in list(diff):
+                    if (after.get(k) or {}).get("status") != diff[k]["status"]:
+                        self.finding(full, "security-unavailable",
+                                     f"{k}: GitHub accepted but did not apply '{diff[k]['status']}'")
+                        del diff[k]
+            for k, v in diff.items():
+                self.change(full, "security", f"{k} -> {v['status']}")
         status, _, _ = self.gh.call("GET", f"/repos/{full}/vulnerability-alerts")
         if (status == 204) != sec["vulnerability_alerts"]:
             self.gh.write("PUT" if sec["vulnerability_alerts"] else "DELETE", f"/repos/{full}/vulnerability-alerts")
