@@ -364,6 +364,7 @@ class Aligner:
     def __init__(self, gh: GitHub, std: dict, sweep: bool, blob_cache: dict | None = None):
         self.gh, self.std, self.sweep = gh, std, sweep
         self.blob_cache = blob_cache if blob_cache is not None else {}  # blob sha -> uses (immutable)
+        self._org_pinning: dict[str, bool] = {}
         self.changes, self.findings, self.errors = [], [], []
         self.reclaimed = {"caches": 0, "bytes": 0}
 
@@ -455,6 +456,15 @@ class Aligner:
                 self.blob_cache[key] = found
             return found
         return None  # a Docker action, or a private repo this token cannot read
+
+    def org_enforces_pinning(self, owner: str) -> bool:
+        if owner not in self._org_pinning:
+            if self.std["owners"][owner].get("kind") == "user":
+                self._org_pinning[owner] = False
+            else:
+                _, body = self.gh.get(f"/orgs/{owner}/actions/permissions")  # raises on any failure
+                self._org_pinning[owner] = bool(body.get("sha_pinning_required"))
+        return self._org_pinning[owner]
 
     @staticmethod
     def raw_public(repo: str, ref: str, path: str) -> str | None:
@@ -553,8 +563,13 @@ class Aligner:
         if loose and want.get("sha_pinning_required"):
             # Enforced pinning fails the whole job at "Set up job", nested refs included, so it stays
             # off until every ref is pinned; a repo already enforcing it is switched off, not left broken.
-            self.finding(full, "actions-not-pinned", "SHA pinning not enforced; pin: " + ", ".join(loose))
-            want["sha_pinning_required"] = False
+            if self.org_enforces_pinning(repo["owner"]["login"]):  # a repo cannot loosen its org (409)
+                self.finding(full, "actions-not-pinned",
+                             "org enforces SHA pinning, so jobs using these fail; pin or replace: " + ", ".join(loose))
+                want["sha_pinning_required"] = perms.get("sha_pinning_required")
+            else:
+                self.finding(full, "actions-not-pinned", "SHA pinning not enforced; pin: " + ", ".join(loose))
+                want["sha_pinning_required"] = False
         if {k: perms.get(k) for k in want} != want:
             self.gh.write("PUT", f"/repos/{full}/actions/permissions", want)
             self.change(full, "actions", f"permissions -> {want}")
