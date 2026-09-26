@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.25.4](https://github.com/rknightion/.github/compare/v1.25.3...v1.25.4) (2026-09-26)
+
+
+### Miscellaneous
+
+* **release:** stop aligner-only changes under fleet/ cutting hub releases ([8cc3967](https://github.com/rknightion/.github/commit/8cc396722dbad45e59b825e4edaa7aeb3201e932))
+
 ## [1.25.3](https://github.com/rknightion/.github/compare/v1.25.2...v1.25.3) (2026-09-26)
 
 
