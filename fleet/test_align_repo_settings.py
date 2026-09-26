@@ -61,6 +61,31 @@ class Allowlist(unittest.TestCase):
         self.assertEqual(align.uses_in(text), {f"actions/checkout@{SHA}", "x/y@1"})
 
 
+class NestedActions(unittest.TestCase):
+    """A composite action's own `uses:` are gated by the caller's allowlist too."""
+    WF = f"rknightion/.github/.github/workflows/ci.yml@{SHA}"
+    FILES = {
+        f"aquasecurity/trivy-action@{SHA}": f"runs:\n  steps:\n    - uses: aquasecurity/setup-trivy@{SHA}\n    - uses: ./caller-local\n",
+        f"aquasecurity/setup-trivy@{SHA}": "runs:\n  using: composite\n",
+        WF: "jobs:\n  a:\n    uses: ./.github/workflows/child.yml\n  b:\n    steps:\n      - uses: ./workspace-action\n",
+        f"rknightion/.github/.github/workflows/child.yml@{SHA}": f"jobs:\n  a:\n    steps:\n      - uses: deep/one@{SHA}\n",
+        f"deep/one@{SHA}": f"runs:\n  steps:\n    - uses: deeper/two@{SHA}\n",
+        f"deeper/two@{SHA}": "runs:\n  using: node24\n",
+    }
+
+    def nested_of(self, u):
+        return align.uses_in(self.FILES[u]) if u in self.FILES else None
+
+    def test_expands_composites_and_reusables_recursively(self):
+        got, unreadable = align.expand_nested({f"aquasecurity/trivy-action@{SHA}", self.WF, "./x"}, self.nested_of)
+        self.assertEqual(got, {f"aquasecurity/setup-trivy@{SHA}", f"rknightion/.github/.github/workflows/child.yml@{SHA}",
+                               f"deep/one@{SHA}", f"deeper/two@{SHA}"})
+        self.assertEqual(unreadable, set())
+
+    def test_unreadable_is_reported_not_assumed_empty(self):
+        self.assertEqual(align.expand_nested({f"private/thing@{SHA}"}, self.nested_of), (set(), {f"private/thing@{SHA}"}))
+
+
 class Pinning(unittest.TestCase):
     def test_unpinned(self):
         uses = {f"actions/checkout@{SHA}", "actions/checkout@v6", "./local", "docker://alpine:3",

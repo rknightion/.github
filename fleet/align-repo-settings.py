@@ -40,6 +40,7 @@ import subprocess
 import sys
 import time
 import urllib.error
+import urllib.parse
 import urllib.request
 from concurrent.futures import ThreadPoolExecutor
 from typing import Any
@@ -202,6 +203,50 @@ def unpinned(uses: set[str]) -> list[str]:
 def uses_in(text: str) -> set[str]:
     return {u for u in USES_RE.findall(text)
             if not u.startswith("${{") and (u.startswith(("./", "docker://")) or "/" in u)}
+
+
+def remote_target(uses: str) -> tuple[str, str, list[str]] | None:
+    """(owner/repo, ref, candidate file paths) for a remote action or reusable workflow."""
+    if uses.startswith(("./", "docker://")) or "@" not in uses:
+        return None
+    name, _, ref = uses.partition("@")
+    parts = name.split("/")
+    if len(parts) < 2:
+        return None
+    path = "/".join(parts[2:])
+    if "/.github/workflows/" in f"/{path}":
+        return "/".join(parts[:2]), ref, [path]
+    return "/".join(parts[:2]), ref, [f"{path}/{f}" if path else f for f in ("action.yml", "action.yaml")]
+
+
+def expand_nested(uses: set[str], nested_of) -> tuple[set[str], set[str]]:
+    """(every action reached through a composite action or reusable workflow, the ones unreadable).
+
+    `uses` itself is excluded. nested_of(u) returns the `uses:` inside u, or None when it cannot be
+    read; an unreadable target cannot be proven covered."""
+    seen: set[str] = set()
+    unreadable: set[str] = set()
+    queue = [u for u in uses if remote_target(u)]
+    while queue:
+        u = queue.pop()
+        found = nested_of(u)
+        if found is None:
+            unreadable.add(u)
+            continue
+        repo, ref, paths = remote_target(u)
+        for n in found:
+            if n.startswith("./"):
+                # Only a reusable-workflow call resolves in the calling workflow's repo; a `./` action
+                # resolves in the caller's checkout, which the caller's own scan already covers.
+                if not (paths[0].startswith(".github/workflows/") and n.startswith("./.github/workflows/")):
+                    continue
+                n = f"{repo}/{n[2:]}@{ref}"
+            if n in seen or n in uses:
+                continue
+            seen.add(n)
+            if remote_target(n):
+                queue.append(n)
+    return seen, unreadable
 
 
 def is_default_branch_ruleset(rs: dict) -> bool:
@@ -384,6 +429,25 @@ class Aligner:
             uses |= set(cached)
         return uses
 
+    def nested_uses(self, uses: str) -> list[str] | None:
+        """`uses:` inside a remote composite action or reusable workflow; None when not readable here."""
+        repo, ref, paths = remote_target(uses)
+        key = f"nested:{uses}"
+        if key in self.blob_cache:
+            return self.blob_cache[key]
+        for path in paths:
+            q = urllib.parse.quote(ref, safe="")
+            status, body, _ = self.gh.call("GET", f"/repos/{repo}/contents/{path}?ref={q}")
+            if status == 404:
+                continue
+            if status != 200 or body.get("encoding") != "base64":
+                raise ApiError("GET", f"/repos/{repo}/contents/{path}", status, body)
+            found = sorted(uses_in(base64.b64decode(body["content"]).decode(errors="replace")))
+            if FULL_SHA.match(ref):  # immutable, safe to keep across runs
+                self.blob_cache[key] = found
+            return found
+        return None  # a Docker action, or a private repo this token cannot read
+
     def wiki_has_pages(self, full: str) -> bool:
         url = f"https://github.com/{full}.wiki.git/info/refs?service=git-upload-pack"
         req = urllib.request.Request(url)
@@ -453,6 +517,10 @@ class Aligner:
         want = dict(a["permissions"])
         uses = self.workflow_uses(full)
         uncovered = sorted(u for u in uses if not action_allowed(u, allow))
+        # Composite actions and reusable workflows run their own `uses:` under this repo's policy.
+        nested, unreadable = expand_nested(uses, self.nested_uses)
+        uncovered += sorted(f"{u} (nested)" for u in nested if not action_allowed(u, allow))
+        uncovered += sorted(f"{u} (unreadable, cannot check what it calls)" for u in unreadable)
         if uncovered:
             self.finding(full, "actions-not-allowlisted",
                          "allowlist not applied; add or replace: " + ", ".join(uncovered))
@@ -460,7 +528,7 @@ class Aligner:
                 want.pop("allowed_actions")
             else:
                 want["allowed_actions"] = perms["allowed_actions"]
-        loose = unpinned(uses)
+        loose = unpinned(uses | nested)  # the pinning policy also rejects a tag-pinned nested action
         if loose and want.get("sha_pinning_required"):
             self.finding(full, "actions-not-pinned", "SHA pinning not enforced; pin: " + ", ".join(loose))
             want["sha_pinning_required"] = perms.get("sha_pinning_required")
@@ -470,7 +538,9 @@ class Aligner:
         if want.get("allowed_actions") == "selected":
             status, sel, _ = self.gh.call("GET", f"/repos/{full}/actions/permissions/selected-actions")
             cur = sel if status == 200 else {}
-            if (cur.get("github_owned_allowed") != allow["github_owned_allowed"]
+            if status == 409:
+                pass  # the org's own selected-actions list governs this repo; align_org keeps it current
+            elif (cur.get("github_owned_allowed") != allow["github_owned_allowed"]
                     or cur.get("verified_allowed") != allow["verified_allowed"]
                     or sorted(cur.get("patterns_allowed") or []) != sorted(allow["patterns_allowed"])):
                 self.gh.write("PUT", f"/repos/{full}/actions/permissions/selected-actions", allow)
