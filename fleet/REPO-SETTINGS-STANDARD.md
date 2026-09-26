@@ -125,5 +125,7 @@ Free plan: no org rulesets and no org cache settings.
 ## Output
 
 One JSON object on stdout: `changes` (what was changed, or would be under `--dry-run`),
-`findings` (things for a human: `needs-aggregator`, `actions-not-allowlisted`, `kept`),
+`findings` (things for a human: `needs-aggregator`, `actions-not-allowlisted`, `actions-not-pinned`,
+`org-actions-held`, `kept`), `new_findings` (findings absent from the previous full, non-dry run;
+state in `--state-dir`),
 `cache_reclaimed` and `errors`. Exit 0 on a completed run, 2 if any API call failed.

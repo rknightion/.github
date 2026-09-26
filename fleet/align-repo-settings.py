@@ -306,6 +306,10 @@ def caches_to_delete(caches: list[dict], pr_state: dict[int, str], now: dt.datet
     return out
 
 
+def finding_key(f: dict) -> str:
+    return f"{f['scope']}|{f['kind']}|{f['detail']}"
+
+
 # ---------------------------------------------------------------- aligner
 
 
@@ -761,12 +765,27 @@ def main() -> int:
     tmp = blob_path + ".tmp"
     json.dump(blob_cache, open(tmp, "w"))
     os.replace(tmp, blob_path)
+
+    # Findings persist until fixed; only report the ones not seen last run, so a scheduled caller
+    # can stay quiet when nothing is new. Scoped runs (--owner/--repo) and dry runs never update it.
+    seen_path = os.path.join(args.state_dir, "findings-seen.json")
+    try:
+        seen = set(json.load(open(seen_path)))
+    except (OSError, json.JSONDecodeError):
+        seen = set()
+    keys = {finding_key(f): f for f in findings}
+    new_findings = [f for k, f in sorted(keys.items()) if k not in seen]
+    if not args.dry_run and not args.owner and not args.repo:
+        tmp = seen_path + ".tmp"
+        json.dump(sorted(keys), open(tmp, "w"))
+        os.replace(tmp, seen_path)
     report = {
         "run_at": dt.datetime.now(dt.timezone.utc).isoformat(timespec="seconds"),
         "dry_run": args.dry_run,
         "repos": total,
         "changes": sorted(changes, key=lambda c: (c["scope"], c["area"])),
         "findings": sorted(findings, key=lambda f: (f["scope"], f["kind"])),
+        "new_findings": new_findings,
         "cache_reclaimed": {"caches": reclaimed["caches"], "gb": round(reclaimed["bytes"] / 1e9, 2)},
         "errors": errors,
         "api_calls": calls,
