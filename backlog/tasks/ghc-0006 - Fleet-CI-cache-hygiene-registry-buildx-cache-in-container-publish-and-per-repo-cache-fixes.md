@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-09-26 15:49'
-updated_date: '2026-09-26 15:56'
+updated_date: '2026-09-26 18:54'
 labels: []
 dependencies: []
 priority: high
@@ -60,9 +60,9 @@ Why aggregators matter: the aligner only applies the gated main ruleset (and all
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 container-publish.yml uses a GHCR registry buildx cache and a released version is out
-- [ ] #2 ghcr-cleanup.yml keeps buildcache tags
-- [ ] #3 Trivy DB cache no longer accumulates one entry per day
+- [x] #1 container-publish.yml uses a GHCR registry buildx cache and a released version is out
+- [x] #2 ghcr-cleanup.yml keeps buildcache tags
+- [x] #3 Trivy DB cache no longer accumulates one entry per day
 - [ ] #4 Every repo in the 'could not take a local task' list has its fix landed or a task filed in that repo
 <!-- AC:END -->
 
@@ -71,3 +71,15 @@ Why aggregators matter: the aligner only applies the gated main ruleset (and all
 - [ ] #1 just check (fmt-check + lint + test + pii-check; the same gate ci.yml enforces via .github/workflows/just-check.yml)
 - [ ] #2 For a change to a reusable workflow's INPUTS or PERMISSIONS: check the callers across the fleet, not just this repo — `just callers`
 <!-- DOD:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+2026-09-26: container-publish moved to a GHCR registry cache (b26de71, released v1.25.1). Verified on graph2otel run 36263716070: both platforms wrote buildcache-linux-{amd64,arm64} to GHCR, and the import miss on that first cold run is expected and non-fatal. Trivy cache off in container-publish and docker-security (DB from mirror.gcr.io); graph2otel Docker Security green. ghcr-cleanup now prunes only buildcache tags idle for 30 days. Other callers pick it up on their Renovate bump to v1.25.1+.
+AC #4 still open for three repos. Their tasks could not be filed safely: the checkouts are mid-work for other sessions, behind origin with staged or modified files, so a new ID would collide.
+- m7kni/brewmdm-environments: bme board. Checkout has a modified justfile and untracked tasks.
+- m7kni/brewmdm-agent-core: rename or add ci-success. Tracked on the bma (macos-agent) board, whose checkout is 59 behind.
+- m7kni/brewmdm-docs: tracked on the bmc (control-plane) board, whose checkout is 194 behind with staged code.
+- m7kni/trustheader-website: has no board.
+File these when the checkouts are clean.
+<!-- SECTION:NOTES:END -->
