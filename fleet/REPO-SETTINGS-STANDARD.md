@@ -81,6 +81,9 @@ under immutability.
   the named third-party actions the fleet actually uses. Adding an action means adding it here
   first. The aligner only applies the allowlist to a repo whose workflows are fully covered, and
   reports the uncovered `uses:` instead, so a new action is flagged rather than breaking CI.
+  **The allowlist also gates actions called from inside a composite action** (trivy-action calls
+  setup-trivy, setup-just calls setup-crate): each nested action needs its own pattern, or every
+  job using the parent fails at "Set up job".
   `tj-actions/changed-files` is deliberately absent (compromised March 2025); ha-addons replaces
   it under HAB-0021.
 - Fork PRs from anyone outside the repo need approval before workflows run
