@@ -12,6 +12,10 @@ fleet/align-repo-settings.py --repo rknightion/cf2otel     # one repo, for real
 python3 -m unittest discover -s fleet -p 'test_*.py'       # decision-logic tests
 ```
 
+Changes under `fleet/` never cut a hub release (`exclude-paths` in `release-please-config.json`):
+no caller pins this code, and n8n runs the aligner from `main`. A release there would only send a
+no-op bump PR to every caller.
+
 The standard replaces the earlier majority-derived audit (`collect-repo-settings.py`), which could
 not see a majority drifting together and never enforced anything.
 
