@@ -36,9 +36,8 @@ visibility and plan, so a new repo is picked up with no edit here.
 - Projects, downloads and sponsorships off. Backlog.md is the tracker.
 - Wiki and discussions off, **unless they have content** (a wiki with pages, any discussion). The
   aligner never hides content; it reports that it kept the feature on.
-- Issues on for public repos (community channel). Off for private repos, unless open
-  human-authored issues exist. Renovate's Dependency Dashboard issue is ignored for that test; on a
-  private repo with Issues off, Renovate simply has no dashboard.
+- Issues on everywhere. Rob kept them on for private repos too: Renovate's Dependency Dashboard
+  issue lives there, and turning the tab off is not worth losing it.
 - `allow_auto_merge` is on **only** where the default branch is gated by required checks.
   Renovate's `platformAutomerge` relies on the ruleset as its gate; auto-merge without one merges
   a Renovate PR before CI runs.

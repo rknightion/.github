@@ -95,6 +95,7 @@
       "sigstore/cosign-installer@*",
       "softprops/action-gh-release@*",
       "step-security/harden-runner@*",
+      "taiki-e/install-action@*",
       "tailscale/github-action@*",
       "terraform-linters/setup-tflint@*",
       "updatecli/updatecli-action@*",
@@ -169,7 +170,7 @@
         "delete_branch_on_merge": true,
         "allow_update_branch": true,
         "pull_request_creation_policy": "all",
-        "has_issues": false
+        "has_issues": true
       },
       "graphql": {
         "hasSponsorshipsEnabled": false
@@ -216,7 +217,7 @@
         "delete_branch_on_merge": true,
         "allow_update_branch": true,
         "pull_request_creation_policy": "all",
-        "has_issues": false
+        "has_issues": true
       },
       "graphql": {
         "hasSponsorshipsEnabled": false
@@ -254,7 +255,7 @@
         "delete_branch_on_merge": true,
         "allow_update_branch": true,
         "pull_request_creation_policy": "all",
-        "has_issues": false
+        "has_issues": true
       },
       "graphql": {
         "hasSponsorshipsEnabled": false
