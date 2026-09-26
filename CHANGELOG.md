@@ -1,5 +1,16 @@
 # Changelog
 
+## [1.25.1](https://github.com/rknightion/.github/compare/v1.25.0...v1.25.1) (2026-09-26)
+
+
+### Bug Fixes
+
+* **container-publish:** move the buildx cache to GHCR and stop Trivy's daily cache entries ([b26de71](https://github.com/rknightion/.github/commit/b26de71616a408e87e6e6f772e2d1153e85c2681))
+* **fleet:** allowlist the actions nested inside allowed composite actions ([f264fa0](https://github.com/rknightion/.github/commit/f264fa0f297b81691ec31d953e74656714ef190d))
+* **fleet:** check nested actions against the allowlist and pinning; let the org list govern org repos ([1dd0c31](https://github.com/rknightion/.github/commit/1dd0c3195317ceb0ed050cf65e2804317e99a9d2))
+* **fleet:** raise org cache caps before the repo pass ([4edb938](https://github.com/rknightion/.github/commit/4edb938cab363fa74fe8146c81c8516de185209e))
+* **fleet:** read security settings back; report ones GitHub ignores ([a630fe0](https://github.com/rknightion/.github/commit/a630fe0cbb711746e373e552a96c224642f753d8))
+
 ## [1.25.0](https://github.com/rknightion/.github/compare/v1.24.0...v1.25.0) (2026-09-26)
 
 
