@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.25.3](https://github.com/rknightion/.github/compare/v1.25.2...v1.25.3) (2026-09-26)
+
+
+### Bug Fixes
+
+* **fleet:** keep pinning on where the org enforces it; report the refs that break ([a558374](https://github.com/rknightion/.github/commit/a558374571b2f65ec1ccca6b925062f4ce05c2c0))
+
 ## [1.25.2](https://github.com/rknightion/.github/compare/v1.25.1...v1.25.2) (2026-09-26)
 
 
