@@ -126,9 +126,11 @@ jobs:
         with:
           egress-policy: audit
 
-      # Stale buildkit layer caches. Regenerated on the next build; referenced by
-      # nothing. Safe to prune hard, and this is the bulk of the untagged volume.
-      - name: Prune stale buildcache
+      # Abandoned buildkit layer caches only. container-publish keeps one moving
+      # buildcache-<platform> tag per image and rewrites it on every main build,
+      # so a live cache is never this old; a quiet repo keeps its cache for a
+      # month. Superseded cache manifests go untagged and fall to Prune orphans.
+      - name: Prune abandoned buildcache
         uses: dataaxiom/ghcr-cleanup-action@d52806a0dc70b430571a37da1fde39733ffd640f # v1.2.2
         with:
           token: ${{ github.token }}
@@ -136,7 +138,7 @@ jobs:
           use-regex: true
           delete-tags: '^buildcache-.*$'
           exclude-tags: ${{ inputs.protected-tags }}
-          older-than: 7 days
+          older-than: 30 days
           delete-orphaned-images: true
           validate: true
           dry-run: ${{ inputs.dry-run }}

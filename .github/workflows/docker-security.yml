@@ -70,6 +70,8 @@ jobs:
         with:
           scan-type: fs
           scanners: vuln,misconfig,secret
+          # No Actions cache: the action writes a new dated entry every day; the DB comes from mirror.gcr.io.
+          cache: false
           format: sarif
           output: trivy.sarif
       - name: Upload Trivy SARIF
