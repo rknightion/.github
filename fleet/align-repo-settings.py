@@ -629,6 +629,17 @@ class Aligner:
             self.guarded(full, "cache", self.sweep_caches, repo)
 
     # -- org level
+    def align_org_caps(self, org: str, cfg: dict):
+        """Org-level ceilings that cap repo values. Runs BEFORE the repo pass: an org retention cap
+        below the repo target makes every repo PUT fail with 'must be between 1 and <cap>'."""
+        if cfg.get("cache"):
+            self._put_if_diff(org, "actions/cache/retention-limit",
+                              {"max_cache_retention_days": cfg["cache"]["max_cache_retention_days"]},
+                              skip_status=(402,), base="/orgs")
+            self._put_if_diff(org, "actions/cache/storage-limit",
+                              {"max_cache_size_gb": cfg["cache"]["max_cache_size_gb"]},
+                              skip_status=(402,), base="/orgs")
+
     def align_org(self, org: str, cfg: dict, blocked: list[str] | None = None):
         allow = self.std["actions_allowlist"]
         if cfg.get("actions") and blocked:
@@ -653,13 +664,6 @@ class Aligner:
         if cfg.get("fork_pr_contributor_approval"):
             self._put_if_diff(org, "actions/permissions/fork-pr-contributor-approval",
                               {"approval_policy": cfg["fork_pr_contributor_approval"]}, base="/orgs")
-        if cfg.get("cache"):
-            self._put_if_diff(org, "actions/cache/retention-limit",
-                              {"max_cache_retention_days": cfg["cache"]["max_cache_retention_days"]},
-                              skip_status=(402,), base="/orgs")
-            self._put_if_diff(org, "actions/cache/storage-limit",
-                              {"max_cache_size_gb": cfg["cache"]["max_cache_size_gb"]},
-                              skip_status=(402,), base="/orgs")
         csc = cfg.get("code_security_configuration")
         if csc:
             _, confs = self.gh.get(f"/orgs/{org}/code-security/configurations")
@@ -733,6 +737,8 @@ def main() -> int:
         try:
             if kind == "org":
                 plans[o] = (gh.get(f"/orgs/{o}")[1].get("plan") or {}).get("name")
+                if not args.no_org and not args.repo and o in std.get("orgs", {}):
+                    al.guarded(o, "org", al.align_org_caps, o, std["orgs"][o])
             targets = []
             for r in list_repos(gh, o, kind):
                 if args.repo and r["full_name"] not in args.repo:
