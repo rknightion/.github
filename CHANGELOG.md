@@ -1,5 +1,18 @@
 # Changelog
 
+## [1.25.0](https://github.com/rknightion/.github/compare/v1.24.0...v1.25.0) (2026-09-26)
+
+
+### Features
+
+* **fleet:** declared repo-settings standard and aligner ([48355d4](https://github.com/rknightion/.github/commit/48355d41ce570c3904616be1bc8ee566535b969b))
+* **fleet:** report findings that are new since the last full run ([02c3959](https://github.com/rknightion/.github/commit/02c39599ffbf01ff1f4c5c4b7ed945383847df52))
+
+
+### Bug Fixes
+
+* **fleet:** keep Issues on for private repos; allow taiki-e/install-action ([f930d65](https://github.com/rknightion/.github/commit/f930d65fbab704a5e0f5f8459017d0dee3448184))
+
 ## [1.24.0](https://github.com/rknightion/.github/compare/v1.23.0...v1.24.0) (2026-09-23)
 
 
