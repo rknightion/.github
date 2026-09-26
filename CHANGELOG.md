@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.25.2](https://github.com/rknightion/.github/compare/v1.25.1...v1.25.2) (2026-09-26)
+
+
+### Bug Fixes
+
+* **fleet:** switch pinning off where a nested ref is unpinned; read IP-allowlisted actions anonymously ([ce1f4f3](https://github.com/rknightion/.github/commit/ce1f4f31e3b5483a4080f71012af74745f5ec2a3))
+
 ## [1.25.1](https://github.com/rknightion/.github/compare/v1.25.0...v1.25.1) (2026-09-26)
 
 
