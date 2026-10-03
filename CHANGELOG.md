@@ -1,5 +1,17 @@
 # Changelog
 
+## [1.25.5](https://github.com/rknightion/.github/compare/v1.25.4...v1.25.5) (2026-10-03)
+
+
+### Documentation
+
+* **loop:** adopt the lean LOOP.md and point at the loop contract ([89f3a51](https://github.com/rknightion/.github/commit/89f3a5156c4805d4788748ddb8d864da552d116d))
+
+
+### Miscellaneous
+
+* gitignore .pi/ for loop-pi runs [skip ci] ([efc2563](https://github.com/rknightion/.github/commit/efc2563661b50707f11bbcc68ceb875f76873322))
+
 ## [1.25.4](https://github.com/rknightion/.github/compare/v1.25.3...v1.25.4) (2026-09-26)
 
 
