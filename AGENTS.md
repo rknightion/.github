@@ -63,7 +63,7 @@ This repo's task surface is a `justfile`. Discover it, don't guess it:
 Work is tracked in `backlog/` with [Backlog.md](https://backlog.md). `backlog task list --plain` is
 the queue; `backlog doc list --plain` lists the durable documents.
 
-Read the **Agent fan-out protocol (canonical)** doc before designing a wave, and the **Wave operating
+Read `~/repos/agent-docs/sources/loop/contract.md` before designing a wave, and the **Wave operating
 model** doc for this project's own rules, recurring defects and escape hatch. The **Closed GitHub
 issues index (pre-tracker)** doc covers everything closed before 2026-08-14; the issues themselves
 were archived to `archive/` and deleted from GitHub.

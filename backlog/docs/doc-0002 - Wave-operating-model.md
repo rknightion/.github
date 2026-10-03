@@ -5,7 +5,7 @@ type: guide
 created_date: '2026-08-14 16:35'
 updated_date: '2026-08-14 16:40'
 ---
-This repo's own rules. The campaign model itself is the **Agent fan-out protocol (canonical)** doc —
+This repo's own rules. The campaign model itself is `~/repos/agent-docs/sources/loop/contract.md`  - 
 this one restates none of it and only carries what is true of `rknightion/.github` specifically.
 
 ## What this repo is, and why that changes the risk calculus
