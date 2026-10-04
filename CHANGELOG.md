@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.25.6](https://github.com/rknightion/.github/compare/v1.25.5...v1.25.6) (2026-10-04)
+
+
+### Miscellaneous
+
+* **backlog:** capture actionlint ubuntu-26.04 fleet gap ([e7d0946](https://github.com/rknightion/.github/commit/e7d094653d706d8188efb01c010bb1e64e35a855))
+
 ## [1.25.5](https://github.com/rknightion/.github/compare/v1.25.4...v1.25.5) (2026-10-03)
 
 
