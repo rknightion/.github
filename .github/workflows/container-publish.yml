@@ -141,6 +141,13 @@ jobs:
         run: |
           if [ -n "${RELEASE_TAG}" ]; then v="${RELEASE_TAG#v}"; else v="$(git rev-parse --short HEAD)"; fi
           echo "COMPUTED_VERSION=${v}" >> "$GITHUB_ENV"
+          # Stable releases override only the version label, not metadata's source/revision.
+          # Leave the entire input empty for edge/prerelease builds to retain their defaults.
+          if [ -n "${RELEASE_TAG}" ] && [[ "${RELEASE_TAG}" != *-* ]]; then
+            echo "OCI_VERSION_LABEL=org.opencontainers.image.version=${v}" >> "$GITHUB_ENV"
+          else
+            echo "OCI_VERSION_LABEL=" >> "$GITHUB_ENV"
+          fi
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@37fe631027851001ddb9b187196cc803df7f5f0e # v4.3.0
@@ -160,6 +167,7 @@ jobs:
         uses: docker/metadata-action@dc802804100637a589fabce1cb79ff13a1411302 # v6.2.0
         with:
           images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          labels: ${{ env.OCI_VERSION_LABEL }}
 
       - name: Log in to Docker Hub (base-image pulls)
         if: inputs.dockerhub-login
