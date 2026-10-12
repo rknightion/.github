@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.25.7](https://github.com/rknightion/.github/compare/v1.25.6...v1.25.7) (2026-10-12)
+
+
+### Bug Fixes
+
+* **container:** label stable image platforms with the semantic release version ([361f19e](https://github.com/rknightion/.github/commit/361f19e703843ef04b5db97e11cfd673b3eaa6ef))
+
 ## [1.25.6](https://github.com/rknightion/.github/compare/v1.25.5...v1.25.6) (2026-10-04)
 
 
