@@ -57,6 +57,7 @@ lint:
 test:
     bash .github/actions/next-rc-tag/next-rc-tag_test.sh
     python3 -m unittest discover -s fleet -p 'test_*.py'
+    python3 -m unittest discover -s .github/actions/bao-secret -p 'test_*.py'
 
 # fail if backlog/ carries an identifier (AGENTS.md rule)
 # Ignore only the task's literal documented scanner command, not any real match.

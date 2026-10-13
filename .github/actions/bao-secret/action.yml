@@ -134,8 +134,12 @@ runs:
         KV_PATH: ${{ inputs.path }}
       run: |
         set -euo pipefail
+        umask 077
         tmp=$(mktemp -d); trap 'rm -rf "$tmp"' EXIT
         export BAO_SUMMARY="$tmp/summary"
+        export BAO_KV_FILE="$tmp/kv.json"
+        export BAO_ENV_EXPORTS="$tmp/environment"
+        export BAO_KEYS_OUTPUT="$tmp/outputs"
 
         # `curl --fail-with-body` needs curl >= 7.76 and NOT every runner has
         # it: rkps-awsinfra's self-hosted jobs run in a container whose curl
@@ -148,15 +152,31 @@ runs:
           code=$(curl -sS -o "$out" -w '%{http_code}' "$@")
           if [ "$code" -ge 400 ]; then
             echo "::error::${what} returned HTTP ${code}"
-            cat "$out" >&2 || true
             return 1
           fi
+        }
+
+        read_token() {
+          python3 - "$1" "$2" <<'PYTOKEN'
+        import json, sys
+        try:
+            with open(sys.argv[1]) as response:
+                value = json.load(response)
+            for member in sys.argv[2].split('.'):
+                value = value[member]
+            if (not isinstance(value, str) or not value
+                    or any(ord(c) <= 32 or ord(c) > 126 for c in value)):
+                raise ValueError()
+        except (OSError, ValueError, KeyError, TypeError):
+            raise SystemExit('secret reader received an invalid token response')
+        print(value)
+        PYTOKEN
         }
 
         req "$tmp/jwt.json" "the GitHub OIDC token request" \
           -H "Authorization: bearer ${ACTIONS_ID_TOKEN_REQUEST_TOKEN}" \
           "${ACTIONS_ID_TOKEN_REQUEST_URL}&audience=${BAO_ADDR}"
-        gh_jwt=$(python3 -c 'import sys,json; print(json.load(open(sys.argv[1]))["value"])' "$tmp/jwt.json")
+        gh_jwt=$(read_token "$tmp/jwt.json" value)
 
         printf '%s' "$gh_jwt" > "$tmp/jwt.txt"
         python3 -c 'import json,os,sys; print(json.dumps({"role": os.environ["BAO_ROLE"], "jwt": open(sys.argv[1]).read().strip()}))' \
@@ -164,12 +184,12 @@ runs:
         req "$tmp/auth.json" "auth/gha/login" \
           ${BAO_RESOLVE} -X POST "${BAO_ADDR}/v1/auth/gha/login" \
           -H 'Content-Type: application/json' --data-binary @"$tmp/login.json"
-        bao_token=$(python3 -c 'import sys,json; print(json.load(open(sys.argv[1]))["auth"]["client_token"])' "$tmp/auth.json")
+        bao_token=$(read_token "$tmp/auth.json" auth.client_token)
         echo "::add-mask::${bao_token}"
 
         # KV v2 reads go through <mount>/data/<path>; the CLI hides that but the
         # HTTP API does not, and omitting it is the classic KV v2 mistake.
-        req /tmp/bao-kv.json "the KV read" ${BAO_RESOLVE} \
+        req "$BAO_KV_FILE" "the KV read" ${BAO_RESOLVE} \
           -H "X-Vault-Token: ${bao_token}" \
           "${BAO_ADDR}/v1/${KV_MOUNT}/data/${KV_PATH}"
 
@@ -205,22 +225,40 @@ runs:
         #
         # The worst a future bug can now do is fail the step. It cannot print.
         python3 - > "$tmp/masks" <<'PY'
-        import json, os
-        d = json.load(open('/tmp/bao-kv.json'))['data']['data']
+        import json, os, re, secrets
+        try:
+            with open(os.environ['BAO_KV_FILE']) as response:
+                d = json.load(response)['data']['data']
+            if not isinstance(d, dict):
+                raise ValueError()
+        except (OSError, ValueError, KeyError, TypeError):
+            raise SystemExit('secret reader received an invalid KV response')
+        exports = []
+        seen = set()
+        for k, v in d.items():
+            name = k.upper().replace('-', '_')
+            if (not re.fullmatch(r'[A-Z_][A-Z0-9_]*', name)
+                    or name.startswith(('GITHUB_', 'RUNNER_', 'ACTIONS_'))
+                    or name == 'NODE_OPTIONS' or name in seen):
+                raise SystemExit('secret reader received invalid environment keys')
+            seen.add(name)
+            exports.append((name, str(v)))
         names = []
-        with open(os.environ['GITHUB_ENV'], 'a') as env:
-            for k, v in d.items():
-                v = str(v)
+        with open(os.environ['BAO_ENV_EXPORTS'], 'w') as env:
+            for name, v in exports:
                 # One command per LINE, always -- never the whole value when it
                 # spans more than one, since that is the leak.
                 for line in v.splitlines():
                     if line.strip():
-                        print(f"::add-mask::{line}")
-                name = k.upper().replace('-', '_')
+                        escaped = line.replace("%", "%25").replace("\r", "%0D").replace("\n", "%0A")
+                        print(f"::add-mask::{escaped}")
                 names.append(name)
                 # Heredoc form so multi-line values (PEM keys, certs) survive.
-                env.write(f"{name}<<__BAO_EOF__\n{v}\n__BAO_EOF__\n")
-        with open(os.environ['GITHUB_OUTPUT'], 'a') as out:
+                delimiter = "BAO_" + secrets.token_hex(16)
+                while delimiter in v.splitlines():
+                    delimiter = "BAO_" + secrets.token_hex(16)
+                env.write(f"{name}<<{delimiter}\n{v}\n{delimiter}\n")
+        with open(os.environ['BAO_KEYS_OUTPUT'], 'w') as out:
             out.write("keys=" + " ".join(names) + "\n")
         # The summary goes to a file too; the shell prints it after vetting.
         with open(os.environ['BAO_SUMMARY'], 'w') as s:
@@ -235,5 +273,8 @@ runs:
           exit 1
         fi
         cat "$tmp/masks"          # every line here is a command the runner consumes
+        # Export only after every mask was vetted and registered. Failures
+        # cannot leave unmasked values in the runner environment.
+        cat "$BAO_ENV_EXPORTS" >> "$GITHUB_ENV"
+        cat "$BAO_KEYS_OUTPUT" >> "$GITHUB_OUTPUT"
         cat "$BAO_SUMMARY"        # key NAMES only, no values
-        rm -f /tmp/bao-kv.json
