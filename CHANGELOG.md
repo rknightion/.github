@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.25.8](https://github.com/rknightion/.github/compare/v1.25.7...v1.25.8) (2026-10-13)
+
+
+### Bug Fixes
+
+* **bao-secret:** contain temporary secrets and failure output ([17c1d6f](https://github.com/rknightion/.github/commit/17c1d6f1bb36c5f1616adfddc87a804a51bab2e9))
+
 ## [1.25.7](https://github.com/rknightion/.github/compare/v1.25.6...v1.25.7) (2026-10-12)
 
 
