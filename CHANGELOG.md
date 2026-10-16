@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.25.9](https://github.com/rknightion/.github/compare/v1.25.8...v1.25.9) (2026-10-16)
+
+
+### Documentation
+
+* record verified secret-reader containment release ([9f9fa99](https://github.com/rknightion/.github/commit/9f9fa99e59ca9f314cd688166bfcc7385dba2c06))
+
 ## [1.25.8](https://github.com/rknightion/.github/compare/v1.25.7...v1.25.8) (2026-10-13)
 
 
