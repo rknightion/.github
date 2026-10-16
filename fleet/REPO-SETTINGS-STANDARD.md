@@ -126,7 +126,10 @@ turns on the free dependency graph and Dependabot alerts only.
 
 m7kni and BroTEK-Solutions carry the same Actions policy at org level (allowlist, SHA pinning,
 read-only token, fork approval), so a new repo starts compliant. m7kni's org cache retention cap is
-raised to 14 days, because an org cap below the repo value silently limits it. BroTEK is on the
+raised to 14 days, because an org cap below the repo value silently limits it. m7kni's org
+artifact and log retention is **7 days**: its private repos share one artifact-storage allowance,
+and Portina's Playwright uploads exhausted it on 2026-10-10. The org value caps every repo (a repo
+PUT above it is a 409), so m7kni repos are clamped to 7 rather than the profile's 90. BroTEK is on the
 Free plan: no org rulesets and no org cache settings.
 
 ## Not automatable

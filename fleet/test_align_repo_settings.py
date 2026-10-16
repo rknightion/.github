@@ -196,6 +196,19 @@ class AutoMerge(unittest.TestCase):
         self.assertEqual(self.run_gate(True, "other"), [])
 
 
+class ArtifactRetention(unittest.TestCase):
+    def test_org_cap_clamps_repo_target(self):  # a repo PUT above its org's cap is a 409
+        self.assertEqual(align.artifact_retention_days(STD, "m7kni", 90), STD["orgs"]["m7kni"]["artifact_retention_days"])
+        self.assertEqual(align.artifact_retention_days(STD, "rknightion", 90), 90)
+        self.assertEqual(align.artifact_retention_days(STD, "BroTEK-Solutions", 90), 90)
+
+    def test_org_pass_sets_the_cap(self):
+        gh = FakeGH()
+        gh.call = lambda method, path: (200, {"days": 400, "maximum_allowed_days": 400}, None)
+        align.Aligner(gh, STD, sweep=False).align_org_caps("m7kni", {"artifact_retention_days": 7})
+        self.assertEqual(gh.writes, [("PUT", "/orgs/m7kni/actions/permissions/artifact-and-log-retention", {"days": 7})])
+
+
 class CacheSweep(unittest.TestCase):
     now = dt.datetime(2026, 9, 27, 12, tzinfo=dt.timezone.utc)
 

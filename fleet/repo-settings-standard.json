@@ -315,6 +315,7 @@
         "max_cache_size_gb": 10,
         "max_cache_retention_days": 14
       },
+      "artifact_retention_days": 7,
       "code_security_configuration": {
         "name": "brewmdm-org-config-1",
         "set": {

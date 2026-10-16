@@ -360,6 +360,12 @@ def finding_key(f: dict) -> str:
 # ---------------------------------------------------------------- aligner
 
 
+def artifact_retention_days(std: dict, owner: str, profile_days: int) -> int:
+    """A repo cannot exceed its org's artifact and log retention cap (the PUT 409s), so clamp to it."""
+    cap = std.get("orgs", {}).get(owner, {}).get("artifact_retention_days")
+    return min(profile_days, cap) if cap else profile_days
+
+
 class Aligner:
     def __init__(self, gh: GitHub, std: dict, sweep: bool, blob_cache: dict | None = None):
         self.gh, self.std, self.sweep = gh, std, sweep
@@ -595,7 +601,8 @@ class Aligner:
         self._put_if_diff(full, "actions/cache/retention-limit",
                           {"max_cache_retention_days": a["cache"]["max_cache_retention_days"]}, skip_status=(402, 403))
         self._put_if_diff(full, "actions/permissions/artifact-and-log-retention",
-                          {"days": a["artifact_retention_days"]})
+                          {"days": artifact_retention_days(self.std, repo["owner"]["login"],
+                                                           a["artifact_retention_days"])})
 
     def _put_if_diff(self, scope_repo: str, sub: str, want: dict, skip_status=(), base="/repos"):
         path = f"{base}/{scope_repo}/{sub}"
@@ -756,6 +763,9 @@ class Aligner:
             self._put_if_diff(org, "actions/cache/storage-limit",
                               {"max_cache_size_gb": cfg["cache"]["max_cache_size_gb"]},
                               skip_status=(402,), base="/orgs")
+        if cfg.get("artifact_retention_days"):
+            self._put_if_diff(org, "actions/permissions/artifact-and-log-retention",
+                              {"days": cfg["artifact_retention_days"]}, base="/orgs")
 
     def align_org(self, org: str, cfg: dict, blocked: list[str] | None = None):
         allow = self.std["actions_allowlist"]
