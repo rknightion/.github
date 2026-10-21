@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.25.11](https://github.com/rknightion/.github/compare/v1.25.10...v1.25.11) (2026-10-21)
+
+
+### Bug Fixes
+
+* **deps:** accept the official ubuntu-26.04 runner in actionlint ([4271851](https://github.com/rknightion/.github/commit/427185189b4a5a2b1160fd0a291d0d2b6d2d8a6b))
+
 ## [1.25.10](https://github.com/rknightion/.github/compare/v1.25.9...v1.25.10) (2026-10-21)
 
 
