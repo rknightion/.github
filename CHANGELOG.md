@@ -1,5 +1,15 @@
 # Changelog
 
+## [1.25.14](https://github.com/rknightion/.github/compare/v1.25.13...v1.25.14) (2026-10-21)
+
+
+### Build & CI
+
+* **deps:** update github/codeql-action action to v4.39.0 ([#122](https://github.com/rknightion/.github/issues/122)) ([0061746](https://github.com/rknightion/.github/commit/0061746af23539a4ee4080a9ef6d2a6f4cee8979))
+* **deps:** update goreleaser/goreleaser-action action to v7.3.0 ([#123](https://github.com/rknightion/.github/issues/123)) ([9a1a801](https://github.com/rknightion/.github/commit/9a1a801af461d8758fde5fd179fddc61d81ab3a3))
+* **deps:** update ossf/scorecard-action action to v2.5.0 ([#124](https://github.com/rknightion/.github/issues/124)) ([5ca2cac](https://github.com/rknightion/.github/commit/5ca2cac9bede33ea84f55bb96ebb4c269cdc0735))
+* **deps:** update step-security/harden-runner action to v2.22.2 ([#125](https://github.com/rknightion/.github/issues/125)) ([03c7bc4](https://github.com/rknightion/.github/commit/03c7bc40627d4a5799f331f6a20bab7a26c0e56d))
+
 ## [1.25.13](https://github.com/rknightion/.github/compare/v1.25.12...v1.25.13) (2026-10-21)
 
 
