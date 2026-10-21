@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.25.17](https://github.com/rknightion/.github/compare/v1.25.16...v1.25.17) (2026-10-21)
+
+
+### Build & CI
+
+* **deps:** update github/codeql-action action to v4.39.1 ([#133](https://github.com/rknightion/.github/issues/133)) ([95c2efa](https://github.com/rknightion/.github/commit/95c2efae3f96f7f45df2b8b4699f89de86e85ecb))
+* **deps:** update rknightion/.github action to v1.25.12 ([#134](https://github.com/rknightion/.github/issues/134)) ([1c56688](https://github.com/rknightion/.github/commit/1c56688957858e67996a4173c22a2556c3468d24))
+
 ## [1.25.16](https://github.com/rknightion/.github/compare/v1.25.15...v1.25.16) (2026-10-21)
 
 
