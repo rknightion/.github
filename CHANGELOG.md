@@ -1,5 +1,15 @@
 # Changelog
 
+## [1.25.13](https://github.com/rknightion/.github/compare/v1.25.12...v1.25.13) (2026-10-21)
+
+
+### Build & CI
+
+* **deps:** update dependency casey/just to v1.59.0 ([#116](https://github.com/rknightion/.github/issues/116)) ([f8cbbc4](https://github.com/rknightion/.github/commit/f8cbbc4b41e63b6b3fee5ad0e63691632b367867))
+* **deps:** update dependency zizmor to v1.31.1 ([#117](https://github.com/rknightion/.github/issues/117)) ([c71010c](https://github.com/rknightion/.github/commit/c71010c6fb761098095dd896b701a5de5d2899bc))
+* **deps:** update docker/build-push-action action to v7.4.0 ([#118](https://github.com/rknightion/.github/issues/118)) ([87fddea](https://github.com/rknightion/.github/commit/87fddea2bd7cfbf67e3ed6a1d640106c1f243340))
+* **deps:** update docker/setup-buildx-action action to v4.4.1 ([#119](https://github.com/rknightion/.github/issues/119)) ([fbc8131](https://github.com/rknightion/.github/commit/fbc8131e3624fc315a395ac2488d703dc2186b2d))
+
 ## [1.25.12](https://github.com/rknightion/.github/compare/v1.25.11...v1.25.12) (2026-10-21)
 
 
