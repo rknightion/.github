@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.25.10](https://github.com/rknightion/.github/compare/v1.25.9...v1.25.10) (2026-10-21)
+
+
+### Bug Fixes
+
+* **deps:** restore Renovate custom version tracking ([4569957](https://github.com/rknightion/.github/commit/4569957a0ac7a77e32c2663e0977ad2edf97cbcb))
+* **deps:** update shared scorecard workflow to v1.25.8 ([53e552d](https://github.com/rknightion/.github/commit/53e552d12406b58aae0d0af075ad6fbd3c3388e5))
+
 ## [1.25.9](https://github.com/rknightion/.github/compare/v1.25.8...v1.25.9) (2026-10-16)
 
 
