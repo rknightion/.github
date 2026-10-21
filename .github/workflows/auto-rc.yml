@@ -103,7 +103,7 @@ jobs:
       release_pr: ${{ steps.decide.outputs.release_pr }}
     steps:
       - name: Harden the runner (audit egress)
-        uses: step-security/harden-runner@05e31511f85b41b11d1cf0ef85d0992719546e2c # v2.21.0
+        uses: step-security/harden-runner@dc2769abcc0fcfbadfc1df54081c1608579ef6b2 # v2.22.2
         with:
           egress-policy: audit
 
@@ -284,7 +284,7 @@ jobs:
       tag: ${{ steps.create.outputs.tag }}
     steps:
       - name: Harden the runner (audit egress)
-        uses: step-security/harden-runner@05e31511f85b41b11d1cf0ef85d0992719546e2c # v2.21.0
+        uses: step-security/harden-runner@dc2769abcc0fcfbadfc1df54081c1608579ef6b2 # v2.22.2
         with:
           egress-policy: audit
 
