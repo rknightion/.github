@@ -10,7 +10,7 @@ set shell := ["bash", "-euo", "pipefail", "-c"]
 actionlint_version := "1.7.12"
 
 # renovate: datasource=pypi depName=zizmor
-zizmor_version := "1.29.0"
+zizmor_version := "1.31.1"
 
 tools := justfile_directory() / ".tools"
 venv_bin := tools / "venv" / "bin"
