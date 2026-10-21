@@ -57,14 +57,17 @@ jobs:
           RUNNER_ARCH: ${{ runner.arch }}
           RUNNER_OS: ${{ runner.os }}
         run: |
+          # actionlint 1.7.12 predates this official hosted runner (upstream #682).
+          # Keep caller config intact and exempt only this exact label diagnostic.
+          known_runner='^label "ubuntu-26\.04" is unknown\.'
           if command -v actionlint >/dev/null 2>&1; then
-            installed_version="$(actionlint -version | sed -n '1{s/^v//;p}')"
+            installed_version="$(actionlint -version | sed -n '1{s/^v//;p;}')"
             if [ "${installed_version}" != "${ACTIONLINT_VERSION}" ]; then
               printf 'actionlint version mismatch: installed=%s expected=%s\n' \
                 "${installed_version:-<unknown>}" "${ACTIONLINT_VERSION}" >&2
               exit 1
             fi
-            actionlint -color
+            actionlint -color -ignore "$known_runner"
           else
             if [ "${RUNNER_OS}" != "Linux" ] || [ "${RUNNER_ARCH}" != "X64" ]; then
               printf 'actionlint is not on PATH and no fallback artifact exists for os=%s arch=%s\n' \
@@ -84,5 +87,5 @@ jobs:
               "https://github.com/rhysd/actionlint/releases/download/v${ACTIONLINT_VERSION}/${archive}"
             printf '%s  %s\n' "${ACTIONLINT_LINUX_AMD64_SHA256}" "${archive}" | sha256sum --check --strict
             tar -xzf "${archive}" actionlint
-            ./actionlint -color
+            ./actionlint -color -ignore "$known_runner"
           fi

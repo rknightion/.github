@@ -23,6 +23,10 @@ The `binaries` reusable reads Go from the caller's `go.mod` by default; an expli
 Renovate regex managers use `extractVersionTemplate` for a fixed extraction expression;
 `extractVersion` is a capture group, not a supported custom-manager config field.
 
+The actionlint reusable accepts the official `ubuntu-26.04` runner through an exact
+diagnostic exemption until upstream supports it; other unknown labels still fail and
+caller actionlint configuration remains in effect.
+
 ## Gate
 
 ```bash
