@@ -17,7 +17,7 @@ inputs:
     description: "Exact just version to install. Pin exactly; never a range."
     required: false
     # renovate: datasource=github-releases depName=casey/just
-    default: "1.58.0"
+    default: "1.59.0"
   github-token:
     description: >-
       Token used to fetch the release asset. Defaults to the job token; pass one
