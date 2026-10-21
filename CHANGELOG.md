@@ -1,5 +1,16 @@
 # Changelog
 
+## [1.25.12](https://github.com/rknightion/.github/compare/v1.25.11...v1.25.12) (2026-10-21)
+
+
+### Build & CI
+
+* **deps:** update actions/download-artifact action to v8.0.2 ([#110](https://github.com/rknightion/.github/issues/110)) ([dcea63d](https://github.com/rknightion/.github/commit/dcea63dba8fad90cdba9f72dc98cb816b582568b))
+* **deps:** update actions/upload-artifact action to v7.0.2 ([#111](https://github.com/rknightion/.github/issues/111)) ([2a45a16](https://github.com/rknightion/.github/commit/2a45a16dbd17534b2818239d25b2922dc9b182de))
+* **deps:** update anchore/sbom-action action to v0.24.3 ([#112](https://github.com/rknightion/.github/issues/112)) ([1d6d255](https://github.com/rknightion/.github/commit/1d6d25585e537fd42d710b45481337b44dbbaba4))
+* **deps:** update dependency goreleaser/goreleaser to v2.18.3 ([#113](https://github.com/rknightion/.github/issues/113)) ([8f0d0d4](https://github.com/rknightion/.github/commit/8f0d0d48406b741a355ecbb4e9573a654c5fc9f9))
+* **deps:** update oras-project/setup-oras action to v2.0.2 ([#114](https://github.com/rknightion/.github/issues/114)) ([3b03c2f](https://github.com/rknightion/.github/commit/3b03c2f3143ede88b50ebf62e377a50d19b96b01))
+
 ## [1.25.11](https://github.com/rknightion/.github/compare/v1.25.10...v1.25.11) (2026-10-21)
 
 
