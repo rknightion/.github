@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.25.15](https://github.com/rknightion/.github/compare/v1.25.14...v1.25.15) (2026-10-21)
+
+
+### Build & CI
+
+* **deps:** update tailscale/github-action action to v4.2.0 ([#127](https://github.com/rknightion/.github/issues/127)) ([6f9bfe4](https://github.com/rknightion/.github/commit/6f9bfe44b4e291c6996f8889723d50068394f9f9))
+* **deps:** update zizmorcore/zizmor-action action to v0.7.1 ([#128](https://github.com/rknightion/.github/issues/128)) ([bd8a9cd](https://github.com/rknightion/.github/commit/bd8a9cd07a8f5f96121102f81ba8ea0275b7086f))
+
 ## [1.25.14](https://github.com/rknightion/.github/compare/v1.25.13...v1.25.14) (2026-10-21)
 
 
