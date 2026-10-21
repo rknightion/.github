@@ -18,6 +18,11 @@ callers rather than reasoning about them:
 gh search code --owner rknightion 'uses: rknightion/.github'
 ```
 
+The `binaries` reusable reads Go from the caller's `go.mod` by default; an explicit
+`go-version` input overrides it. This hub does not pin a fleet Go or Node runtime.
+Renovate regex managers use `extractVersionTemplate` for a fixed extraction expression;
+`extractVersion` is a capture group, not a supported custom-manager config field.
+
 ## Gate
 
 ```bash
