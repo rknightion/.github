@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.25.21](https://github.com/rknightion/.github/compare/v1.25.20...v1.25.21) (2026-10-22)
+
+
+### Build & CI
+
+* **deps:** update rknightion/.github action to v1.25.16 ([#142](https://github.com/rknightion/.github/issues/142)) ([6d566db](https://github.com/rknightion/.github/commit/6d566db5cffc1b026cfa7aa07656c346eda2702b))
+
 ## [1.25.20](https://github.com/rknightion/.github/compare/v1.25.19...v1.25.20) (2026-10-21)
 
 
