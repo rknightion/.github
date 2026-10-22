@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.25.25](https://github.com/rknightion/.github/compare/v1.25.24...v1.25.25) (2026-10-22)
+
+
+### Build & CI
+
+* **scorecard:** call the scorecard reusable locally to end the self-bump release loop ([d7fced8](https://github.com/rknightion/.github/commit/d7fced82fe68925339c6655848d84688e1a8abf9))
+
 ## [1.25.24](https://github.com/rknightion/.github/compare/v1.25.23...v1.25.24) (2026-10-22)
 
 
