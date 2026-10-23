@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.25.26](https://github.com/rknightion/.github/compare/v1.25.25...v1.25.26) (2026-10-23)
+
+
+### Build & CI
+
+* **deps:** update dependency goreleaser/goreleaser to v2.19.0 ([#152](https://github.com/rknightion/.github/issues/152)) ([c21fe11](https://github.com/rknightion/.github/commit/c21fe110a8b759cf77fded317a9cbcc13baaa1ac))
+* **deps:** update tailscale/github-action action to v4.3.0 ([#151](https://github.com/rknightion/.github/issues/151)) ([7f44c45](https://github.com/rknightion/.github/commit/7f44c45dc9f91887f71370b4e7bdc4d3b74d3962))
+
 ## [1.25.25](https://github.com/rknightion/.github/compare/v1.25.24...v1.25.25) (2026-10-22)
 
 
