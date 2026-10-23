@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.25.28](https://github.com/rknightion/.github/compare/v1.25.27...v1.25.28) (2026-10-23)
+
+
+### Build & CI
+
+* **deps:** update docker/login-action action to v4.7.0 ([#156](https://github.com/rknightion/.github/issues/156)) ([bddc132](https://github.com/rknightion/.github/commit/bddc132e938bf6f36f92ec03c3215cf71cbf2646))
+
 ## [1.25.27](https://github.com/rknightion/.github/compare/v1.25.26...v1.25.27) (2026-10-23)
 
 
