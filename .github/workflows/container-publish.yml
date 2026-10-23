@@ -275,7 +275,7 @@ jobs:
 
   merge:
     name: merge + sign + sbom
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     timeout-minutes: 20
     needs: build
     if: github.event_name != 'merge_group'
@@ -392,7 +392,7 @@ jobs:
 
   helm:
     name: helm publish
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     timeout-minutes: 15
     needs: merge
     if: github.event_name != 'merge_group' && inputs.helm-chart-path != ''

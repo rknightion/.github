@@ -90,7 +90,7 @@ jobs:
   # Decide whether this commit deserves an RC, and what it would be called.
   guard:
     name: guard
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     timeout-minutes: 10
     permissions:
       contents: read       # read the release PR branch manifest and the tag list
@@ -201,7 +201,7 @@ jobs:
     name: wait-for-ci
     needs: guard
     if: needs.guard.outputs.should_release == 'true' && inputs.sha == ''
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     timeout-minutes: 60
     permissions:
       contents: read  # required for the implicit token to read this repo
@@ -276,7 +276,7 @@ jobs:
       !cancelled()
       && needs.guard.outputs.should_release == 'true'
       && (needs.wait-for-ci.result == 'skipped' || needs.wait-for-ci.outputs.proceed == 'true')
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     timeout-minutes: 10
     permissions:
       contents: write # create the tag and the GitHub prerelease
