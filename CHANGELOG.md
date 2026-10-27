@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.25.29](https://github.com/rknightion/.github/compare/v1.25.28...v1.25.29) (2026-10-27)
+
+
+### Build & CI
+
+* **deps:** update oras-project/setup-oras action to v2.0.3 ([#158](https://github.com/rknightion/.github/issues/158)) ([b116f08](https://github.com/rknightion/.github/commit/b116f0822b143f4a8da55ccd3b4b2b6a954fd1da))
+* **deps:** update step-security/harden-runner action to v2.22.3 ([#159](https://github.com/rknightion/.github/issues/159)) ([07ace44](https://github.com/rknightion/.github/commit/07ace441e73152f810418189f66bff2fbbc32c2e))
+
 ## [1.25.28](https://github.com/rknightion/.github/compare/v1.25.27...v1.25.28) (2026-10-23)
 
 
