@@ -41,6 +41,12 @@ jobs:
       # requiring hash-pin here makes that self-enforcing (a reintroduced @main fails
       # CI). Written as an auto-discovered .github/zizmor.yml (ephemeral, not committed);
       # skipped if the repo already ships its own zizmor config.
+      #
+      # self-repository is off: it asks for the `$/` same-repo `uses:` form, but
+      # actionlint (pinned in actionlint.yml) rejects `$/` as an invalid reusable
+      # workflow call, so following it trades a zizmor finding for an actionlint
+      # failure. `./` for a job-level reusable call already resolves at the
+      # caller's commit. Re-enable once the pinned actionlint parses `$/`.
       - name: Write zizmor policy
         run: |
           if [ ! -e .github/zizmor.yml ]; then
@@ -51,6 +57,8 @@ jobs:
               echo '    config:'
               echo '      policies:'
               echo '        "*": hash-pin'
+              echo '  self-repository:'
+              echo '    disable: true'
             } > .github/zizmor.yml
           fi
 
