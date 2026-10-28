@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.25.31](https://github.com/rknightion/.github/compare/v1.25.30...v1.25.31) (2026-10-28)
+
+
+### Bug Fixes
+
+* **zizmor:** disable self-repository until actionlint parses `$/` ([51cf913](https://github.com/rknightion/.github/commit/51cf91357fbb07965098b5f064b5f349dace448a))
+
 ## [1.25.30](https://github.com/rknightion/.github/compare/v1.25.29...v1.25.30) (2026-10-28)
 
 
