@@ -122,9 +122,34 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           REPO: ${{ github.repository }}
           PR_PREFIX: ${{ inputs.release-pr-branch-prefix }}
+          EVENT_NAME: ${{ github.event_name }}
+          WR_EVENT: ${{ github.event.workflow_run.event }}
+          WR_HEAD_REPO: ${{ github.event.workflow_run.head_repository.full_name }}
+          DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
         run: |
           set -euo pipefail
           skip() { echo "should_release=false" >> "$GITHUB_OUTPUT"; echo "SKIP: $1"; exit 0; }
+
+          # (0) Only ever cut an RC from code already on the default branch.
+          # A caller's `workflow_run: branches: [main]` filter matches the
+          # triggering run's head branch NAME, so a green CI run on a fork pull
+          # request from a branch called `main` fires it too, and this job holds
+          # contents: write. These checks hold even when a caller's own `if:`
+          # forgets to exclude pull requests.
+          if [ "${EVENT_NAME}" = "workflow_run" ]; then
+            if [ "${WR_EVENT}" != "push" ] || [ "${WR_HEAD_REPO}" != "${REPO}" ]; then
+              echo "::warning::triggering run was a '${WR_EVENT}' event from '${WR_HEAD_REPO}', not a push to ${REPO}; refusing to cut an RC"
+              skip "triggering run was not a push to this repository"
+            fi
+          fi
+          if [ -z "${DEFAULT_BRANCH}" ] || ! git rev-parse --verify --quiet "refs/remotes/origin/${DEFAULT_BRANCH}" >/dev/null; then
+            echo "::error::cannot resolve origin/${DEFAULT_BRANCH:-<unset>} to check the commit is on the default branch"
+            exit 1
+          fi
+          if ! git merge-base --is-ancestor HEAD "refs/remotes/origin/${DEFAULT_BRANCH}"; then
+            echo "::warning::$(git rev-parse HEAD) is not on ${DEFAULT_BRANCH}; refusing to cut an RC"
+            skip "commit is not on ${DEFAULT_BRANCH}"
+          fi
 
           # (1) HEAD already carries a stable release tag -- this is the commit
           # release-please just merged and tagged. That release is its to own.
