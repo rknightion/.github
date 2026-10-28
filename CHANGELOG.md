@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.25.30](https://github.com/rknightion/.github/compare/v1.25.29...v1.25.30) (2026-10-28)
+
+
+### Bug Fixes
+
+* **auto-rc:** refuse RCs for pull-request runs and commits off the default branch ([ba2d119](https://github.com/rknightion/.github/commit/ba2d119b2eb6100ad9f59104b5b10f76102ae2bb))
+
 ## [1.25.29](https://github.com/rknightion/.github/compare/v1.25.28...v1.25.29) (2026-10-27)
 
 
