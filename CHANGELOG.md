@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.25.32](https://github.com/rknightion/.github/compare/v1.25.31...v1.25.32) (2026-10-29)
+
+
+### Build & CI
+
+* **deps:** update tailscale/github-action action to v4.4.0 ([#163](https://github.com/rknightion/.github/issues/163)) ([1557095](https://github.com/rknightion/.github/commit/15570950ea21a3ebf22702b5eb4006a7282552ae))
+
 ## [1.25.31](https://github.com/rknightion/.github/compare/v1.25.30...v1.25.31) (2026-10-28)
 
 
