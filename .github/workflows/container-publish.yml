@@ -204,6 +204,37 @@ jobs:
             ${{ inputs.build-args }}
             VERSION=${{ env.COMPUTED_VERSION }}
 
+      - name: Install verified Trivy release
+        if: inputs.trivy
+        env:
+          RUNNER_ARCH: ${{ runner.arch }}
+        run: |
+          set -euo pipefail
+          version=0.70.0
+          case "$RUNNER_ARCH" in
+            X64) arch=Linux-64bit ;;
+            ARM64) arch=Linux-ARM64 ;;
+            *) echo "Unsupported Trivy runner architecture: $RUNNER_ARCH" >&2; exit 1 ;;
+          esac
+          scratch=$(mktemp -d "$RUNNER_TEMP/trivy-download.XXXXXX")
+          trap 'rm -rf "$scratch"' EXIT
+          asset="trivy_${version}_${arch}.tar.gz"
+          base="https://github.com/aquasecurity/trivy/releases/download/v${version}"
+          for name in "$asset" "trivy_${version}_checksums.txt"; do
+            curl --retry 5 --retry-all-errors --retry-delay 2 --retry-max-time 120 \
+              --connect-timeout 20 --max-time 60 --fail --location --silent --show-error \
+              --proto '=https' --proto-redir '=https' --output "$scratch/$name" "$base/$name"
+          done
+          cd "$scratch"
+          awk -v asset="$asset" '$2 == asset {print}' "trivy_${version}_checksums.txt" > selected.sha256
+          test "$(wc -l < selected.sha256)" -eq 1
+          sha256sum --check --strict selected.sha256
+          tar -xzf "$asset" trivy
+          install -d "$RUNNER_TEMP/trivy-bin"
+          install -m 0755 trivy "$RUNNER_TEMP/trivy-bin/trivy"
+          "$RUNNER_TEMP/trivy-bin/trivy" --version
+          echo "$RUNNER_TEMP/trivy-bin" >> "$GITHUB_PATH"
+
       - name: Run Trivy vulnerability scanner
         id: trivy
         if: inputs.trivy
@@ -212,6 +243,7 @@ jobs:
           TRIVY_IGNORE_UNFIXED: ${{ inputs.trivy-ignore-unfixed }}
         uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
         with:
+          skip-setup-trivy: true
           input: ${{ runner.temp }}/image-${{ env.PLATFORM_PAIR }}
           format: sarif
           output: trivy-${{ env.PLATFORM_PAIR }}.sarif

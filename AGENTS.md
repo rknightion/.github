@@ -49,6 +49,12 @@ accepted.
 A Linux binary is not executed on macOS and a composite action's behaviour on a consumer's runner is
 not observable from here — so when a change executes in CI, name the run that will prove it.
 
+The container publisher installs its pinned Trivy binary directly from GitHub release assets and
+verifies the selected archive against that release's checksums before extraction. The pin lives in
+the reusable because its checkout belongs to the consumer. Keep both native runner architectures
+covered, reject ambiguous or missing checksums, and retain the scanner action's enforced gate with
+its own installer disabled. Tests execute the embedded installation shell with synthetic assets.
+
 ## Task interface
 
 This repo's task surface is a `justfile`. Discover it, don't guess it:
