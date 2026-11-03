@@ -1,5 +1,17 @@
 # Changelog
 
+## [1.25.33](https://github.com/rknightion/.github/compare/v1.25.32...v1.25.33) (2026-11-03)
+
+
+### Bug Fixes
+
+* verify Trivy release downloads before container scans ([ab6ff50](https://github.com/rknightion/.github/commit/ab6ff50477ec266923e0106e3e8c7328de227ed6))
+
+
+### Miscellaneous
+
+* track verified scanner installation repair ([1effbfe](https://github.com/rknightion/.github/commit/1effbfeb7b37eff54a50accb96a8f5aaa5974898))
+
 ## [1.25.32](https://github.com/rknightion/.github/compare/v1.25.31...v1.25.32) (2026-10-29)
 
 
