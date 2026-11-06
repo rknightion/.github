@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.25.34](https://github.com/rknightion/.github/compare/v1.25.33...v1.25.34) (2026-11-06)
+
+
+### Miscellaneous
+
+* retire legacy review configuration ([15a8ae7](https://github.com/rknightion/.github/commit/15a8ae7e79c6ff40f2d3f826f4905f7613355faa))
+
 ## [1.25.33](https://github.com/rknightion/.github/compare/v1.25.32...v1.25.33) (2026-11-03)
 
 
