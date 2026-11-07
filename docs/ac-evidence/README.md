@@ -39,8 +39,12 @@ caller: on a `pull_request` event the caller workflow file comes from the PR hea
 outside the workflow:
 
 - `tracker close --pr` accepts only a GitHub Actions run whose workflow run references
-  `rknightion/.github/.github/workflows/ac-evidence.yml` at a commit on this repository's `main`, and
-  refuses a PR that changed `.github/workflows` or `.github/actions`.
+  `rknightion/.github/.github/workflows/ac-evidence.yml` at a commit on this repository's `main`, whose
+  check run is a job of that workflow run, and which carries this workflow's
+  `Acceptance evidence binding` notice naming that pull request and its head commit. Check runs belong to
+  a commit, not a pull request, so without the notice a second pull request at the same head could lend
+  its passing run to the first. It also refuses a PR that changed `.github/workflows` or
+  `.github/actions`.
 - The check is a required status check in a branch ruleset, so a pull request cannot merge while it
   fails. That does not bind GitHub's own `Closes #N` auto-close to this checker: a PR that edits the
   caller can supply a stub job with the same check name, merge, and GitHub closes the issue. The tracker

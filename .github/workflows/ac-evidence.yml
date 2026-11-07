@@ -78,6 +78,19 @@ jobs:
         with:
           egress-policy: audit
 
+      # Check runs belong to a commit, not a pull request, so two pull requests at one head share them.
+      # This annotation names the pull request this run judged; `tracker close --pr` requires it to match.
+      - name: Record which pull request this run judges
+        env:
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          PR_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          if ! [[ "$PR_NUMBER" =~ ^[1-9][0-9]*$ && "$PR_HEAD_SHA" =~ ^[0-9a-f]{40}$ ]]; then
+            echo "::error title=Acceptance evidence::the pull request number or head commit is malformed"
+            exit 1
+          fi
+          echo "::notice title=Acceptance evidence binding::pr=${PR_NUMBER} head=${PR_HEAD_SHA}"
+
       - name: Checkout the pull request head
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
