@@ -30,7 +30,7 @@ reaches a shell. After editing the body, re-run the job.
 ## What binds the judge
 
 The checker is not read from the caller's repository. The reusable workflow checks out
-`rknightion/.github` at `github.job_workflow_sha`, the commit of the reusable the caller named in
+`rknightion/.github` at `job.workflow_sha`, the commit of the reusable the caller named in
 `uses: ...@<release SHA>`, and runs the script from there.
 
 This binds the checker to whatever the caller names. It does not stop a pull request from changing the
@@ -41,8 +41,11 @@ outside the workflow:
 - `tracker close --pr` accepts only a GitHub Actions run whose workflow run references
   `rknightion/.github/.github/workflows/ac-evidence.yml` at a commit on this repository's `main`, and
   refuses a PR that changed `.github/workflows` or `.github/actions`.
-- The check is a required status check in a branch ruleset, so GitHub's own `Closes #N` auto-close also
-  waits for it.
+- The check is a required status check in a branch ruleset, so a pull request cannot merge while it
+  fails. That does not bind GitHub's own `Closes #N` auto-close to this checker: a PR that edits the
+  caller can supply a stub job with the same check name, merge, and GitHub closes the issue. The tracker
+  refuses such a PR when it closes the issue itself, so a PR that changes `.github/workflows` or
+  `.github/actions` must not carry a closing keyword; the owner reviews it and closes its issue by hand.
 
 Bumping the pin (Renovate does it) is how the checker changes.
 
@@ -111,7 +114,7 @@ The called job is named `Acceptance evidence`. GitHub joins the caller's job nam
 with ` / `, so with the caller above the check run is `ac-evidence / Acceptance evidence`. A caller job
 `name:` replaces `ac-evidence` in that prefix. The name is never exactly `Acceptance evidence` when the
 workflow is called: anything looking for the check run must match the suffix ` / Acceptance evidence`.
-Require the check run by its full name (`ac-evidence / Acceptance evidence` for the caller above) in the ruleset, so a stub job with another name does not satisfy it; an aggregator job that `needs:` the caller job is an additional gate, not a substitute.
+Require the check run by its full name (`ac-evidence / Acceptance evidence` for the caller above) in the ruleset, so a stub job with another name does not satisfy it; an aggregator job that `needs:` the caller job is an additional gate, not a substitute. A stub that copies the full name still satisfies the ruleset; see "What binds the judge".
 
 ## Pull request template
 

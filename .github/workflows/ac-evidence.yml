@@ -4,7 +4,7 @@ name: ac-evidence (reusable)
 # criterion of that issue. Spec, caller snippet and PR template: docs/ac-evidence/README.md.
 #
 # The checker is NOT read from the caller's repository. It is checked out from this repository at
-# github.job_workflow_sha, the commit of this workflow the caller named in `uses:`. That binds the checker to
+# job.workflow_sha, the commit of this workflow the caller named in `uses:`. That binds the checker to
 # whatever the caller names; it does not stop a pull request from changing the caller. On a pull_request
 # event the caller's workflow file comes from the PR head, so a PR can repoint `uses:` or stub a job with this
 # name. The binding is enforced outside this file: the tracker's `tracker close --pr` accepts only a GitHub
@@ -86,10 +86,10 @@ jobs:
 
       - name: Refuse to run without the pinned reusable commit
         env:
-          JOB_WORKFLOW_SHA: ${{ github.job_workflow_sha }}
+          JOB_WORKFLOW_SHA: ${{ job.workflow_sha }}
         run: |
           if ! [[ "$JOB_WORKFLOW_SHA" =~ ^[0-9a-f]{40}$ ]]; then
-            echo "::error title=Acceptance evidence::github.job_workflow_sha is not a commit, so the pinned checker cannot be selected"
+            echo "::error title=Acceptance evidence::job.workflow_sha is not a commit, so the pinned checker cannot be selected"
             exit 1
           fi
 
@@ -98,7 +98,7 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           repository: rknightion/.github
-          ref: ${{ github.job_workflow_sha }}
+          ref: ${{ job.workflow_sha }}
           path: .ac-evidence-judge
           persist-credentials: false
           sparse-checkout: scripts/ac-evidence/ac-evidence-check.mjs
