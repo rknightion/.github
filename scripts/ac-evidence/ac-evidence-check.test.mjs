@@ -339,12 +339,14 @@ test("the command reads the live pull request body and fails with workflow error
   git("init", "-q");
   git("config", "user.email", "x@example.invalid");
   git("config", "user.name", "x");
+  git("config", "commit.gpgsign", "false");
   mkdirSync(join(repo, "internal/runs"), { recursive: true });
   mkdirSync(join(repo, "web/src/pages"), { recursive: true });
   writeFileSync(join(repo, "internal/runs/summary_test.go"), "package runs\n");
   writeFileSync(join(repo, "web/src/pages/pull.test.tsx"), "x\n");
   git("add", ".");
-  git("commit", "-qm", "head");
+  const committed = git("commit", "-qm", "head");
+  assert.equal(committed.status, 0, committed.stderr);
   const sha = git("rev-parse", "HEAD").stdout.trim();
   const env = { PR_HEAD_SHA: sha, GITHUB_WORKSPACE: repo };
 
@@ -410,10 +412,12 @@ test("the head file check uses git on the head commit, so a file only in the wor
   git("init", "-q");
   git("config", "user.email", "x@example.invalid");
   git("config", "user.name", "x");
+  git("config", "commit.gpgsign", "false");
   mkdirSync(join(repo, "internal/runs"), { recursive: true });
   writeFileSync(join(repo, "internal/runs/summary_test.go"), "package runs\n");
   git("add", ".");
-  git("commit", "-qm", "head");
+  const committed = git("commit", "-qm", "head");
+  assert.equal(committed.status, 0, committed.stderr);
   const sha = git("rev-parse", "HEAD").stdout.trim();
   writeFileSync(join(repo, "internal/runs/untracked_test.go"), "package runs\n");
   const body = prBody("Closes #101", table(...row101.map((r) => r.replace("internal/runs/summary_test.go", "internal/runs/untracked_test.go"))));

@@ -55,7 +55,7 @@ Bumping the pin (Renovate does it) is how the checker changes.
 
 ## Caller
 
-Copy `.github/workflows/ac-evidence.yml` into the caller and pin it:
+Create a caller workflow in the calling repository from this example (do not copy the reusable workflow itself) and pin it:
 
 ```yaml
 name: acceptance-evidence
