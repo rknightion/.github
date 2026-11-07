@@ -49,6 +49,7 @@ SHA-pinned and kept current by Renovate (`helpers:pinGitHubActionDigests`).
 |---|---|
 | `codeql.yml` | CodeQL Advanced code scanning. `languages` selects the matrix; optional `ref`, `category-suffix`, and `fail-on-security-severity` inputs support pinned publication gates. The pinned reusable owns the configuration, query selection, and path exclusions; the CodeQL bundle and evolving `security-extended` suite remain upstream inputs. |
 | `zizmor.yml` | GitHub Actions security audit. Same-repo runs upload SARIF; fork PRs use annotations, so the scan still gates without forbidden Security-tab writes. |
+| `ac-evidence.yml` | Pull request check `Acceptance evidence`: a PR that closes an issue must show one evidence row per acceptance criterion; the checker runs from the caller's pinned reusable commit, so the PR cannot change its judge. Caller snippet, inputs, PR template and spec: [`docs/ac-evidence/README.md`](docs/ac-evidence/README.md). |
 | `actionlint.yml` | GitHub Actions workflow correctness lint (non-gating). |
 | `dependency-review.yml` | PR dependency review; fails on newly introduced high-severity vulns. |
 | `docker-security.yml` | hadolint (Dockerfile lint) + Trivy fs scan (vuln/misconfig/secret), both SARIF, non-gating. |

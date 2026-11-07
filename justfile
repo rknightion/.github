@@ -51,7 +51,7 @@ lint:
     zizmor --no-exit-codes .github/workflows/ .github/actions/
     shellcheck $(git ls-files '*.sh')
 
-# run the shell and fleet aligner unit tests
+# run the shell, fleet aligner and acceptance-evidence checker unit tests
 [group('check')]
 [no-exit-message]
 test:
@@ -59,6 +59,7 @@ test:
     python3 -m unittest discover -s fleet -p 'test_*.py'
     python3 -m unittest discover -s .github/actions/bao-secret -p 'test_*.py'
     python3 -m unittest discover -s tests -p 'test_*.py'
+    node --test scripts/ac-evidence/
 
 # fail if backlog/ carries an identifier (AGENTS.md rule)
 # Ignore only the task's literal documented scanner command, not any real match.

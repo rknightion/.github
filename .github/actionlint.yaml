@@ -1,0 +1,7 @@
+# actionlint 1.7.12 predates the github.job_workflow_sha context property (the commit of the reusable
+# workflow a job runs from). ac-evidence.yml needs it to run its checker from the caller's pinned commit.
+# Remove this file once the pinned actionlint knows the property.
+paths:
+  .github/workflows/ac-evidence.yml:
+    ignore:
+      - 'property "job_workflow_sha" is not defined in object type'

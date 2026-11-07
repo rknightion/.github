@@ -1,0 +1,120 @@
+name: ac-evidence (reusable)
+
+# Reusable pull request check: a pull request that closes an issue shows evidence for every acceptance
+# criterion of that issue. Spec, caller snippet and PR template: docs/ac-evidence/README.md.
+#
+# The checker is NOT read from the caller's repository. It is checked out from this repository at
+# github.job_workflow_sha, the commit of this workflow the caller named in `uses:`. That binds the checker to
+# whatever the caller names; it does not stop a pull request from changing the caller. On a pull_request
+# event the caller's workflow file comes from the PR head, so a PR can repoint `uses:` or stub a job with this
+# name. The binding is enforced outside this file: the tracker's `tracker close --pr` accepts only a GitHub
+# Actions run that references rknightion/.github/.github/workflows/ac-evidence.yml at a commit on this
+# repo's main, and refuses a PR that changed .github/workflows or .github/actions. Make the check required in
+# a branch ruleset so GitHub's own Closes-#N auto-close also waits for it. The caller's head commit is checked
+# out only as the files a proof may cite.
+#
+# Caller permissions are mandatory (a called workflow is capped by its caller and validated at startup):
+# contents: read, issues: read, pull-requests: read.
+#
+# Check run name: the caller's job name, " / ", then this job's name "Acceptance evidence".
+
+on:
+  workflow_call:
+    inputs:
+      enforce-all-prs:
+        description: >-
+          true: every pull request needs a Closes target with an evidence table, or "Task: none, <reason>".
+          false: only a pull request whose body closes an issue is checked. Public repositories take outside
+          and bot pull requests, so leave false there; a private repository with no outside contributors sets true.
+        required: false
+        type: boolean
+        default: false
+      release-please-author:
+        description: >-
+          Login of the release-please account whose oversized-release-notes placeholder body counts as
+          "Task: none" on the release-please--branches--main branch. Empty never accepts it.
+        required: false
+        type: string
+        default: ""
+      runs-on:
+        description: "Runner label. Self-hosted callers must also set harden to false."
+        required: false
+        type: string
+        default: "ubuntu-latest"
+      harden:
+        description: >-
+          Run step-security/harden-runner. MUST be false on a self-hosted runner: it is Enterprise-tier
+          there and needs an agent on the runner host.
+        required: false
+        type: boolean
+        default: true
+      node-version:
+        description: "Exact Node version for the checker."
+        required: false
+        type: string
+        default: "24.22.1"
+
+permissions: {}
+
+# A newer run on the same pull request supersedes an older one; the body is read live, so only the latest matters.
+concurrency:
+  group: ac-evidence-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  ac-evidence:
+    name: Acceptance evidence
+    if: github.event_name == 'pull_request'
+    runs-on: ${{ inputs.runs-on }}
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      issues: read
+      pull-requests: read
+    steps:
+      - name: Harden the runner (audit egress)
+        if: ${{ inputs.harden }}
+        uses: step-security/harden-runner@46b06cea07f9e64621fdf066ba77ac6915163d43 # v2.22.3
+        with:
+          egress-policy: audit
+
+      - name: Checkout the pull request head
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          persist-credentials: false
+
+      - name: Refuse to run without the pinned reusable commit
+        env:
+          JOB_WORKFLOW_SHA: ${{ github.job_workflow_sha }}
+        run: |
+          if ! [[ "$JOB_WORKFLOW_SHA" =~ ^[0-9a-f]{40}$ ]]; then
+            echo "::error title=Acceptance evidence::github.job_workflow_sha is not a commit, so the pinned checker cannot be selected"
+            exit 1
+          fi
+
+      # The checker comes from the commit of this reusable workflow the caller named, never from the caller's tree.
+      - name: Checkout the checker at the pinned reusable commit
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          repository: rknightion/.github
+          ref: ${{ github.job_workflow_sha }}
+          path: .ac-evidence-judge
+          persist-credentials: false
+          sparse-checkout: scripts/ac-evidence/ac-evidence-check.mjs
+          sparse-checkout-cone-mode: false
+
+      - name: Set up Node
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: ${{ inputs.node-version }}
+          package-manager-cache: false
+
+      - name: Check the acceptance evidence
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          PR_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          AC_EVIDENCE_ENFORCE_ALL_PRS: ${{ inputs.enforce-all-prs && 'true' || 'false' }}
+          AC_EVIDENCE_RELEASE_AUTHOR: ${{ inputs.release-please-author }}
+        run: node .ac-evidence-judge/scripts/ac-evidence/ac-evidence-check.mjs < /dev/null
