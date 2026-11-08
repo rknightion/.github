@@ -2,6 +2,7 @@
 
   python3 -m unittest discover -s fleet -p 'test_*.py'
 """
+import base64
 import datetime as dt
 import importlib.util
 import json
@@ -173,11 +174,181 @@ class Rulesets(unittest.TestCase):
 
 
 class FakeGH:
-    def __init__(self):
+    def __init__(self, rulesets=None, loopmd=None, loopmd_status=None):
         self.writes = []
+        self.rulesets = rulesets or []
+        self.loopmd, self.loopmd_status = loopmd, loopmd_status
 
     def write(self, method, path, body=None, ok=None):
         self.writes.append((method, path, body))
+
+    def paginate(self, path, key=None):
+        return [{"id": r["id"]} for r in self.rulesets]
+
+    def get(self, path, ok=(200,)):
+        rid = int(path.rsplit("/", 1)[1])
+        return 200, json.loads(json.dumps(next(r for r in self.rulesets if r["id"] == rid)))
+
+    def call(self, method, path, body=None, raw_url=None):
+        if path.endswith("/contents/LOOP.md"):
+            if self.loopmd_status:
+                return self.loopmd_status, {"message": "boom"}, {}
+            if self.loopmd is None:
+                return 404, {"message": "Not Found"}, {}
+            return 200, {"encoding": "base64", "content": base64.b64encode(self.loopmd.encode()).decode()}, {}
+        return 404, None, {}  # no release-please-config.json
+
+
+LOOPMD = "# Loop: x\ntier: guarded\ngate: just check\ntracker: github\nlanding: pr\n\n## Queue\n"
+ADMIN = {"actor_type": "RepositoryRole", "actor_id": 5, "bypass_mode": "always"}
+APP = {"actor_type": "Integration", "actor_id": 3512185, "bypass_mode": "always"}
+
+
+def base_main(rid=10, bypass=(ADMIN,)):
+    return {"id": rid, "name": "main", "target": "branch", "enforcement": "active",
+            "conditions": {"ref_name": {"include": ["~DEFAULT_BRANCH"], "exclude": []}},
+            "bypass_actors": [dict(a) for a in bypass],
+            "rules": [{"type": "deletion"}, {"type": "non_fast_forward"}]}
+
+
+def tracker_gate(rid=20, bypass=()):
+    return {"id": rid, "name": "pr only", "target": "branch", "enforcement": "active",
+            "conditions": {"ref_name": {"include": ["~DEFAULT_BRANCH"], "exclude": []}},
+            "bypass_actors": [dict(a) for a in bypass],
+            "rules": [{"type": "pull_request", "parameters": {"allowed_merge_methods": ["squash"],
+                                                              "required_approving_review_count": 0}},
+                      {"type": "required_status_checks", "parameters": {
+                          "strict_required_status_checks_policy": False,
+                          "required_status_checks": [{"context": "ci-success", "integration_id": 15368}]}}]}
+
+
+class LoopMd(unittest.TestCase):
+    def test_reads_the_opening_keys_only(self):
+        self.assertEqual(align.loopmd_tracker(LOOPMD), "github")
+        self.assertEqual(align.loopmd_tracker("# Loop: x\ngate: just check\n"), "backlog")
+        self.assertEqual(align.loopmd_tracker(None), "backlog")
+        self.assertEqual(align.loopmd_tracker("# Loop: x\n## Notes\ntracker: github\n"), "backlog")
+        self.assertEqual(align.loopmd_tracker("# Loop: x\n```\ntracker: github\n```\n"), "backlog")
+        self.assertEqual(align.loopmd_tracker("# Loop: x\ntracker: backlog\ntracker: github\n"), "backlog")
+        # a fence closes only on the marker that opened it (loop-lint numbered())
+        self.assertEqual(align.loopmd_tracker("# L\n```\n~~~\ntracker: github\n```\n"), "backlog")
+        self.assertEqual(align.loopmd_tracker("# L\n~~~\n```\n~~~\ntracker: github\n"), "github")
+
+
+class TrackerRulesets(unittest.TestCase):
+    def test_reconcile_removes_standard_bypass_keeps_others(self):
+        rs = base_main(bypass=(ADMIN, APP))
+        want = align.reconcile_main_ruleset(rs, True, STD, tracker=True)
+        self.assertEqual(want["bypass_actors"], [APP])
+        again = align.reconcile_main_ruleset(want, True, STD, tracker=True)
+        self.assertEqual(align.normalise_ruleset(want), align.normalise_ruleset(again))
+
+    def test_new_tracker_ruleset_has_no_bypass(self):
+        self.assertEqual(align.reconcile_main_ruleset(None, True, STD, tracker=True)["bypass_actors"], [])
+        self.assertEqual(align.reconcile_main_ruleset(None, True, STD)["bypass_actors"], [ADMIN])
+
+    def test_pick_prefers_active_gated_ruleset(self):
+        b, g = base_main(), tracker_gate()
+        self.assertIs(align.pick_main_ruleset([b, g], "ci-success", "main"), g)
+        g["enforcement"] = "evaluate"
+        self.assertIs(align.pick_main_ruleset([b, g], "ci-success", "main"), b)
+        self.assertIsNone(align.pick_main_ruleset([], "ci-success", "main"))
+
+    def run_rulesets(self, gh):
+        al = align.Aligner(gh, STD, sweep=False)
+        al.ci_success_reported = lambda full: self.fail("gate found in rulesets; no GraphQL needed")
+        gate = al.align_rulesets(repo("rknightion/x"), STD["profiles"]["oss"])
+        return al, gate
+
+    def test_tracker_repo_loses_admin_bypass_everywhere(self):
+        gh = FakeGH([base_main(), tracker_gate()], loopmd=LOOPMD)
+        al, gate = self.run_rulesets(gh)
+        self.assertEqual(gate, "ci")
+        puts = {p.rsplit("/", 1)[1]: b for m, p, b in gh.writes if m == "PUT"}
+        self.assertEqual(puts["10"]["bypass_actors"], [])          # the aligner's old base ruleset
+        self.assertEqual(puts["20"]["bypass_actors"], [])          # the gate: admin bypass not added
+        rsc = [r for r in puts["20"]["rules"] if r["type"] == "required_status_checks"]
+        self.assertEqual(len(rsc), 1)
+        self.assertFalse([f for f in al.findings if f["kind"] == "tracker-bypass"])
+
+    def test_tracker_repo_reports_other_bypass(self):
+        gh = FakeGH([tracker_gate(bypass=(ADMIN, APP))], loopmd=LOOPMD)
+        al, _ = self.run_rulesets(gh)
+        (put,) = [b for m, _p, b in gh.writes if m == "PUT"]
+        self.assertEqual(put["bypass_actors"], [APP])
+        self.assertEqual([f["kind"] for f in al.findings], ["tracker-bypass"])
+
+    def test_backlog_repo_never_adds_bypass_to_a_second_gate(self):
+        # Migration step 3 made a no-bypass PR ruleset before LOOP.md flips: it must stay no-bypass.
+        gh = FakeGH([base_main(), tracker_gate()])  # no LOOP.md
+        al, gate = self.run_rulesets(gh)
+        self.assertEqual(gate, "ci")  # the second ruleset's gate is seen, so auto-merge stays on
+        for m, p, b in gh.writes:
+            self.assertNotEqual(p, "/repos/rknightion/x/rulesets/10")  # the base ruleset is left alone
+            self.assertEqual(b["bypass_actors"], [], p)
+
+    def test_single_ruleset_keeps_todays_floor(self):  # AC5: a repo's only ruleset gets the bypass
+        rs = tracker_gate()
+        rs["name"] = "main delivery gate"
+        gh = FakeGH([rs])
+        self.run_rulesets(gh)
+        (put,) = [b for m, _p, b in gh.writes if m == "PUT"]
+        self.assertEqual(put["bypass_actors"], [ADMIN])
+
+    def test_landing_pr_alone_keeps_the_bypass(self):  # board-only commits still go straight to main
+        gh = FakeGH([tracker_gate()], loopmd="# Loop: x\nlanding: pr\n")
+        al, _ = self.run_rulesets(gh)
+        (put,) = [b for m, _p, b in gh.writes if m == "PUT"]
+        self.assertEqual(put["bypass_actors"], [ADMIN])
+        self.assertFalse([f for f in al.findings if f["kind"] == "tracker-bypass"])
+
+    def test_two_gates_still_get_the_full_floor(self):
+        a, b = tracker_gate(20), tracker_gate(30)
+        a["name"] = "main"
+        a["rules"] = [r for r in a["rules"] if r["type"] != "pull_request"]
+        for r in a["rules"] + b["rules"]:
+            for c in (r.get("parameters") or {}).get("required_status_checks", []):
+                c.pop("integration_id")
+        gh = FakeGH([a, b])
+        _, gate = self.run_rulesets(gh)
+        self.assertEqual(gate, "ci")
+        put = next(body for m, p, body in gh.writes if p.endswith("/20"))
+        self.assertIn("pull_request", [r["type"] for r in put["rules"]])
+        rsc = next(r for r in put["rules"] if r["type"] == "required_status_checks")["parameters"]
+        self.assertEqual(rsc["required_status_checks"], [{"context": "ci-success", "integration_id": 15368}])
+
+    def test_pick_never_prefers_a_disabled_named_ruleset(self):
+        protect, main = base_main(1), base_main(2)
+        protect["name"], main["enforcement"] = "protect", "disabled"
+        self.assertIs(align.pick_main_ruleset([protect, main], "ci-success", "main"), protect)
+        main["enforcement"] = "active"
+        self.assertIs(align.pick_main_ruleset([protect, main], "ci-success", "main"), main)
+
+    def test_pick_with_nothing_active_keeps_the_first(self):  # unchanged from before the pick order
+        first, main = base_main(1), tracker_gate(2)
+        first["name"] = "protect"
+        first["enforcement"] = main["enforcement"] = "disabled"
+        main["name"] = "main"
+        self.assertIs(align.pick_main_ruleset([first, main], "ci-success", "main"), first)
+
+    def test_pick_prefers_the_gated_main_among_gates(self):
+        other, main = tracker_gate(1), tracker_gate(2)
+        main["name"] = "main"
+        self.assertIs(align.pick_main_ruleset([other, main], "ci-success", "main"), main)
+
+    def test_unexpected_loopmd_body_stops_before_any_write(self):
+        gh = FakeGH([tracker_gate()], loopmd="x")
+        gh.call = lambda method, path, body=None, raw_url=None: (200, {"encoding": "none", "content": ""}, {})
+        with self.assertRaises(align.ApiError):
+            align.Aligner(gh, STD, sweep=False).align_rulesets(repo("rknightion/x"), STD["profiles"]["oss"])
+        self.assertEqual(gh.writes, [])
+
+    def test_unreadable_loopmd_stops_before_any_write(self):
+        gh = FakeGH([tracker_gate()], loopmd_status=500)
+        al = align.Aligner(gh, STD, sweep=False)
+        with self.assertRaises(align.ApiError):
+            al.align_rulesets(repo("rknightion/x"), STD["profiles"]["oss"])
+        self.assertEqual(gh.writes, [])
 
 
 class AutoMerge(unittest.TestCase):

@@ -37,7 +37,8 @@ visibility and plan, so a new repo is picked up with no edit here.
   conventional commit per PR, and Renovate's PR bodies (upstream release notes that can contain
   `BREAKING CHANGE`) never land in commit bodies to trigger false major bumps.
 - `delete_branch_on_merge` and `allow_update_branch` on.
-- Projects, downloads and sponsorships off. Backlog.md is the tracker.
+- Repository Projects, downloads and sponsorships off. Work is tracked on each owner's own
+  Project (or a repo's Backlog.md board until it migrates); the repo-level Projects tab is not used.
 - Wiki and discussions off, **unless they have content** (a wiki with pages, any discussion). The
   aligner never hides content; it reports that it kept the feature on.
 - Issues on everywhere. Rob kept them on for private repos too: Renovate's Dependency Dashboard
@@ -53,7 +54,7 @@ visibility and plan, so a new repo is picked up with no edit here.
 No repo uses legacy branch protection, and none should.
 
 **`main`** targets the default branch, admin bypass `always` (so Rob can still push straight to
-main), deletion and force-push blocked. It is **gated** when `ci-success` has reported recently
+main on a repo still on Backlog.md), deletion and force-push blocked. It is **gated** when `ci-success` has reported recently
 (default branch or a recent PR head) or the ruleset already requires other checks: then it also
 requires a PR (0 approvals, squash only) and the `ci-success` check (GitHub Actions app,
 non-strict; the check is bound to the GitHub Actions app, so no other app or commit status can
@@ -66,6 +67,21 @@ lands.
 Rulesets are reconciled as a **floor**: required rules, checks and bypass actors are added, never
 removed. Per-repo extras survive, for example portina-iac's Integration bypasses and linear
 history, meraki-dashboard-ha's `validate-success`, or brewmdm-control-plane's eleven named checks.
+
+**Tracker repos are the exception.** A repo whose `LOOP.md` on the default branch declares
+`tracker: github` lands every change by pull request with no bypass actor (`landing: pr` alone does
+not count: those repos still push board-only commits straight to main). There the aligner adds no admin bypass and removes the standard's own one from every
+default-branch ruleset. Any other bypass actor is left in place and reported as `tracker-bypass`
+for a human to decide. The key is read the way agent-docs `loop-lint` reads them (opening
+`key: value` lines before the first `## `, fences skipped). An unreadable `LOOP.md` stops the
+rulesets pass for that repo rather than guessing.
+
+Every active default-branch ruleset counts as a gate. The standard is reconciled onto one ruleset,
+chosen in this order: an active one already requiring `ci-success` (the one named `main` first),
+the active one named `main`, the first active one, else (none active) the first. The admin bypass is
+only added to the aligner's own ruleset (named `main`, or one it creates) or a repo's only
+default-branch ruleset, never to a second ruleset someone made without it, such as a migration's
+no-bypass pull-request ruleset before `LOOP.md` declares `tracker: github`.
 
 `ungated_repos` in the JSON stay on base deliberately (no pull_request CI): rkps-awsinfra,
 portina-site, agent-docs, dmarc-reporties-docs.
