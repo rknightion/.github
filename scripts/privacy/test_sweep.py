@@ -183,6 +183,12 @@ class SweepTest(unittest.TestCase):
         code, out, err = self.allow_sweep("contact " + EMAIL + "\n", (half + "\n" + rest + "\n").encode())
         self.assertEqual((code, out.strip()), (1, F + "net.md:1:9: email"), err)
 
+    def test_overlapping_occurrences_of_one_entry_each_allow(self):
+        # An entry that occurs twice, overlapping, allows a finding inside the second occurrence too.
+        entry = EMAIL + " " + EMAIL
+        code, out, err = self.allow_sweep("x " + entry + " " + EMAIL + "\n", (entry + "\n").encode())
+        self.assertEqual((code, out.strip()), (0, ""), out + err)
+
     def test_repo_patterns_file_applied(self):
         self.repo.write(".github/privacy/patterns.txt", "# local names\nwidget-hos[t]-[0-9]+\n")
         self.repo.commit("patterns")

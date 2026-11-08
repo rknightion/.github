@@ -69,6 +69,11 @@ outside the workflow:
 
 Bumping the pin (Renovate does it) is how the checker changes.
 
+The job fails on any event other than `pull_request`, so a skipped job can never stand in for a
+pass. Before bumping a caller whose workflow also runs on `push`, `merge_group` or
+`workflow_dispatch`, put `if: github.event_name == 'pull_request'` on its calling job, and make its
+`ci-success` sentinel accept `skipped` for this job only off a pull request.
+
 ## Caller
 
 Create a caller workflow in the calling repository from this example (do not copy the reusable workflow itself) and pin it:
@@ -89,6 +94,8 @@ jobs:
       issues: read
       pull-requests: read
     uses: rknightion/.github/.github/workflows/ac-evidence.yml@<release SHA> # vX.Y.Z
+    # A caller workflow that also triggers on push, merge_group or workflow_dispatch adds
+    # `if: github.event_name == 'pull_request'` here: the reusable fails on any other event.
     # with:
     #   enforce-all-prs: false         # default; a private repo with no outside contributors sets true
     #   release-please-author: ''      # see below

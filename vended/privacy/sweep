@@ -255,8 +255,8 @@ def matches(text, rules, allow=(), strict=False):
         # Case folds for ASCII letters only: Unicode folding reads U+017F as s and U+212A as k, so an
         # allowed string would match text that holds a different identifier. Matching runs on the
         # original text, never a lowercased copy whose spans can drift.
-        spans = [(m.start(), m.end()) for literal in allow
-                 for m in re.finditer(re.escape(literal), text, re.IGNORECASE | re.ASCII)]
+        spans = [(m.start(), m.start() + len(literal)) for literal in allow
+                 for m in re.finditer("(?=" + re.escape(literal) + ")", text, re.IGNORECASE | re.ASCII)]
         raw = [hit for hit in raw if not any(s <= hit[0] and hit[1] <= e for s, e in spans)]
     return sorted((start + 1, name, text[start:end]) for start, end, name in raw)
 
