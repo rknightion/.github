@@ -5,5 +5,6 @@
   {"repo": "m7kni/jffrip", "privacy_sweep": false},
   {"repo": "rknightion/paperless-ngx-dedupe"},
   {"repo": "rknightion/graph2otel"},
-  {"repo": "rknightion/meraki-dashboard-exporter"}
+  {"repo": "rknightion/meraki-dashboard-exporter"},
+  {"repo": "rknightion/sf2loki"}
 ]}
