@@ -21,3 +21,6 @@ codex/
 
 # loop-pi (pi-subagents writes .pi/subagents/)
 .pi/
+
+# Python bytecode from the test suites.
+__pycache__/

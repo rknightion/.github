@@ -1,0 +1,131 @@
+name: privacy-sweep (reusable)
+
+# Reusable pull request check: the lines a pull request adds carry no identifier, email address,
+# public IPv4 address or credential shape. Rules, per-repository files and local use:
+# docs/privacy-sweep/README.md.
+#
+# The sweep is NOT read from the caller's repository. It is checked out from this repository at
+# job.workflow_sha, the commit of this workflow the caller named in `uses:`, together with its
+# default patterns file. The caller's own .github/privacy/patterns.txt and allow.txt are read from the
+# pull request's BASE commit, so a pull request cannot loosen its own sweep through those files. The
+# head checkout supplies only the diff; nothing from it runs.
+#
+# Limit: on a pull_request event the caller's workflow file comes from the PR head, so a PR can repoint
+# `uses:`, pass other inputs or replace the job with a stub of the same name. That is the same limit
+# ac-evidence.yml documents; review any PR that changes .github/workflows or .github/actions.
+#
+# Only pull_request events are swept. Any other event fails the job loudly, because a skipped required
+# check reports success.
+#
+# Caller permissions: contents: read. No secrets are used. Check run name: the caller's job name,
+# " / ", then this job's name "Privacy sweep".
+
+on:
+  workflow_call:
+    inputs:
+      runs-on:
+        description: "Runner label. Self-hosted callers must also set harden to false."
+        required: false
+        type: string
+        default: "ubuntu-latest"
+      harden:
+        description: >-
+          Run step-security/harden-runner. MUST be false on a self-hosted runner: it is Enterprise-tier
+          there and needs an agent on the runner host.
+        required: false
+        type: boolean
+        default: true
+      strict-addresses:
+        description: "Also report RFC 1918, link-local and CGNAT IPv4 addresses."
+        required: false
+        type: boolean
+        default: false
+
+permissions: {}
+
+concurrency:
+  group: privacy-sweep-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  privacy-sweep:
+    name: Privacy sweep
+    runs-on: ${{ inputs.runs-on }}
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    steps:
+      - name: Harden the runner (audit egress)
+        if: ${{ inputs.harden }}
+        uses: step-security/harden-runner@46b06cea07f9e64621fdf066ba77ac6915163d43 # v2.22.3
+        with:
+          egress-policy: audit
+
+      - name: Refuse anything but a pull request with well-formed commits
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          JOB_WORKFLOW_SHA: ${{ job.workflow_sha }}
+        run: |
+          if [[ "$EVENT_NAME" != "pull_request" ]]; then
+            echo "::error title=Privacy sweep::this check sweeps pull_request events only, not ${EVENT_NAME}; call it from a pull_request trigger"
+            exit 1
+          fi
+          if ! [[ "$BASE_SHA" =~ ^[0-9a-f]{40}$ && "$HEAD_SHA" =~ ^[0-9a-f]{40}$ ]]; then
+            echo "::error title=Privacy sweep::the pull request base or head commit is malformed"
+            exit 1
+          fi
+          if ! [[ "$JOB_WORKFLOW_SHA" =~ ^[0-9a-f]{40}$ ]]; then
+            echo "::error title=Privacy sweep::job.workflow_sha is not a commit, so the pinned sweep cannot be selected"
+            exit 1
+          fi
+
+      - name: Checkout the pull request head
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          # The sweep diffs from the merge base, which a shallow clone cannot resolve.
+          fetch-depth: 0
+          persist-credentials: false
+
+      # The sweep comes from the commit of this reusable workflow the caller named, never from the caller's tree.
+      - name: Checkout the sweep at the pinned reusable commit
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          repository: rknightion/.github
+          ref: ${{ job.workflow_sha }}
+          path: .privacy-sweep-judge
+          persist-credentials: false
+          sparse-checkout: vended/privacy/
+          sparse-checkout-cone-mode: false
+
+      - name: Sweep the lines this pull request adds
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          STRICT_ADDRESSES: ${{ inputs.strict-addresses && 'true' || 'false' }}
+        run: |
+          set -euo pipefail
+          python3 -c 'import sys; sys.exit(sys.version_info < (3, 12))' || { echo "::error title=Privacy sweep::the runner needs Python 3.12 or newer"; exit 1; }
+          if ! git cat-file -e "${BASE_SHA}^{commit}"; then
+            echo "::error title=Privacy sweep::the base commit is not in the checkout"
+            exit 1
+          fi
+          # The repository's own pattern and allow files come from the base commit; a regular file only.
+          files="${RUNNER_TEMP}/privacy-base"
+          mkdir -p "$files"
+          args=(--base "$BASE_SHA" --head "$HEAD_SHA" --no-repo-files)
+          for name in patterns allow; do
+            path=".github/privacy/${name}.txt"
+            mode="$(git ls-tree "$BASE_SHA" -- "$path" | cut -d' ' -f1)"
+            case "$mode" in
+              "") continue ;;
+              100644 | 100755) git show "${BASE_SHA}:${path}" > "${files}/${name}.txt" ;;
+              *) echo "::error title=Privacy sweep::${path} on the base commit is not a regular file"; exit 1 ;;
+            esac
+            if [[ "$name" == patterns ]]; then args+=(--patterns "${files}/patterns.txt"); else args+=(--allow "${files}/allow.txt"); fi
+          done
+          if [[ "$STRICT_ADDRESSES" == true ]]; then args+=(--strict-addresses); fi
+          # -I: the pinned sweep runs isolated from PYTHON* variables and the working directory.
+          python3 -I .privacy-sweep-judge/vended/privacy/sweep "${args[@]}" < /dev/null

@@ -60,6 +60,9 @@ test:
     python3 -m unittest discover -s .github/actions/bao-secret -p 'test_*.py'
     python3 -m unittest discover -s tests -p 'test_*.py'
     node --test scripts/ac-evidence/
+    python3 -m unittest discover -s scripts/vend -p 'test_*.py'
+    python3 -m unittest discover -s scripts/privacy -p 'test_*.py'
+    python3 vended/privacy/sweep --self-test
 
 # fail if backlog/ carries an identifier (AGENTS.md rule)
 # Ignore only the task's literal documented scanner command, not any real match.
@@ -68,9 +71,21 @@ test:
 pii-check:
     @if grep -arniE '\.ts\.net|@gmail|@[a-z0-9-]+\.(com|net|io)|ghp_|github_pat_|-----BEGIN' backlog/ | grep -vF "grep -rniE '\.ts\.net|@gmail|@[a-z0-9-]+\.(com|net|io)|ghp_|github_pat_|-----BEGIN' backlog/" >/dev/null; then echo "identifier found in backlog/ — see AGENTS.md" >&2; exit 1; fi
 
+# lint the vended skills, contributor guide and AGENTS block
+[group('check')]
+[no-exit-message]
+check-vended:
+    python3 scripts/vend/check_skills.py
+
+# sweep the lines this branch adds for identifiers, addresses and credentials
+[group('check')]
+[no-exit-message]
+privacy-sweep *args:
+    python3 vended/privacy/sweep {{ args }}
+
 # the full gate — exactly what ci.yml enforces
 [group('check')]
-check: fmt-check lint test pii-check
+check: fmt-check lint test pii-check check-vended
 
 # list every fleet caller of this repo's reusables (network + gh auth)
 [group('dev')]

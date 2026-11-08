@@ -1,0 +1,180 @@
+# Push the vended contributor kit (vended/) into every enrolled repository.
+#
+# For each repository in vended/manifest.json: mint an App token for its owner from the
+# OpenBao broker, run scripts/vend/vend.py against a fresh clone, and when anything changed
+# push branch vend/rknightion-github and open or update one auto-merging pull request.
+# vended/README.md describes enrolment. Nothing under .github/workflows/ is ever vended:
+# the permission sets carry no `workflows` permission.
+#
+# OpenBao objects (created by hand): permission sets vend-sync-rknightion and
+# vend-sync-m7kni (contents: write, pull_requests: write, metadata: read, scoped to the
+# enrolled repositories of that owner) and the JWT role vend-sync bound to this repository,
+# allowed both policies.
+name: vend-sync
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      repo:
+        description: "Sync only this enrolled repository (owner/name). Empty syncs all."
+        required: false
+        default: ""
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: vend-sync
+  cancel-in-progress: false
+
+jobs:
+  plan:
+    name: plan
+    # A prerelease is not something to push into other repositories.
+    if: github.event_name != 'release' || !github.event.release.prerelease
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    permissions:
+      contents: read
+    outputs:
+      matrix: ${{ steps.plan.outputs.matrix }}
+      count: ${{ steps.plan.outputs.count }}
+      ref: ${{ steps.plan.outputs.ref }}
+    steps:
+      - name: Harden the runner (audit egress)
+        uses: step-security/harden-runner@46b06cea07f9e64621fdf066ba77ac6915163d43 # v2.22.3
+        with:
+          egress-policy: audit
+
+      - name: Check out source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Work out which repositories to sync
+        id: plan
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          RELEASE_TAG: ${{ github.event.release.tag_name }}
+          REF_NAME: ${{ github.ref_name }}
+          INPUT_REPO: ${{ inputs.repo }}
+        run: |
+          set -euo pipefail
+          if [ "${EVENT_NAME}" = "release" ]; then ref="${RELEASE_TAG}"; else ref="${REF_NAME}"; fi
+          if ! [[ "${ref}" =~ ^[A-Za-z0-9._/-]+$ ]]; then
+            echo "::error::the ref to sync has unexpected characters"
+            exit 1
+          fi
+
+          listed="$(python3 scripts/vend/vend.py list)"
+          mapfile -t repos <<< "${listed}"
+          if [ -z "${listed}" ]; then repos=(); fi
+
+          if [ -n "${INPUT_REPO}" ]; then
+            if ! [[ "${INPUT_REPO}" =~ ^[A-Za-z0-9-]+/[A-Za-z0-9._-]+$ ]]; then
+              echo "::error::the repo input is not owner/name"
+              exit 1
+            fi
+            found=""
+            for r in "${repos[@]}"; do
+              if [ "${r,,}" = "${INPUT_REPO,,}" ]; then found="${r}"; fi
+            done
+            if [ -z "${found}" ]; then
+              echo "::error::${INPUT_REPO} is not enrolled in vended/manifest.json"
+              exit 1
+            fi
+            repos=("${found}")
+          fi
+
+          for r in "${repos[@]}"; do
+            case "${r%%/*}" in
+              rknightion | m7kni) ;;
+              *)
+                echo "::error::${r}: no vend-sync permission set for owner ${r%%/*}"
+                exit 1
+                ;;
+            esac
+          done
+
+          if [ "${#repos[@]}" -eq 0 ]; then
+            echo "No repositories are enrolled in vended/manifest.json; nothing to sync."
+            matrix='{"include":[]}'
+          else
+            matrix="$(printf '%s\n' "${repos[@]}" | jq -R -s -c '
+              split("\n") | map(select(length > 0)) | group_by(split("/")[0])
+              | {include: map({owner: (.[0] | split("/")[0]),
+                               permission_set: ("vend-sync-" + (.[0] | split("/")[0])),
+                               repos: join(" ")})}')"
+          fi
+          {
+            echo "matrix=${matrix}"
+            echo "count=${#repos[@]}"
+            echo "ref=${ref}"
+          } >> "${GITHUB_OUTPUT}"
+          echo "ref ${ref}; ${#repos[@]} repositories: ${repos[*]}"
+
+  sync:
+    name: sync ${{ matrix.owner }}
+    needs: plan
+    if: needs.plan.outputs.count != '0'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    permissions:
+      contents: read
+      # REQUIRED for the broker: without it the OIDC request returns nothing.
+      id-token: write
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJSON(needs.plan.outputs.matrix) }}
+    steps:
+      - name: Harden the runner (audit egress)
+        uses: step-security/harden-runner@46b06cea07f9e64621fdf066ba77ac6915163d43 # v2.22.3
+        with:
+          egress-policy: audit
+
+      - name: Check out source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      # One token per owner: each matrix job logs in to OpenBao once. The permission set
+      # names the owner's installation and lists its enrolled repositories.
+      - name: Mint a sync token
+        id: token
+        uses: ./.github/actions/broker-token
+        with:
+          permission-set: ${{ matrix.permission_set }}
+          role: vend-sync
+          tailscale-client-id: ${{ secrets.TS_WIF_CLIENT_ID }}
+          tailscale-audience: ${{ secrets.TS_WIF_AUDIENCE }}
+
+      - name: Sync each repository
+        env:
+          GH_TOKEN: ${{ steps.token.outputs.token }}
+          REPOS: ${{ matrix.repos }}
+          VEND_REF: ${{ needs.plan.outputs.ref }}
+          VEND_SHA: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+          bot_name='rknightion-token-broker[bot]'
+          bot_id="$(gh api '/users/rknightion-token-broker%5Bbot%5D' --jq .id)"
+          export BOT_NAME="${bot_name}"
+          export BOT_EMAIL="${bot_id}+${bot_name}@users.noreply.github.com"
+          export SOURCE_DIR="${GITHUB_WORKSPACE}"
+          read -r -a repo_list <<< "${REPOS}"
+          failed=0
+          for repo in "${repo_list[@]}"; do
+            echo "::group::${repo}"
+            if ! bash scripts/vend/sync-repo.sh "${repo}"; then
+              failed=$((failed + 1))
+              echo "::error::sync failed for ${repo}"
+            fi
+            echo "::endgroup::"
+          done
+          if [ "${failed}" -ne 0 ]; then
+            echo "::error::${failed} repositories failed to sync"
+            exit 1
+          fi
