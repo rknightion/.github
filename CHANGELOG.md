@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.26.2](https://github.com/rknightion/.github/compare/v1.26.1...v1.26.2) (2026-11-08)
+
+
+### Documentation
+
+* **vended:** an enrolled repository needs a required check for auto-merge ([64a34d2](https://github.com/rknightion/.github/commit/64a34d217567bc9d11a7ab708a542ad27905da56))
+
 ## [1.26.1](https://github.com/rknightion/.github/compare/v1.26.0...v1.26.1) (2026-11-08)
 
 
