@@ -265,6 +265,8 @@ def load_lock(root: Path, out: list[str]) -> dict:
         out.append(f"{p}:1: schema must be 1")
         return {"sources": {}, "skills": {}}
     for name, entry in sorted((lock.get("skills") or {}).items()):
+        if not re.match(r"^[a-z0-9][a-z0-9-]*$", name):
+            out.append(f"{p}:0: skill name {name!r} must be lower-case letters, digits and hyphens")
         if entry.get("source") not in (lock.get("sources") or {}):
             out.append(f"{p}:0: skill {name!r} names unknown source {entry.get('source')!r}")
     return lock

@@ -192,7 +192,7 @@ class TestResync(ResyncCase):
     def test_symlink_inside_skill_is_refused(self) -> None:
         os.symlink("/etc/hostname", self.up / "skills/eng/one/extra.md")
         sha2 = self.commit("inner link")
-        self.assertRefusedClean("--sha", sha2, needle="extra.md: mode 120000")
+        self.assertRefusedClean("--sha", sha2, needle="extra.md': mode 120000")
 
     def test_skill_level_license_is_refused(self) -> None:
         self.write_up("skills/eng/one/LICENSE", "Other licence\n")
@@ -211,6 +211,46 @@ class TestResync(ResyncCase):
         side = self.commit("side")
         sh("git", "checkout", "-q", "main", cwd=self.up)
         self.assertRefusedClean("--sha", side, needle="not on the default branch")
+
+    def hostile_commit(self, bad_name: bytes) -> str:
+        """A commit on main whose skill tree holds an entry git itself would never write."""
+        def obj(kind: str, data: bytes) -> str:
+            return subprocess.run(["git", "hash-object", "-w", "--literally", "-t", kind, "--stdin"],
+                                  cwd=self.up, env=GIT_ENV, input=data, check=True,
+                                  capture_output=True).stdout.decode().strip()
+
+        def tree(*items: tuple[bytes, bytes, str]) -> str:
+            body = b"".join(mode + b" " + name + b"\0" + bytes.fromhex(sha)
+                            for mode, name, sha in sorted(items, key=lambda i: i[1]))
+            return obj("tree", body)
+
+        payload = obj("blob", b"PWNED\n")
+        skill = obj("blob", (self.up / "skills/eng/one/SKILL.md").read_bytes())
+        one = tree((b"100644", b"SKILL.md", skill), (b"100644", bad_name, payload))
+        two = sh("git", "rev-parse", "HEAD:skills/eng/two", cwd=self.up).strip()
+        eng = tree((b"40000", b"one", one), (b"40000", b"two", two))
+        skills = tree((b"40000", b"eng", eng))
+        lic = sh("git", "rev-parse", "HEAD:LICENSE", cwd=self.up).strip()
+        root = tree((b"100644", b"LICENSE", lic), (b"40000", b"skills", skills))
+        commit = sh("git", "commit-tree", root, "-p", "HEAD", "-m", "hostile", cwd=self.up).strip()
+        sh("git", "update-ref", "refs/heads/main", commit, cwd=self.up)
+        return commit
+
+    def test_hostile_tree_names_write_nothing_outside(self) -> None:
+        target = Path(self.tmp.name) / "pwned"
+        for bad in (str(target).encode(), b"../../../pwned", b".git"):
+            with self.subTest(name=bad):
+                sha = self.hostile_commit(bad)
+                for mode in ((), ("--dry-run",)):
+                    rc, _, err = self.run_resync("--sha", sha, *mode)
+                    self.assertEqual(rc, 1, err)
+                    self.assertFalse(target.exists())
+                    self.assertFalse((self.root / "skills/one").exists())
+                sh("git", "reset", "-q", "--hard", self.sha1, cwd=self.up)
+
+    def test_unsafe_lock_skill_name_is_refused(self) -> None:
+        self.assertRefusedClean("--sha", self.sha1, "--add", "../escape=skills/eng/one",
+                                needle="a skill name is lower-case")
 
     def test_result_passes_check_skills(self) -> None:
         import check_skills

@@ -24,6 +24,7 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import re
 import shutil
 import subprocess
 import sys
@@ -34,6 +35,10 @@ LOCK_NAME = "upstream.lock.json"
 DEFAULT_ROOT = Path(__file__).resolve().parent.parent.parent / "vended"
 DEFAULT_SOURCE = "dzhng/skills"
 REGULAR = ("100644", "100755")
+NAME_RE = re.compile(r"^[a-z0-9][a-z0-9-]*$")
+# Refuse tree entries named with a slash, `..`, `.` or `.git` while fetching, before they reach disk.
+FSCK = ("-c", "fetch.fsckObjects=true", "-c", "fetch.fsck.fullPathname=error",
+        "-c", "fetch.fsck.hasDotdot=error", "-c", "fetch.fsck.hasDot=error")
 GIT_ENV = {"GIT_CONFIG_NOSYSTEM": "1", "GIT_CONFIG_GLOBAL": "/dev/null", "GIT_TERMINAL_PROMPT": "0",
            "PATH": "/usr/bin:/bin:/usr/local/bin:/opt/homebrew/bin"}
 
@@ -52,11 +57,17 @@ def git(*args: str, cwd: Path) -> str:
 
 
 def safe_rel(path: str) -> str:
-    """A repository-relative POSIX path with no absolute start, `..`, `.` or empty component."""
+    """A repository-relative POSIX path with no absolute start, `..`, `.`, `.git` or empty component."""
     parts = path.split("/")
-    if path.startswith("/") or any(p in ("", ".", "..") for p in parts):
+    if path.startswith("/") or any(p in ("", ".", "..") or p.lower() == ".git" for p in parts):
         raise Refused(f"{path!r}: not a safe repository-relative path")
     return path
+
+
+def safe_name(name: str) -> str:
+    if not NAME_RE.match(name):
+        raise Refused(f"{name!r}: a skill name is lower-case letters, digits and hyphens")
+    return name
 
 
 def fetch(url: str, sha: str, repo: Path) -> None:
@@ -64,11 +75,11 @@ def fetch(url: str, sha: str, repo: Path) -> None:
     repo.mkdir(parents=True)
     git("init", "-q", "--bare", cwd=repo)
     git("remote", "add", "origin", url, cwd=repo)
-    git("fetch", "-q", "--filter=blob:none", "origin", "HEAD:refs/remotes/origin/HEAD", cwd=repo)
+    git(*FSCK, "fetch", "-q", "--filter=blob:none", "origin", "HEAD:refs/remotes/origin/HEAD", cwd=repo)
     try:
         git("cat-file", "-e", f"{sha}^{{commit}}", cwd=repo)
     except subprocess.CalledProcessError:
-        git("fetch", "-q", "--filter=blob:none", "origin", sha, cwd=repo)
+        git(*FSCK, "fetch", "-q", "--filter=blob:none", "origin", sha, cwd=repo)
     try:
         git("merge-base", "--is-ancestor", sha, "refs/remotes/origin/HEAD", cwd=repo)
     except subprocess.CalledProcessError:
@@ -105,8 +116,11 @@ def read_tree(repo: Path, sha: str, path: str) -> dict[str, tuple[str, bytes]]:
     files: dict[str, tuple[str, bytes]] = {}
     for mode, kind, obj, name in entries(repo, sha, "-r", f"{path}/"):
         if mode not in REGULAR or kind != "blob":
-            raise Refused(f"{name}: mode {mode} upstream; only regular files are vended")
-        files[name[len(path) + 1:]] = (mode, git_bytes("cat-file", "blob", obj, cwd=repo))
+            raise Refused(f"{name!r}: mode {mode} upstream; only regular files are vended")
+        if not name.startswith(f"{path}/"):
+            raise Refused(f"{name!r}: outside {path} upstream")
+        rel = safe_rel(name[len(path) + 1:])
+        files[rel] = (mode, git_bytes("cat-file", "blob", obj, cwd=repo))
     if not files:
         raise Refused(f"{path}: empty upstream")
     if "LICENSE" in files:
@@ -128,8 +142,12 @@ def read_file(repo: Path, sha: str, path: str) -> bytes:
 
 
 def stage_skill(dest: Path, files: dict[str, tuple[str, bytes]], license_bytes: bytes) -> None:
+    dest.mkdir(parents=True)
+    inside = dest.resolve()
     for rel, (mode, data) in files.items():
-        out = dest / rel
+        out = dest / safe_rel(rel)
+        if inside not in out.resolve().parents:
+            raise Refused(f"{rel!r}: would be written outside {dest}")
         out.parent.mkdir(parents=True, exist_ok=True)
         out.write_bytes(data)
         out.chmod(0o755 if mode == "100755" else 0o644)
@@ -150,13 +168,13 @@ def resync(root: Path, source: str, sha: str, url: str | None, adds: dict[str, s
     for name, path in adds.items():
         if name in lock["skills"]:
             raise Refused(f"{name}: already in the lock")
-        lock["skills"][name] = {"source": source, "path": safe_rel(path), "vend": False, "files": {}}
+        lock["skills"][safe_name(name)] = {"source": source, "path": safe_rel(path), "vend": False, "files": {}}
     report: list[str] = []
     with tempfile.TemporaryDirectory(prefix="vend-resync-") as tmp:
         repo = Path(tmp) / "src.git"
         fetch(fetch_url, sha, repo)
         license_bytes = read_file(repo, sha, safe_rel(src_entry.get("license_path", "LICENSE")))
-        trees = {name: read_tree(repo, sha, safe_rel(entry["path"]))
+        trees = {safe_name(name): read_tree(repo, sha, safe_rel(entry["path"]))
                  for name, entry in sorted(lock["skills"].items()) if entry["source"] == source}
         # Everything is read and checked. Stage the vended copies, then swap them in.
         staging = Path(tmp) / "stage"
@@ -167,7 +185,7 @@ def resync(root: Path, source: str, sha: str, url: str | None, adds: dict[str, s
             state = "added" if name in adds else ("unchanged" if entry["files"] == locked else "changed")
             entry["files"] = locked
             report.append(f"{name}: {state}{'' if entry['vend'] else ' (not vended)'}")
-            if entry["vend"]:
+            if entry["vend"] and not dry_run:
                 stage_skill(staging / name, files, license_bytes)
         src_entry["sha"] = sha
         src_entry["license_sha256"] = hashlib.sha256(license_bytes).hexdigest()
@@ -218,6 +236,10 @@ def main(argv: list[str] | None = None) -> int:
     except subprocess.CalledProcessError as exc:
         err = exc.stderr.decode("utf-8", "replace").strip() if isinstance(exc.stderr, bytes) else exc.stderr
         print(f"refused: git {' '.join(exc.cmd[3:])} failed: {err}", file=sys.stderr)
+        return 1
+    except OSError as exc:
+        print(f"failed while writing: {exc}; restore with `git checkout -- vended/` and rerun",
+              file=sys.stderr)
         return 1
     return 0
 
