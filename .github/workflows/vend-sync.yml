@@ -6,10 +6,10 @@
 # vended/README.md describes enrolment. Nothing under .github/workflows/ is ever vended:
 # the permission sets carry no `workflows` permission.
 #
-# OpenBao objects (created by hand): permission sets vend-sync-rknightion and
-# vend-sync-m7kni (contents: write, pull_requests: write, metadata: read, scoped to the
+# OpenBao objects (created by hand): permission sets vend-sync-rknightion,
+# vend-sync-m7kni and vend-sync-brotek-solutions (the owner lowercased) (contents: write, pull_requests: write, metadata: read, scoped to the
 # enrolled repositories of that owner) and the JWT role vend-sync bound to this repository,
-# allowed both policies.
+# allowed all three policies.
 name: vend-sync
 
 # A push to main that changes the kit or the sync runs it; a release would not work, because the
@@ -92,7 +92,7 @@ jobs:
 
           for r in "${repos[@]}"; do
             case "${r%%/*}" in
-              rknightion | m7kni) ;;
+              rknightion | m7kni | BroTEK-Solutions) ;;
               *)
                 echo "::error::${r}: no vend-sync permission set for owner ${r%%/*}"
                 exit 1
@@ -107,7 +107,7 @@ jobs:
             matrix="$(printf '%s\n' "${repos[@]}" | jq -R -s -c '
               split("\n") | map(select(length > 0)) | group_by(split("/")[0])
               | {include: map({owner: (.[0] | split("/")[0]),
-                               permission_set: ("vend-sync-" + (.[0] | split("/")[0])),
+                               permission_set: ("vend-sync-" + (.[0] | split("/")[0] | ascii_downcase)),
                                repos: join(" ")})}')"
           fi
           {

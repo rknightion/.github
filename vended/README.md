@@ -1,6 +1,6 @@
 # Vended contributor kit
 
-Files under `vended/` are copied into enrolled `rknightion` and `m7kni` repositories, so that any
+Files under `vended/` are copied into enrolled `rknightion`, `m7kni` and `BroTEK-Solutions` repositories, so that any
 person or coding agent can contribute from a clone alone. `scripts/vend/vend.py` does the copying
 and `.github/workflows/vend-sync.yml` runs it on every push to `main` that changes `vended/` or
 `scripts/vend/`, and by hand.
@@ -56,7 +56,7 @@ that cannot be read is a usage error (exit 2).
    Leave out `skills` to get the default set, or list skill names to choose them. A flag left out
    counts as true.
 2. Add the repository to the `repositories` list of the OpenBao permission set for its owner,
-   `vend-sync-rknightion` or `vend-sync-m7kni`. Without it the token cannot reach the repository.
+   `vend-sync-rknightion`, `vend-sync-m7kni` or `vend-sync-brotek-solutions` (the owner, lowercased). Without it the token cannot reach the repository.
 3. Run the `vend-sync` workflow by hand (`workflow_dispatch`), giving the repository as `repo`.
    It opens one pull request from the branch `vend/rknightion-github` and turns on auto-merge.
 
