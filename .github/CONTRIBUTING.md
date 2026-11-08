@@ -9,10 +9,10 @@ repository has one, or an `AGENTS.md`, that file wins.
   Say in the pull request what you ran and what you could not run.
 - The pull request title is a Conventional Commit subject (`fix: ...`, `feat: ...`), using a type
   from the repository's `release-please-config.json`.
-- Say how the pull request relates to an issue, on a line of its own: `Closes #N` with the
-  acceptance evidence table when it completes one, `Refs #N` when it only relates to one, or
-  `Task: none, <reason>` when there is none. A pull request that changes `.github/workflows/` or
-  `.github/actions/` never carries a closing keyword.
+- Say how the pull request relates to an issue, on a line of its own: `Refs #N` when it works on
+  issue N (describe how you verified the change), or `Task: none, <reason>` when there is none. Do
+  not write a closing keyword (`Closes #N`, `Fixes #N` and the like) anywhere in the body: a
+  maintainer adds the acceptance evidence and closes the issue.
 - The first time you contribute, a maintainer approves the CI run before it starts. Pull requests
   from forks get no secrets, so checks that need one are not required of you.
 - Never commit personal data, credentials or real identifiers such as email addresses, hostnames,

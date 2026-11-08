@@ -131,9 +131,13 @@ prints the base it chose on stderr. It never assumes `origin` on a fork.
 Diffs are read with `git diff --text --no-ext-diff --no-textconv`, so a NUL byte or a `-diff` or
 `binary` attribute set by the same change cannot hide a line. A file whose content starts with a
 UTF-16 or UTF-32 byte order mark is decoded and swept whole. Content in which NUL bytes are a fifth
-or more of the bytes (binary, or UTF-16 without a byte order mark) is swept with its NUL bytes
-removed, so ASCII text inside it, such as an address or a token, still matches. A branch or staged sweep also checks the
-path of every file the change adds, copies or renames to.
+or more of the bytes (binary, or UTF-16 without a byte order mark) is swept twice: once with its
+NUL bytes removed, so UTF-16 text matches, and once with each NUL read as a line break, so a NUL
+still separates the bytes either side of it. A finding both views see is reported once. In a branch
+or staged sweep, a file any of whose added lines holds a NUL byte is judged by its whole content at
+the head: when that content needs decoding as above, the whole file is swept with file line
+numbers. A branch or staged sweep also checks the path of every file the change adds, copies or
+renames to.
 
 ## Output and exit codes
 
