@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.26.10](https://github.com/rknightion/.github/compare/v1.26.9...v1.26.10) (2026-11-08)
+
+
+### Miscellaneous
+
+* **vended:** enrol rknightion/paperless-ngx-dedupe ([4b89543](https://github.com/rknightion/.github/commit/4b895439e57071c704033ec372bfb4f03cb0ebf7))
+
 ## [1.26.9](https://github.com/rknightion/.github/compare/v1.26.8...v1.26.9) (2026-11-08)
 
 
