@@ -1,10 +1,17 @@
 name: zizmor (reusable)
 
 # Reusable GitHub Actions security audit (zizmor). Findings upload to the caller
-# repo's Security tab as SARIF.
+# repo's Security tab as SARIF. With `enforce: true`, a pull_request run prints findings as
+# annotations instead and zizmor's own non-zero exit fails the job, so a caller that lists this job
+# in its ci-success needs blocks the merge. Push runs always upload SARIF and never fail on findings.
 
 on:
-  workflow_call: {}
+  workflow_call:
+    inputs:
+      enforce:
+        description: Fail pull_request runs on findings instead of only uploading SARIF.
+        type: boolean
+        default: false
 
 permissions: {}
 
@@ -66,5 +73,7 @@ jobs:
         uses: zizmorcore/zizmor-action@53290badfa369cb0bf7ad16342cb62c2fa47ac7b # v0.8.0
         with:
           version: 1.31.1
-          advanced-security: ${{ github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository }}
-          annotations: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name != github.repository }}
+          # advanced-security true uploads SARIF and never fails; false prints annotations and fails on
+          # findings. Fork PRs cannot upload, and enforced PRs must fail, so both take false.
+          advanced-security: ${{ !(inputs.enforce && github.event_name == 'pull_request') && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository) }}
+          annotations: ${{ github.event_name == 'pull_request' && (inputs.enforce || github.event.pull_request.head.repo.full_name != github.repository) }}
