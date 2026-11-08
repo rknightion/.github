@@ -1,5 +1,30 @@
 # Changelog
 
+## [1.26.9](https://github.com/rknightion/.github/compare/v1.26.8...v1.26.9) (2026-11-08)
+
+
+### Bug Fixes
+
+* **ac-evidence:** check cited proof paths that contain spaces ([336d187](https://github.com/rknightion/.github/commit/336d18732d74bb6ded5904b68d1c7e124d185f39))
+* **judges:** fail closed off pull_request and keep the PR tree beside the judge ([af91d7c](https://github.com/rknightion/.github/commit/af91d7cb776bd42674ac2340a31069a4d391c19f))
+* **privacy-sweep:** allow overlapping occurrences of one entry; document the caller guard for non-PR triggers ([dd8dc94](https://github.com/rknightion/.github/commit/dd8dc947415dccc533349514fe328314447f5b06))
+* **privacy-sweep:** make allow entries fail closed ([faa6744](https://github.com/rknightion/.github/commit/faa67443d63d6d2e481d28053ed5254aedc995bd))
+* **privacy-sweep:** prefix every finding line so a path cannot start a workflow command ([bc74b11](https://github.com/rknightion/.github/commit/bc74b114fbaa299fa253bae73788b613a7866acc))
+* **privacy-sweep:** sweep the raw bytes of content behind a byte order mark ([8dcdfbb](https://github.com/rknightion/.github/commit/8dcdfbb65e34beaef2216d9cf4772f5415a038c9))
+* **vend:** close a code fence only on a bare fence line ([ea4d711](https://github.com/rknightion/.github/commit/ea4d71113e13d6e6c1ff1e2bf26ac95b2aa2b8a9))
+
+
+### Build & CI
+
+* **vend-sync:** sync BroTEK-Solutions repositories too ([e213155](https://github.com/rknightion/.github/commit/e21315582d4f3f339dcf40380159038c3e630d8a))
+
+
+### Documentation
+
+* **ac-evidence:** a fork pull request runs the check like any other ([7852292](https://github.com/rknightion/.github/commit/7852292e0888649ca1ae9dbdec36478c50d5f803))
+* **ac-evidence:** state the closing grammar and the paths the checker misses ([2230250](https://github.com/rknightion/.github/commit/22302508d241e33c91be7d756a9658adeca5d9eb))
+* **vend:** state the workflow_run trust check plainly in the security review skill ([f884dc6](https://github.com/rknightion/.github/commit/f884dc68050c9f9fa779c9abf8e9f5769dc8812b))
+
 ## [1.26.8](https://github.com/rknightion/.github/compare/v1.26.7...v1.26.8) (2026-11-08)
 
 
