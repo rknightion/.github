@@ -355,6 +355,9 @@ LISTED = "m7kni/gc-gitsync-m7kni"
 BROKER = {"actor_type": "Integration", "actor_id": 4520356, "bypass_mode": "always"}
 GITSYNC = {"actor_type": "Integration", "actor_id": 3512185, "bypass_mode": "always"}
 OTHER_APP = {"actor_type": "Integration", "actor_id": 999, "bypass_mode": "always"}
+ENGINE = {"actor_type": "Integration", "actor_id": 5526552, "bypass_mode": "always"}
+RENOVATE = {"actor_type": "Integration", "actor_id": 3107245, "bypass_mode": "always"}
+FACTORY, AWSINFRA = "m7kni/factory", "m7kni/rkps-awsinfra"
 HISTORY_RULES = {"deletion", "non_fast_forward"}
 
 
@@ -433,8 +436,7 @@ class TrackerBypassAllow(unittest.TestCase):
         wide = base_main(30, bypass=())
         wide["name"] = "protect all"
         wide["conditions"]["ref_name"]["include"] = ["~DEFAULT_BRANCH", "refs/heads/release/*"]
-        main = base_main(bypass=(BROKER, GITSYNC))
-        main["rules"] = []
+        main = self.split_main()  # gated main, already split
         gh = FakeGH([main, wide, history_ruleset()], loopmd=LOOPMD)
         al, _ = self.run_rulesets(gh, LISTED)
         self.assertEqual([w for w in gh.writes if w[0] in ("PUT", "POST")], [])
@@ -532,14 +534,18 @@ class TrackerBypassAllow(unittest.TestCase):
     def writes_by_name(self, gh):
         return {b["name"]: (m, p, b) for m, p, b in gh.writes if m in ("PUT", "POST")}
 
-    def test_standard_lists_the_two_machine_writers(self):
+    def test_standard_lists_the_machine_writers(self):
         allow = STD["rulesets"]["tracker_bypass_allow"]
         self.assertEqual(actor_keys(allow[LISTED]), actor_keys([BROKER, GITSYNC]))
+        self.assertEqual(actor_keys(allow[FACTORY]), actor_keys([ENGINE]))
+        self.assertEqual(actor_keys(allow[AWSINFRA]), actor_keys([ADMIN, RENOVATE, BROKER]))
+        self.assertEqual(STD["rulesets"]["tracker_bypass_allow_admin"], [AWSINFRA])
         self.assertNotEqual(STD["rulesets"]["history_name"], STD["rulesets"]["main_name"])
         for full, actors in allow.items():
             self.assertIn(full.split("/")[0], STD["owners"], full)
             for a in actors:
-                self.assertFalse(align.is_standard_bypass(a, STD), full)  # never the admin bypass
+                if full not in STD["rulesets"]["tracker_bypass_allow_admin"]:
+                    self.assertFalse(align.is_standard_bypass(a, STD), full)  # admin only where flagged
                 self.assertEqual(set(a), {"actor_type", "actor_id", "bypass_mode"}, full)
 
     def test_reconcile_adds_allowed_moves_history_rules_and_removes_admin(self):
@@ -560,8 +566,27 @@ class TrackerBypassAllow(unittest.TestCase):
         want = align.reconcile_main_ruleset(rs, True, STD, tracker=True, allow=[GITSYNC])
         self.assertEqual(want["bypass_actors"], [GITSYNC])
 
-    def test_listed_tracker_repo_gets_a_no_bypass_history_ruleset_first(self):
+    def test_pure_history_main_needs_no_companion(self):  # gc-gitsync-m7kni today: no CI, base main
         gh = FakeGH([base_main(bypass=(ADMIN,))], loopmd=LOOPMD)
+        al, _ = self.run_rulesets(gh, LISTED)
+        (w,) = [(m, p, b) for m, p, b in gh.writes if m in ("PUT", "POST")]
+        self.assertEqual(w[0], "PUT")
+        self.assertEqual(w[2]["bypass_actors"], [])               # binds everyone, writers included
+        self.assertLessEqual(HISTORY_RULES, rule_types(w[2]))     # and keeps the history rules
+        self.assertEqual(self.kinds(al), [])
+
+    def test_skip_ruleset_drops_allowed_writers_exempt_from_its_history(self):
+        gh = FakeGH([base_main(bypass=(ADMIN, GITSYNC))], loopmd=LOOPMD)
+        self.run_rulesets(gh, LISTED)
+        (put,) = [b for m, _p, b in gh.writes if m == "PUT"]
+        self.assertEqual(put["bypass_actors"], [])
+        self.assert_writers_never_exempt_from_history(gh)
+
+    def test_listed_tracker_repo_gets_a_no_bypass_history_ruleset_first(self):
+        main = tracker_gate(10, bypass=(ADMIN,))
+        main["name"] = "main"
+        main["rules"] += [{"type": "deletion"}, {"type": "non_fast_forward"}]
+        gh = FakeGH([main], loopmd=LOOPMD)
         al, _ = self.run_rulesets(gh, LISTED)
         writes = [(m, p, b) for m, p, b in gh.writes if m in ("PUT", "POST")]
         self.assertEqual([(m, b["name"]) for m, _p, b in writes],
@@ -578,16 +603,14 @@ class TrackerBypassAllow(unittest.TestCase):
         self.assertFalse([f for f in al.findings if f["kind"] == "tracker-bypass"])
 
     def test_listed_tracker_repo_is_idempotent(self):
-        main = base_main(bypass=(BROKER, GITSYNC))
-        main["rules"] = []
+        main = self.split_main()  # gated main, already split
         gh = FakeGH([main, history_ruleset()], loopmd=LOOPMD)
         al, _ = self.run_rulesets(gh, LISTED)
         self.assertEqual([w for w in gh.writes if w[0] in ("PUT", "POST")], [])
         self.assertFalse([f for f in al.findings if f["kind"] == "tracker-bypass"])
 
     def test_history_ruleset_is_restored_to_no_bypass(self):
-        main = base_main(bypass=(BROKER, GITSYNC))
-        main["rules"] = []
+        main = self.split_main()  # gated main, already split
         hist = history_ruleset(bypass=(ADMIN, GITSYNC), enforcement="disabled")
         hist["rules"].append({"type": "pull_request", "parameters": {}})  # would block the writers
         gh = FakeGH([main, hist], loopmd=LOOPMD)
@@ -602,7 +625,7 @@ class TrackerBypassAllow(unittest.TestCase):
         gh = FakeGH([base_main(bypass=(ADMIN, OTHER_APP))], loopmd=LOOPMD)
         al, _ = self.run_rulesets(gh, LISTED)
         (put,) = [b for m, _p, b in gh.writes if m == "PUT"]
-        self.assertEqual(actor_keys(put["bypass_actors"]), actor_keys([OTHER_APP, BROKER, GITSYNC]))
+        self.assertEqual(actor_keys(put["bypass_actors"]), actor_keys([OTHER_APP]))  # left in place
         (f,) = [f for f in al.findings if f["kind"] == "tracker-bypass"]
         self.assertIn("Integration:999", f["detail"])
         self.assertNotIn("4520356", f["detail"])
@@ -613,13 +636,15 @@ class TrackerBypassAllow(unittest.TestCase):
         # history rules leave every bypassable ruleset, so the writers are never exempt from them.
         gate = tracker_gate()
         gate["rules"].append({"type": "non_fast_forward"})
-        gh = FakeGH([base_main(bypass=(ADMIN,)), gate], loopmd=LOOPMD)
+        main = tracker_gate(10)
+        main["name"] = "main"
+        gh = FakeGH([main, gate], loopmd=LOOPMD)
         al, _ = self.run_rulesets(gh, LISTED)
         puts = {p.rsplit("/", 1)[1]: b for m, p, b in gh.writes if m == "PUT"}
         for rid in ("10", "20"):
             self.assertEqual(actor_keys(puts[rid]["bypass_actors"]), actor_keys([BROKER, GITSYNC]), rid)
             self.assertFalse(rule_types(puts[rid]) & HISTORY_RULES, rid)
-        self.assertIn("pull_request", rule_types(puts["20"]))
+            self.assertIn("pull_request", rule_types(puts[rid]))
         self.assertIn(STD["rulesets"]["history_name"], self.writes_by_name(gh))
         self.assert_writers_never_exempt_from_history(gh)
         self.assertFalse([f for f in al.findings if f["kind"] == "tracker-bypass"])
@@ -640,10 +665,84 @@ class TrackerBypassAllow(unittest.TestCase):
         self.assertLessEqual(HISTORY_RULES, rule_types(put))
 
 
+def factory_main(bypass=(ADMIN, ENGINE)):
+    """m7kni/factory's live `main`: PR + ci-success + history rules, admin and engine bypass."""
+    rs = tracker_gate(26101867, bypass=bypass)
+    rs["name"] = "main"
+    rs["rules"] += [{"type": "deletion"}, {"type": "non_fast_forward"}]
+    return rs
+
+
+def factory_integrity(bypass=(ADMIN,)):
+    rs = history_ruleset(26286216, bypass=bypass)
+    rs["name"] = "main-integrity"
+    return rs
+
+
+class FactoryAndAwsinfra(unittest.TestCase):
+    """The two live layouts behind the factory and rkps-awsinfra entries, before and after cutover."""
+    run_rulesets = TrackerBypassAllow.run_rulesets
+    puts_by_id = TrackerBypassAllow.puts_by_id
+    kinds = TrackerBypassAllow.kinds
+
+    def test_factory_adopts_its_integrity_ruleset_as_the_companion(self):
+        gh = FakeGH([factory_main(), factory_integrity()], loopmd=LOOPMD)
+        al, _ = self.run_rulesets(gh, FACTORY)
+        writes = [(m, p.rsplit("/", 1)[1], b) for m, p, b in gh.writes if m in ("PUT", "POST")]
+        self.assertEqual([(m, rid) for m, rid, _b in writes], [("PUT", "26286216"), ("PUT", "26101867")])
+        integrity, main = writes[0][2], writes[1][2]
+        self.assertEqual(integrity["name"], "main-integrity")    # adopted, not renamed or duplicated
+        self.assertEqual(integrity["bypass_actors"], [])          # binds the admin and the engine
+        self.assertEqual(rule_types(integrity), HISTORY_RULES)
+        self.assertEqual(main["bypass_actors"], [ENGINE])         # engine bypasses PR + checks only
+        self.assertEqual(rule_types(main), {"pull_request", "required_status_checks"})
+        self.assertEqual(self.kinds(al), [])
+
+    def test_factory_after_cutover_is_idempotent(self):
+        main = factory_main(bypass=(ENGINE,))
+        main["rules"] = [r for r in main["rules"] if r["type"] not in HISTORY_RULES]
+        gh = FakeGH([main, factory_integrity(bypass=())], loopmd=LOOPMD)
+        al, _ = self.run_rulesets(gh, FACTORY)
+        self.assertEqual([w for w in gh.writes if w[0] in ("PUT", "POST")], [])
+        self.assertEqual(self.kinds(al), [])
+
+    def test_factory_before_cutover_is_untouched(self):
+        gh = FakeGH([factory_main(), factory_integrity()], loopmd="# Loop: factory\ntier: routine\n")
+        al = align.Aligner(gh, STD, sweep=False)
+        al.align_rulesets(repo(FACTORY, "private"), STD["profiles"]["private"])
+        self.assertEqual([w for w in gh.writes if w[0] in ("PUT", "POST")], [])
+
+    def test_awsinfra_main_binds_everyone_and_reports_nothing(self):
+        gh = FakeGH([base_main(24047088, bypass=(ADMIN,))], loopmd=LOOPMD)
+        al, _ = self.run_rulesets(gh, AWSINFRA)
+        (w,) = [(m, b) for m, p, b in gh.writes if m in ("PUT", "POST")]
+        self.assertEqual(w[0], "PUT")
+        self.assertEqual(w[1]["bypass_actors"], [])  # history rules bind the owner too
+        self.assertLessEqual(HISTORY_RULES, rule_types(w[1]))
+        self.assertEqual(self.kinds(al), [])
+
+    def test_awsinfra_admin_and_writers_reach_a_pr_ruleset(self):
+        gh = FakeGH([base_main(24047088, bypass=(ADMIN,)), tracker_gate()], loopmd=LOOPMD)
+        al, _ = self.run_rulesets(gh, AWSINFRA)
+        puts = self.puts_by_id(gh)
+        self.assertEqual(actor_keys(puts["20"]["bypass_actors"]), actor_keys([ADMIN, RENOVATE, BROKER]))
+        self.assertFalse(rule_types(puts["20"]) & HISTORY_RULES)
+        self.assertEqual(puts["24047088"]["bypass_actors"], [])
+        self.assertFalse([w for w in gh.writes if w[0] == "POST"])  # nothing to split, no companion
+        self.assertEqual(self.kinds(al), [])
+
+    def test_admin_allowed_only_on_the_flagged_repo(self):
+        gh = FakeGH([base_main(bypass=(ADMIN,)), tracker_gate()], loopmd=LOOPMD)
+        self.run_rulesets(gh, LISTED)
+        puts = self.puts_by_id(gh)
+        self.assertFalse(any(align.is_standard_bypass(a, STD) for b in puts.values() for a in b["bypass_actors"]))
+
+
 class StandardValidation(unittest.TestCase):
     def std_with(self, actors, full=LISTED):
         std = json.loads(json.dumps(STD))
         std["rulesets"]["tracker_bypass_allow"] = {full: actors}
+        std["rulesets"]["tracker_bypass_allow_admin"] = []
         return std
 
     def test_shipped_standard_is_valid(self):
@@ -672,7 +771,21 @@ class StandardValidation(unittest.TestCase):
                 align.validate_standard(std)
         std = json.loads(json.dumps(STD))
         std["rulesets"]["tracker_bypass_allow"] = None  # absent or null: no allow-list
+        std["rulesets"]["tracker_bypass_allow_admin"] = None
         align.validate_standard(std)
+
+    def test_admin_needs_the_per_repo_flag(self):
+        std = self.std_with([ADMIN, BROKER])
+        std["rulesets"]["tracker_bypass_allow_admin"] = []
+        with self.assertRaises(ValueError):
+            align.validate_standard(std)
+        std["rulesets"]["tracker_bypass_allow_admin"] = [LISTED]
+        align.validate_standard(std)
+        for flag in ("m7kni/not-listed", 5, LISTED):
+            std = self.std_with([BROKER])  # flagged but no admin entry, or a bad flag value
+            std["rulesets"]["tracker_bypass_allow_admin"] = [flag] if flag != 5 else 5
+            with self.assertRaises(ValueError, msg=repr(flag)):
+                align.validate_standard(std)
         std = self.std_with([BROKER])
         del std["rulesets"]["history_name"]
         with self.assertRaises(ValueError):

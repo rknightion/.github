@@ -20,15 +20,17 @@ Safety rules, each one a way this could otherwise break the fleet:
   bypass actors are removed from every default-branch ruleset, and any other
   bypass actor is reported, not removed. `landing: pr` alone does not count:
   such a repo still pushes board-only commits straight to main.
-- `tracker_bypass_allow` names, per tracker repo, machine writers that keep
-  pushing straight to main after cutover (validated before anything runs). A
-  bypass covers a whole ruleset, so for a listed repo deletion and
-  non_fast_forward move to a companion ruleset (`history_name`, exactly the
-  default branch, no bypass actor at all), created first, and only off
-  rulesets it fully covers. The writers go on every ruleset that can block a
-  push and carries no uncovered history rule; one that has both is reported,
-  never bypassed (an allowed writer already on it is named). No other repo is
-  affected; unlisted bypass actors stay in place and are reported.
+- `tracker_bypass_allow` names, per tracker repo, writers that keep pushing
+  straight to main after cutover (validated before anything runs; the admin
+  role only for a repo in `tracker_bypass_allow_admin`). A bypass covers a
+  whole ruleset, so deletion and non_fast_forward never sit on a ruleset the
+  writers bypass: a history-only ruleset needs no bypass and loses any allowed
+  writer; one that can also block a push has them moved to a no-bypass
+  companion (`history_name`, or an existing history-only ruleset adopted
+  rather than duplicated), written first and only when needed, and only if
+  the companion covers all its refs; otherwise it is reported, never
+  bypassed. No other repo is affected; unlisted bypass actors stay in place
+  and are reported.
 - Every active default-branch ruleset counts when deciding whether the branch
   is gated, so a second, hand-made gate ruleset is not mistaken for no gate.
   The standard's bypass is only ever added to the aligner's own ruleset (or a
@@ -326,6 +328,14 @@ def validate_standard(std: dict) -> None:
         name = rcfg.get("history_name")
         if not isinstance(name, str) or not name or name == rcfg.get("main_name"):
             raise ValueError("rulesets.history_name must be a non-empty name distinct from main_name")
+    admin_ok = rcfg.get("tracker_bypass_allow_admin")
+    admin_ok = [] if admin_ok is None else admin_ok
+    if not isinstance(admin_ok, list) or not all(isinstance(r, str) for r in admin_ok):
+        raise ValueError("rulesets.tracker_bypass_allow_admin must be a list of owner/repo")
+    for full in admin_ok:
+        if not any(is_standard_bypass(a, std) for a in allow.get(full) or [] if isinstance(a, dict)):
+            raise ValueError(f"rulesets.tracker_bypass_allow_admin: {full!r} must also list the admin "
+                             "bypass in tracker_bypass_allow")
     for full, actors in allow.items():
         where = f"rulesets.tracker_bypass_allow[{full!r}]"
         if not isinstance(full, str) or not re.fullmatch(r"[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+", full):
@@ -341,8 +351,9 @@ def validate_standard(std: dict) -> None:
                 raise ValueError(f"{where}: actor_id must be an integer: {a!r}")
             if a["bypass_mode"] not in ALLOW_BYPASS_MODES:
                 raise ValueError(f"{where}: bypass_mode must be one of {ALLOW_BYPASS_MODES}: {a!r}")
-            if is_standard_bypass(a, std):
-                raise ValueError(f"{where}: the standard admin bypass cannot be allowed on a tracker repo: {a!r}")
+            if is_standard_bypass(a, std) and full not in admin_ok:
+                raise ValueError(f"{where}: the standard admin bypass is allowed only for a repo named in "
+                                 f"rulesets.tracker_bypass_allow_admin: {a!r}")
 
 
 def history_covered(rs: dict, default_branch: str | None) -> bool:
@@ -365,17 +376,33 @@ def is_own_history_ruleset(rs: dict) -> bool:
 
 def allow_plan(rs: dict, default_branch: str | None, can_split: bool) -> str:
     """What a listed tracker repo's allowed writers need from one default-branch ruleset:
-    'split'    history rules move to the companion, writers added;
+    'skip'     it cannot block an ordinary push (history rules or nothing): no writer is needed
+               on it, and one that would be exempt from its history rules is dropped;
     'add'      no history rules here, but it can block a push: writers added;
-    'skip'     it cannot block an ordinary push: nothing to do;
+    'split'    it can block a push and its history rules can move to the companion: they move,
+               writers added;
     'conflict' it can block a push and carries history rules the companion cannot take over:
                writers not added (that would exempt them from the history rules), reported."""
-    if can_split and history_covered(rs, default_branch):
-        return "split"
     types = {r["type"] for r in rs.get("rules") or []}
     if not types - set(HISTORY_RULES):
         return "skip"
-    return "conflict" if types & set(HISTORY_RULES) else "add"
+    if not types & set(HISTORY_RULES):
+        return "add"
+    return "split" if can_split and history_covered(rs, default_branch) else "conflict"
+
+
+def is_pure_history(rs: dict) -> bool:
+    types = {r["type"] for r in rs.get("rules") or []}
+    return bool(types) and types <= set(HISTORY_RULES)
+
+
+def plan_actors(actors: list[dict], allow: list[dict], plan: str, has_history: bool) -> list[dict]:
+    """Bypass actors after a plan, the standard admin bypass already stripped from `actors`."""
+    if plan in ("split", "add"):
+        return ensure_actors(actors, allow)
+    if plan == "skip" and has_history:  # an allowed writer here would be exempt from history rules
+        return [a for a in actors if not any(same_actor(a, w) for w in allow)]
+    return [dict(a) for a in actors]
 
 
 def same_actor(a: dict, b: dict) -> bool:
@@ -383,9 +410,11 @@ def same_actor(a: dict, b: dict) -> bool:
 
 
 def tracker_allow(std: dict, full: str) -> list[dict]:
-    """Bypass actors a tracker repo keeps on purpose (machine writers that push straight to main)."""
+    """Bypass actors a tracker repo keeps on purpose (machine writers that push straight to main;
+    the admin role only for a repo in tracker_bypass_allow_admin)."""
+    admin_ok = full in (std["rulesets"].get("tracker_bypass_allow_admin") or [])
     return [dict(a) for a in (std["rulesets"].get("tracker_bypass_allow") or {}).get(full) or []
-            if not is_standard_bypass(a, std)]
+            if admin_ok or not is_standard_bypass(a, std)]
 
 
 def ensure_actors(actors: list[dict], allow: list[dict]) -> list[dict]:
@@ -407,7 +436,8 @@ def ruleset_body(rs: dict) -> dict:
 
 
 def reconcile_main_ruleset(existing: dict | None, gated: bool, std: dict, tracker: bool = False,
-                           add_bypass: bool = True, allow: list[dict] = (), split: bool | None = None) -> dict:
+                           add_bypass: bool = True, allow: list[dict] = (), split: bool | None = None,
+                           drop: list[dict] = ()) -> dict:
     """Desired ruleset body: the standard as a floor over whatever exists.
 
     tracker: the repo lands only by pull request, so the standard's bypass actors are removed
@@ -429,7 +459,8 @@ def reconcile_main_ruleset(existing: dict | None, gated: bool, std: dict, tracke
     }
     if tracker:
         body["bypass_actors"] = ensure_actors(
-            [a for a in body["bypass_actors"] if not is_standard_bypass(a, std)], allow)
+            [a for a in body["bypass_actors"] if not is_standard_bypass(a, std)
+             and not any(same_actor(a, d) for d in drop)], allow)
     for actor in [] if tracker or not add_bypass else rcfg["bypass_actors"]:
         if not any(a.get("actor_type") == actor["actor_type"] and a.get("actor_id") == actor["actor_id"]
                    for a in body["bypass_actors"]):
@@ -466,10 +497,10 @@ def reconcile_main_ruleset(existing: dict | None, gated: bool, std: dict, tracke
     return body
 
 
-def history_ruleset_body(std: dict) -> dict:
+def history_ruleset_body(std: dict, name: str | None = None) -> dict:
     """The companion ruleset of a tracker repo with allowed bypass actors: the history rules alone,
     on the default branch, with no bypass actor at all. It never blocks a fast-forward push."""
-    return {"name": std["rulesets"]["history_name"], "target": "branch", "enforcement": "active",
+    return {"name": name or std["rulesets"]["history_name"], "target": "branch", "enforcement": "active",
             "conditions": {"ref_name": {"include": ["~DEFAULT_BRANCH"], "exclude": []}},
             "bypass_actors": [], "rules": [{"type": t} for t in HISTORY_RULES]}
 
@@ -856,21 +887,22 @@ class Aligner:
         detailed = [self.gh.get(f"/repos/{full}/rulesets/{r['id']}")[1] for r in listed]
         tracker = self.is_tracker_repo(full)
         allow = tracker_allow(self.std, full) if tracker else []
-        history, foreign, can_split = None, None, False
-        if allow:  # the aligner owns the companion outright; it is never the standard's target
-            named = next((r for r in detailed if r.get("name") == self.std["rulesets"]["history_name"]), None)
-            if named is None or is_own_history_ruleset(named):
-                history, can_split = named, True
-            else:
-                foreign = named
+        hname = self.std["rulesets"]["history_name"]
+        named, can_split = None, False
+        if allow:  # the aligner owns a companion with the history name outright
+            named = next((r for r in detailed if r.get("name") == hname), None)
+            if named is not None and not is_own_history_ruleset(named):
                 self.finding(full, "tracker-history-ruleset",
                              f"ruleset '{named.get('name')}' exists but does not target exactly the default "
                              "branch; not adopted as the history ruleset, so no history rule is moved for the "
                              "allowed writers")
+                named = None
+            else:
+                can_split = True
         db = repo.get("default_branch")
         # A foreign ruleset with the companion's name is still an ordinary default-branch ruleset if it
         # targets the default branch: it gets the normal tracker treatment, it is just never adopted.
-        branch = [r for r in detailed if is_default_branch_ruleset(r) and r is not history]
+        branch = [r for r in detailed if is_default_branch_ruleset(r) and r is not named]
         main = pick_main_ruleset(branch, ctx, self.std["rulesets"]["main_name"])
         others = [r for r in branch if r is not main]
         live_others = [r for r in others if r.get("enforcement") == "active"]
@@ -885,17 +917,26 @@ class Aligner:
             self.finding(full, "needs-aggregator",
                          f"no {ctx} check reported recently; "
                          + ("gated on its existing checks" if gated else "base ruleset only, auto-merge off"))
-        if can_split:  # before any history rule is moved off a bypassable ruleset
-            self.ensure_history_ruleset(full, history)
         owned = owns_ruleset(main, branch, self.std["rulesets"]["main_name"])
-        plan = "skip"
+        floor = reconcile_main_ruleset(main, add_ci, self.std, tracker, add_bypass=owned, split=False)
+        plan, history = "skip", named
         if allow:  # judged on the floor the main ruleset gets without the writers
-            plan = allow_plan(reconcile_main_ruleset(main, add_ci, self.std, tracker, add_bypass=owned, split=False),
-                              db, can_split)
+            plans = [allow_plan(floor, db, can_split)] + [allow_plan(r, db, can_split) for r in others]
+            if "split" in plans and history is None:
+                # Adopt an existing history-only ruleset on exactly the default branch (such as a
+                # hand-made integrity ruleset) rather than create a second one beside it.
+                history = next((r for r in others if is_own_history_ruleset(r) and is_pure_history(r)), None)
+                others = [r for r in others if r is not history]
+            if "split" in plans or named is not None:  # before any history rule is moved off
+                self.ensure_history_ruleset(full, history)
+            plan = plans[0]
             if plan == "conflict":
                 self.allow_conflict(full, main or {"name": self.std["rulesets"]["main_name"]}, allow)
-        want = reconcile_main_ruleset(main, add_ci, self.std, tracker, add_bypass=owned,
-                                      allow=allow if plan in ("split", "add") else [], split=plan == "split")
+        present = [w for w in allow if any(same_actor(a, w) for a in (main or {}).get("bypass_actors") or [])]
+        want = reconcile_main_ruleset(
+            main, add_ci, self.std, tracker, add_bypass=owned,
+            allow={"split": allow, "add": allow, "conflict": present}.get(plan, []), split=plan == "split",
+            drop=allow if plan == "skip" and set(HISTORY_RULES) & {r["type"] for r in floor["rules"]} else [])
         if main is None:
             self.gh.write("POST", f"/repos/{full}/rulesets", want)
             self.change(full, "rulesets", f"created '{want['name']}' ({'gated' if gated else 'base'})")
@@ -923,13 +964,15 @@ class Aligner:
         return loopmd_tracker(base64.b64decode(body["content"]).decode(errors="replace")) == "github"
 
     def ensure_history_ruleset(self, full: str, existing: dict | None):
-        want = history_ruleset_body(self.std)
+        want = history_ruleset_body(self.std, (existing or {}).get("name"))
         if existing is None:
             self.gh.write("POST", f"/repos/{full}/rulesets", want)
             self.change(full, "rulesets", f"created '{want['name']}' (deletion and force-push blocked, no bypass)")
         elif normalise_ruleset(want) != normalise_ruleset(existing):
             self.gh.write("PUT", f"/repos/{full}/rulesets/{existing['id']}", want)
-            self.change(full, "rulesets", f"updated '{want['name']}' (deletion and force-push blocked, no bypass)")
+            dropped = sorted(f"{a.get('actor_type')}:{a.get('actor_id')}" for a in existing.get("bypass_actors") or [])
+            self.change(full, "rulesets", f"updated '{want['name']}' as the history ruleset (deletion and force-push "
+                        "blocked, no bypass" + (f"; removed bypass {', '.join(dropped)}" if dropped else "") + ")")
 
     def allow_conflict(self, full: str, rs: dict, allow: list[dict]):
         present = sorted(f"{a.get('actor_type')}:{a.get('actor_id')}" for a in rs.get("bypass_actors") or []
@@ -955,10 +998,12 @@ class Aligner:
         for r in others:
             actors = r.get("bypass_actors") or []
             stripped = [a for a in actors if not is_standard_bypass(a, self.std)]
-            plan = allow_plan(r, default_branch, can_split) if allow else "skip"
+            plan = allow_plan(r, default_branch, can_split) if allow else "none"
             if plan == "conflict":
                 self.allow_conflict(full, r, allow)
-            keep = ensure_actors(stripped, allow if plan in ("split", "add") else [])
+            present = [w for w in allow if any(same_actor(a, w) for a in actors)]
+            keep = plan_actors(stripped, present if plan == "conflict" else allow, plan,
+                               bool({x["type"] for x in r.get("rules") or []} & set(HISTORY_RULES)))
             left |= {key(a) for a in keep}
             rules = r.get("rules") or []
             rules_keep = [x for x in rules if x["type"] not in HISTORY_RULES] if plan == "split" else rules
@@ -969,7 +1014,10 @@ class Aligner:
                 body["rules"] = json.loads(json.dumps(rules_keep))
                 self.gh.write("PUT", f"/repos/{full}/rulesets/{r['id']}", body)
                 what = (["removed admin bypass from"] if len(stripped) != len(actors) else []) \
-                    + (["ensured allowed bypass actors on"] if keep != stripped else []) \
+                    + (["ensured allowed bypass actors on"] if len(keep) > len(stripped) or (keep != stripped
+                       and len(keep) == len(stripped)) else []) \
+                    + (["removed allowed bypass actors exempt from history rules on"]
+                       if len(keep) < len(stripped) else []) \
                     + (["moved history rules off"] if len(rules_keep) != len(rules) else [])
                 self.change(full, "rulesets", f"{' and '.join(what)} '{r.get('name')}' (tracker repo)")
         left -= allowed

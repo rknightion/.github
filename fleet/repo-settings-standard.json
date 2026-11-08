@@ -309,8 +309,35 @@
           "actor_id": 3512185,
           "bypass_mode": "always"
         }
+      ],
+      "m7kni/factory": [
+        {
+          "actor_type": "Integration",
+          "actor_id": 5526552,
+          "bypass_mode": "always"
+        }
+      ],
+      "m7kni/rkps-awsinfra": [
+        {
+          "actor_type": "RepositoryRole",
+          "actor_id": 5,
+          "bypass_mode": "always"
+        },
+        {
+          "actor_type": "Integration",
+          "actor_id": 3107245,
+          "bypass_mode": "always"
+        },
+        {
+          "actor_type": "Integration",
+          "actor_id": 4520356,
+          "bypass_mode": "always"
+        }
       ]
     },
+    "tracker_bypass_allow_admin": [
+      "m7kni/rkps-awsinfra"
+    ],
     "release_tags": {
       "name": "release-tags",
       "include": [
