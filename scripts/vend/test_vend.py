@@ -254,6 +254,14 @@ class TestLocalEdits(VendCase):
         self.assertEqual(self.run_vend()[0], 2)
         self.assertEqual(self.run_vend("--force")[0], 0)
 
+    def test_non_object_record_is_usage_error_unless_forced(self) -> None:
+        self.run_vend()
+        for body in ("[]", "null", "3", '"text"'):
+            (self.tgt / ".vended.json").write_text(body)
+            self.assertEqual(self.run_vend()[0], 2, body)
+            self.assertEqual(self.run_vend("--force")[0], 0, body)
+            self.assertIsInstance(json.loads((self.tgt / ".vended.json").read_text()), dict)
+
     def test_record_with_escaping_path_is_rejected(self) -> None:
         self.run_vend()
         rec = json.loads((self.tgt / ".vended.json").read_text())

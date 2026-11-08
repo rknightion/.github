@@ -48,7 +48,9 @@ fi
 
 # -f: a repository that gitignores .claude/ must still commit the vended skill links.
 git add -A
-git add -f -- .claude/skills .agents/skills 2>/dev/null || true
+for vended_dir in .claude/skills .agents/skills; do
+  if [ -e "${vended_dir}" ]; then git add -f -- "${vended_dir}"; fi
+done
 git -c user.name="${BOT_NAME}" -c user.email="${BOT_EMAIL}" -c commit.gpgsign=false \
   commit --quiet -m "${title}"
 

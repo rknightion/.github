@@ -696,6 +696,9 @@ def cmd_apply(args: argparse.Namespace) -> int:
             old = json.loads(old_raw)
         except ValueError:
             old = None
+        if not isinstance(old, dict):
+            # --force got past an unreadable record in load_record: rewrite it from scratch.
+            old = None
     content_changes = bool(plan.writes or plan.chmods or plan.deletes or plan.links or plan.unlinks)
     write_record = (
         content_changes

@@ -131,10 +131,13 @@ With a correct seam: turn the minimal repro into a failing test, watch it fail f
 apply the fix, watch it pass, then re-run the Phase 1 loop against the original scenario. `write-tests`
 covers what the test should assert.
 
-To show the test fails without the fix: copy the changed production files aside (never the test),
-`git restore --source=<base> --worktree -- <production paths>`, run (red), copy your files back, run
-(green), and confirm `git diff --cached` is unchanged. Do not use `git stash`; every worktree of the
-clone shares it. Do not use `git checkout <base> -- <paths>`; it rewrites the index.
+To show the test fails without the fix: copy the changed production files aside with their modes
+(`cp -p`, never the test). Restore tracked ones with
+`git restore --source=<base> --worktree -- <production paths>`, and move any new untracked production
+file out of the tree (restore cannot remove a file the base never had). Run (red), copy every file back
+with `cp -p`, run (green), and confirm `git status` and `git diff --cached` match what they were before.
+Do not use `git stash`; every worktree of the clone shares it.
+Do not use `git checkout <base> -- <paths>`; it rewrites the index.
 
 ## Phase 6: Clean up
 
