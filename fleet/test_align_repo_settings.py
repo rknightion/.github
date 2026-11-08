@@ -17,10 +17,10 @@ STD = json.load(open(os.path.join(HERE, "repo-settings-standard.json")))
 SHA = "a" * 40
 
 
-def repo(full, visibility="public", fork=False, archived=False):
+def repo(full, visibility="public", fork=False, archived=False, default_branch="main"):
     owner, name = full.split("/")
     return {"full_name": full, "name": name, "owner": {"login": owner}, "visibility": visibility,
-            "fork": fork, "archived": archived}
+            "fork": fork, "archived": archived, "default_branch": default_branch}
 
 
 class Classify(unittest.TestCase):
@@ -379,11 +379,110 @@ class TrackerBypassAllow(unittest.TestCase):
     A bypass covers a whole ruleset, so the writers may only sit on rulesets without deletion or
     non_fast_forward; those two rules move to a companion ruleset that nobody bypasses."""
 
-    def run_rulesets(self, gh, full):
+    def run_rulesets(self, gh, full, default_branch="main"):
         al = align.Aligner(gh, STD, sweep=False)
         al.ci_success_reported = lambda full: False  # gc-gitsync-m7kni has no CI: a base ruleset
-        gate = al.align_rulesets(repo(full, "private"), STD["profiles"]["private"])
+        gate = al.align_rulesets(repo(full, "private", default_branch=default_branch), STD["profiles"]["private"])
         return al, gate
+
+    def puts_by_id(self, gh):
+        return {p.rsplit("/", 1)[1]: b for m, p, b in gh.writes if m == "PUT"}
+
+    def kinds(self, al):
+        return [f["kind"] for f in al.findings if f["kind"] != "needs-aggregator"]
+
+    def test_history_covered_only_for_exactly_the_default_branch(self):
+        def rs(include, exclude=()):
+            return {"target": "branch", "conditions": {"ref_name": {"include": list(include), "exclude": list(exclude)}}}
+        self.assertTrue(align.history_covered(rs(["~DEFAULT_BRANCH"]), "main"))
+        self.assertTrue(align.history_covered(rs(["refs/heads/main"]), "main"))
+        self.assertFalse(align.history_covered(rs(["refs/heads/main"]), "trunk"))   # not the default branch
+        self.assertFalse(align.history_covered(rs(["~DEFAULT_BRANCH", "refs/heads/release/*"]), "main"))
+        self.assertFalse(align.history_covered(rs(["~ALL"]), "main"))
+        self.assertFalse(align.history_covered(rs([]), "main"))
+        self.assertFalse(align.history_covered({"target": "tag", "conditions": rs(["~DEFAULT_BRANCH"])["conditions"]}, "main"))
+
+    def split_main(self):
+        """A gated `main` on exactly the default branch, already split: the standard's target."""
+        main = tracker_gate(10, bypass=(BROKER, GITSYNC))
+        main["name"] = "main"
+        return main
+
+    def test_wider_gate_with_history_rules_is_reported_not_split(self):
+        gate = tracker_gate()
+        gate["conditions"]["ref_name"]["include"].append("refs/heads/release/*")
+        gate["rules"].append({"type": "non_fast_forward"})
+        gh = FakeGH([self.split_main(), gate, history_ruleset()], loopmd=LOOPMD)
+        al, _ = self.run_rulesets(gh, LISTED)
+        self.assertEqual(self.puts_by_id(gh), {})  # history rules stay, writers not added
+        self.assertEqual(self.kinds(al), ["tracker-bypass-allow-conflict"])
+        self.assertIn("pr only", al.findings[-1]["detail"])
+
+    def test_wider_main_is_reported_not_split(self):  # the standard's target always keeps its floor
+        gate = tracker_gate()
+        gate["conditions"]["ref_name"]["include"].append("refs/heads/release/*")
+        gh = FakeGH([gate, history_ruleset()], loopmd=LOOPMD)
+        al, _ = self.run_rulesets(gh, LISTED)
+        put = self.puts_by_id(gh)["20"]
+        self.assertLessEqual(HISTORY_RULES, rule_types(put))
+        self.assertEqual(put["bypass_actors"], [])
+        self.assertEqual(self.kinds(al), ["tracker-bypass-allow-conflict"])
+        self.assert_writers_never_exempt_from_history(gh)
+
+    def test_wider_ruleset_with_only_history_rules_is_left_alone(self):
+        wide = base_main(30, bypass=())
+        wide["name"] = "protect all"
+        wide["conditions"]["ref_name"]["include"] = ["~DEFAULT_BRANCH", "refs/heads/release/*"]
+        main = base_main(bypass=(BROKER, GITSYNC))
+        main["rules"] = []
+        gh = FakeGH([main, wide, history_ruleset()], loopmd=LOOPMD)
+        al, _ = self.run_rulesets(gh, LISTED)
+        self.assertEqual([w for w in gh.writes if w[0] in ("PUT", "POST")], [])
+        self.assertEqual(self.kinds(al), [])
+
+    def test_wider_gate_without_history_rules_gets_the_writers(self):
+        gate = tracker_gate()
+        gate["conditions"]["ref_name"]["include"].append("refs/heads/release/*")
+        gh = FakeGH([self.split_main(), gate, history_ruleset()], loopmd=LOOPMD)
+        al, _ = self.run_rulesets(gh, LISTED)
+        put = self.puts_by_id(gh)["20"]
+        self.assertEqual(actor_keys(put["bypass_actors"]), actor_keys([BROKER, GITSYNC]))
+        self.assertEqual(put["conditions"], gate["conditions"])
+        self.assertEqual(self.kinds(al), [])
+
+    def test_main_on_a_non_default_named_branch_keeps_its_history_rules(self):
+        main = tracker_gate(10)
+        main["name"] = "main"
+        main["conditions"]["ref_name"]["include"] = ["refs/heads/main"]
+        main["rules"] += [{"type": "deletion"}, {"type": "non_fast_forward"}]
+        gh = FakeGH([main, history_ruleset()], loopmd=LOOPMD)
+        al, _ = self.run_rulesets(gh, LISTED, default_branch="trunk")
+        put = self.puts_by_id(gh).get("10")
+        self.assertTrue(put is None or HISTORY_RULES <= rule_types(put))
+        self.assertTrue(put is None or not any(align.same_actor(a, BROKER) for a in put["bypass_actors"]))
+        self.assertEqual(self.kinds(al), ["tracker-bypass-allow-conflict"])
+        self.assert_writers_never_exempt_from_history(gh)
+
+    def test_foreign_history_named_ruleset_is_reported_and_untouched(self):
+        for foreign in ({"target": "tag"}, {"include": ["~DEFAULT_BRANCH", "refs/heads/release/*"]}):
+            hist = history_ruleset(bypass=(ADMIN,))
+            if "target" in foreign:
+                hist["target"] = foreign["target"]
+            else:
+                hist["conditions"]["ref_name"]["include"] = foreign["include"]
+            gate = tracker_gate()
+            gate["name"] = "main"
+            gate["rules"].append({"type": "deletion"})
+            gh = FakeGH([gate, hist], loopmd=LOOPMD)
+            al, _ = self.run_rulesets(gh, LISTED)
+            self.assertNotIn("40", self.puts_by_id(gh), foreign)
+            self.assertFalse([w for w in gh.writes if w[0] == "POST"], foreign)  # no second companion
+            put = self.puts_by_id(gh)["20"]
+            self.assertLessEqual(HISTORY_RULES, rule_types(put), foreign)  # nothing moved off
+            self.assertFalse(any(align.same_actor(a, BROKER) for a in put["bypass_actors"]), foreign)
+            self.assertIn("tracker-history-ruleset", self.kinds(al), foreign)
+            self.assertIn("tracker-bypass-allow-conflict", self.kinds(al), foreign)
+            self.assert_writers_never_exempt_from_history(gh)
 
     def assert_writers_never_exempt_from_history(self, gh):
         for m, p, b in gh.writes:
@@ -501,6 +600,41 @@ class TrackerBypassAllow(unittest.TestCase):
         (put,) = [b for m, _p, b in gh.writes if m in ("PUT", "POST")]
         self.assertEqual(put["bypass_actors"], [ADMIN])  # the migration window: admin bypass comes back
         self.assertLessEqual(HISTORY_RULES, rule_types(put))
+
+
+class StandardValidation(unittest.TestCase):
+    def std_with(self, actors, full=LISTED):
+        std = json.loads(json.dumps(STD))
+        std["rulesets"]["tracker_bypass_allow"] = {full: actors}
+        return std
+
+    def test_shipped_standard_is_valid(self):
+        align.validate_standard(STD)
+
+    def test_rejects_bad_allow_entries(self):
+        bad = [
+            [{"actor_type": "Integration", "actor_id": 4520356}],                              # no bypass_mode
+            [dict(BROKER, bypass_mode="sometimes")],
+            [dict(BROKER, actor_id="4520356")],
+            [dict(BROKER, actor_id=True)],
+            [dict(BROKER, actor_type="Bot")],
+            [dict(BROKER, extra=1)],
+            [dict(ADMIN)],                                                                       # the admin bypass
+            dict(BROKER),                                                                        # not a list
+        ]
+        for actors in bad:
+            with self.assertRaises(ValueError, msg=actors):
+                align.validate_standard(self.std_with(actors))
+        with self.assertRaises(ValueError):
+            align.validate_standard(self.std_with([BROKER], full="gc-gitsync-m7kni"))
+        std = self.std_with([BROKER])
+        del std["rulesets"]["history_name"]
+        with self.assertRaises(ValueError):
+            align.validate_standard(std)
+
+    def test_aligner_refuses_an_invalid_standard(self):
+        with self.assertRaises(ValueError):
+            align.Aligner(FakeGH(), self.std_with([{"actor_type": "Integration", "actor_id": 1}]), sweep=False)
 
 
 class AutoMerge(unittest.TestCase):

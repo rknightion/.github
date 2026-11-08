@@ -69,9 +69,9 @@ removed. Per-repo extras survive, for example portina-iac's Integration bypasses
 history, meraki-dashboard-ha's `validate-success`, or brewmdm-control-plane's eleven named checks.
 
 **Tracker repos are the exception.** A repo whose `LOOP.md` on the default branch declares
-`tracker: github` lands every change by pull request, with no bypass actor except the machine
-writers listed for it in `tracker_bypass_allow` below (`landing: pr` alone does not count: those
-repos still push board-only commits straight to main). There the aligner adds no admin bypass and removes the standard's own one from every
+`tracker: github` lands its people's and agents' changes by pull request; only the machine writers
+listed for it in `tracker_bypass_allow` below may still push straight to the default branch
+(`landing: pr` alone does not count: those repos still push board-only commits straight to main). There the aligner adds no admin bypass and removes the standard's own one from every
 default-branch ruleset. Any other bypass actor is left in place and reported as `tracker-bypass`
 for a human to decide. The key is read the way agent-docs `loop-lint` reads them (opening
 `key: value` lines before the first `## `, fences skipped). An unreadable `LOOP.md` stops the
@@ -82,15 +82,29 @@ keep pushing straight to `main` after a repo's people and agents move to pull re
 covers a whole ruleset, not one rule, so a writer on a ruleset that also blocks deletion and
 force-push could delete or rewrite `main`. For a listed tracker repo the aligner therefore:
 
-1. Ensures a companion default-branch ruleset named by `rulesets.history_name` (`main-history`)
-   holding exactly `deletion` and `non_fast_forward`, active, with **no bypass actor at all** (not the
-   admin, not the writers). It does this first, so the branch is never left without those rules.
-2. Moves `deletion` and `non_fast_forward` off every other default-branch ruleset and ensures each
-   listed actor (type, id and `bypass_mode`) on all of them, since a push has to clear each active
-   ruleset separately. It still removes the standard admin bypass from them.
+1. Ensures a companion ruleset named by `rulesets.history_name` (`main-history`) targeting only
+   `~DEFAULT_BRANCH`, holding exactly `deletion` and `non_fast_forward`, active, with **no bypass
+   actor at all** (not the admin, not the writers). It does this first, so the branch is never left
+   without those rules. An existing ruleset of that name is adopted only if it already targets
+   exactly `~DEFAULT_BRANCH` (no excludes); anything else is left untouched and reported as
+   `tracker-history-ruleset`, and then no history rule is moved anywhere.
+2. Handles every other default-branch ruleset (a push has to clear each active one separately),
+   removing the standard admin bypass from each as for any tracker repo:
+   - one whose refs the companion fully covers (`~DEFAULT_BRANCH`, or `refs/heads/<default>` for
+     the repo's real default branch) loses `deletion` and `non_fast_forward` and gains each listed
+     actor (type, id and `bypass_mode`);
+   - one that also targets other refs keeps its history rules. If it has no other rule it cannot
+     block an ordinary push and is left alone; if it has other rules but no history rules, the
+     listed actors are added; if it has both, the listed actors are **not** added and it is
+     reported as `tracker-bypass-allow-conflict` for a human to split. The standard's own target
+     ruleset always keeps its history floor, so on a wider target that is the conflict case.
 
-The writers' ordinary pushes then pass: they bypass the pull-request and check rulesets, and the
+The writers' ordinary pushes then pass: they bypass the rulesets that could block them, and the
 history ruleset never blocks a fast-forward push. A force-push or a deletion is refused for everyone.
+
+Every entry needs exactly `actor_type` (`Integration`, `RepositoryRole` or `Team`), an integer
+`actor_id` and `bypass_mode` (`always` or `pull_request`); the standard admin bypass is not allowed.
+The aligner validates the list before doing anything and exits 2 on a malformed entry.
 Listed actors are not reported as `tracker-bypass`; any unlisted actor still is. The list never
 applies to a repo that is not listed, or to a listed repo before its `LOOP.md` declares
 `tracker: github`. An `Integration` actor's id is the GitHub App id, not its installation id: run
@@ -190,6 +204,6 @@ Free plan: no org rulesets and no org cache settings.
 
 One JSON object on stdout: `changes` (what was changed, or would be under `--dry-run`),
 `findings` (things for a human: `needs-aggregator`, `actions-not-allowlisted`, `actions-not-pinned`,
-`org-actions-held`, `tracker-bypass`, `kept`), `new_findings` (findings absent from the previous full, non-dry run;
+`org-actions-held`, `tracker-bypass`, `tracker-bypass-allow-conflict`, `tracker-history-ruleset`, `kept`), `new_findings` (findings absent from the previous full, non-dry run;
 state in `--state-dir`),
 `cache_reclaimed` and `errors`. Exit 0 on a completed run, 2 if any API call failed.
