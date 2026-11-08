@@ -1,5 +1,6 @@
 {"schema": 1, "repos": [
   {"repo": "rknightion/tracker-probe"},
   {"repo": "m7kni/tracker-probe"},
-  {"repo": "rknightion/openai2otel"}
+  {"repo": "rknightion/openai2otel"},
+  {"repo": "rknightion/transceiver-exporter"}
 ]}
