@@ -286,6 +286,7 @@
   },
   "rulesets": {
     "main_name": "main",
+    "history_name": "main-history",
     "bypass_actors": [
       {
         "actor_type": "RepositoryRole",

@@ -355,14 +355,29 @@ LISTED = "m7kni/gc-gitsync-m7kni"
 BROKER = {"actor_type": "Integration", "actor_id": 4520356, "bypass_mode": "always"}
 GITSYNC = {"actor_type": "Integration", "actor_id": 3512185, "bypass_mode": "always"}
 OTHER_APP = {"actor_type": "Integration", "actor_id": 999, "bypass_mode": "always"}
+HISTORY_RULES = {"deletion", "non_fast_forward"}
 
 
 def actor_keys(actors):
     return sorted((a["actor_type"], a["actor_id"], a["bypass_mode"]) for a in actors)
 
 
+def rule_types(rs):
+    return {r["type"] for r in rs.get("rules") or []}
+
+
+def history_ruleset(rid=40, bypass=(), enforcement="active"):
+    return {"id": rid, "name": STD["rulesets"]["history_name"], "target": "branch", "enforcement": enforcement,
+            "conditions": {"ref_name": {"include": ["~DEFAULT_BRANCH"], "exclude": []}},
+            "bypass_actors": [dict(a) for a in bypass],
+            "rules": [{"type": "deletion"}, {"type": "non_fast_forward"}]}
+
+
 class TrackerBypassAllow(unittest.TestCase):
-    """Per-repo machine writers that keep pushing straight to main on a tracker repo."""
+    """Per-repo machine writers that keep pushing straight to main on a tracker repo.
+
+    A bypass covers a whole ruleset, so the writers may only sit on rulesets without deletion or
+    non_fast_forward; those two rules move to a companion ruleset that nobody bypasses."""
 
     def run_rulesets(self, gh, full):
         al = align.Aligner(gh, STD, sweep=False)
@@ -370,39 +385,81 @@ class TrackerBypassAllow(unittest.TestCase):
         gate = al.align_rulesets(repo(full, "private"), STD["profiles"]["private"])
         return al, gate
 
+    def assert_writers_never_exempt_from_history(self, gh):
+        for m, p, b in gh.writes:
+            if b is None or m not in ("PUT", "POST"):
+                continue
+            if rule_types(b) & HISTORY_RULES:
+                self.assertEqual(b["bypass_actors"], [], p)  # nobody, not even the admin
+
+    def writes_by_name(self, gh):
+        return {b["name"]: (m, p, b) for m, p, b in gh.writes if m in ("PUT", "POST")}
+
     def test_standard_lists_the_two_machine_writers(self):
         allow = STD["rulesets"]["tracker_bypass_allow"]
         self.assertEqual(actor_keys(allow[LISTED]), actor_keys([BROKER, GITSYNC]))
+        self.assertNotEqual(STD["rulesets"]["history_name"], STD["rulesets"]["main_name"])
         for full, actors in allow.items():
             self.assertIn(full.split("/")[0], STD["owners"], full)
             for a in actors:
                 self.assertFalse(align.is_standard_bypass(a, STD), full)  # never the admin bypass
                 self.assertEqual(set(a), {"actor_type", "actor_id", "bypass_mode"}, full)
 
-    def test_reconcile_adds_allowed_and_still_removes_admin(self):
+    def test_reconcile_adds_allowed_moves_history_rules_and_removes_admin(self):
         rs = base_main(bypass=(ADMIN,))
         want = align.reconcile_main_ruleset(rs, True, STD, tracker=True, allow=[BROKER, GITSYNC])
         self.assertEqual(actor_keys(want["bypass_actors"]), actor_keys([BROKER, GITSYNC]))
+        self.assertFalse(rule_types(want) & HISTORY_RULES)
         again = align.reconcile_main_ruleset(want, True, STD, tracker=True, allow=[BROKER, GITSYNC])
         self.assertEqual(align.normalise_ruleset(want), align.normalise_ruleset(again))
+
+    def test_reconcile_without_allow_keeps_the_history_floor(self):
+        want = align.reconcile_main_ruleset(base_main(bypass=(ADMIN,)), True, STD, tracker=True)
+        self.assertEqual(want["bypass_actors"], [])
+        self.assertLessEqual(HISTORY_RULES, rule_types(want))
 
     def test_reconcile_corrects_an_allowed_actors_mode(self):
         rs = base_main(bypass=(dict(GITSYNC, bypass_mode="pull_request"),))
         want = align.reconcile_main_ruleset(rs, True, STD, tracker=True, allow=[GITSYNC])
         self.assertEqual(want["bypass_actors"], [GITSYNC])
 
-    def test_listed_tracker_repo_gets_its_writers_and_no_finding(self):
+    def test_listed_tracker_repo_gets_a_no_bypass_history_ruleset_first(self):
         gh = FakeGH([base_main(bypass=(ADMIN,))], loopmd=LOOPMD)
         al, _ = self.run_rulesets(gh, LISTED)
-        (put,) = [b for m, _p, b in gh.writes if m == "PUT"]
-        self.assertEqual(actor_keys(put["bypass_actors"]), actor_keys([BROKER, GITSYNC]))
+        writes = [(m, p, b) for m, p, b in gh.writes if m in ("PUT", "POST")]
+        self.assertEqual([(m, b["name"]) for m, _p, b in writes],
+                         [("POST", STD["rulesets"]["history_name"]), ("PUT", "main")])  # protect, then open
+        _, _, hist = writes[0]
+        self.assertEqual(hist["bypass_actors"], [])
+        self.assertEqual(rule_types(hist), HISTORY_RULES)
+        self.assertEqual(hist["enforcement"], "active")
+        self.assertEqual(hist["conditions"]["ref_name"]["include"], ["~DEFAULT_BRANCH"])
+        _, _, main = writes[1]
+        self.assertEqual(actor_keys(main["bypass_actors"]), actor_keys([BROKER, GITSYNC]))
+        self.assertFalse(rule_types(main) & HISTORY_RULES)
+        self.assert_writers_never_exempt_from_history(gh)
         self.assertFalse([f for f in al.findings if f["kind"] == "tracker-bypass"])
 
     def test_listed_tracker_repo_is_idempotent(self):
-        gh = FakeGH([base_main(bypass=(BROKER, GITSYNC))], loopmd=LOOPMD)
+        main = base_main(bypass=(BROKER, GITSYNC))
+        main["rules"] = []
+        gh = FakeGH([main, history_ruleset()], loopmd=LOOPMD)
         al, _ = self.run_rulesets(gh, LISTED)
         self.assertEqual([w for w in gh.writes if w[0] in ("PUT", "POST")], [])
         self.assertFalse([f for f in al.findings if f["kind"] == "tracker-bypass"])
+
+    def test_history_ruleset_is_restored_to_no_bypass(self):
+        main = base_main(bypass=(BROKER, GITSYNC))
+        main["rules"] = []
+        hist = history_ruleset(bypass=(ADMIN, GITSYNC), enforcement="disabled")
+        hist["rules"].append({"type": "pull_request", "parameters": {}})  # would block the writers
+        gh = FakeGH([main, hist], loopmd=LOOPMD)
+        self.run_rulesets(gh, LISTED)
+        (put,) = [(p, b) for m, p, b in gh.writes if m == "PUT"]
+        self.assertTrue(put[0].endswith("/40"))
+        self.assertEqual(put[1]["bypass_actors"], [])
+        self.assertEqual(put[1]["enforcement"], "active")
+        self.assertEqual(rule_types(put[1]), HISTORY_RULES)
 
     def test_listed_tracker_repo_still_reports_an_unlisted_actor(self):
         gh = FakeGH([base_main(bypass=(ADMIN, OTHER_APP))], loopmd=LOOPMD)
@@ -414,27 +471,36 @@ class TrackerBypassAllow(unittest.TestCase):
         self.assertNotIn("4520356", f["detail"])
         self.assertNotIn("3512185", f["detail"])
 
-    def test_listed_writers_reach_every_default_branch_ruleset(self):
-        # A push must clear every active ruleset, so a bypass on one alone would not let it through.
-        gh = FakeGH([base_main(bypass=(ADMIN,)), tracker_gate()], loopmd=LOOPMD)
+    def test_listed_writers_reach_every_ruleset_that_could_block_a_push(self):
+        # A push must clear every active ruleset, so a bypass on one alone would not let it through;
+        # history rules leave every bypassable ruleset, so the writers are never exempt from them.
+        gate = tracker_gate()
+        gate["rules"].append({"type": "non_fast_forward"})
+        gh = FakeGH([base_main(bypass=(ADMIN,)), gate], loopmd=LOOPMD)
         al, _ = self.run_rulesets(gh, LISTED)
         puts = {p.rsplit("/", 1)[1]: b for m, p, b in gh.writes if m == "PUT"}
         for rid in ("10", "20"):
             self.assertEqual(actor_keys(puts[rid]["bypass_actors"]), actor_keys([BROKER, GITSYNC]), rid)
+            self.assertFalse(rule_types(puts[rid]) & HISTORY_RULES, rid)
+        self.assertIn("pull_request", rule_types(puts["20"]))
+        self.assertIn(STD["rulesets"]["history_name"], self.writes_by_name(gh))
+        self.assert_writers_never_exempt_from_history(gh)
         self.assertFalse([f for f in al.findings if f["kind"] == "tracker-bypass"])
 
     def test_allow_list_never_reaches_another_tracker_repo(self):
         gh = FakeGH([base_main(bypass=(ADMIN, GITSYNC))], loopmd=LOOPMD)
         al, _ = self.run_rulesets(gh, "m7kni/other")
-        (put,) = [b for m, _p, b in gh.writes if m == "PUT"]
+        (put,) = [b for m, _p, b in gh.writes if m in ("PUT", "POST")]
         self.assertEqual(put["bypass_actors"], [GITSYNC])  # left in place, not added to
+        self.assertLessEqual(HISTORY_RULES, rule_types(put))  # no split, no companion
         self.assertEqual([f["kind"] for f in al.findings if f["kind"] == "tracker-bypass"], ["tracker-bypass"])
 
     def test_listed_repo_before_cutover_keeps_todays_floor(self):  # no LOOP.md tracker: github yet
         gh = FakeGH([base_main(bypass=())])
         al, _ = self.run_rulesets(gh, LISTED)
-        (put,) = [b for m, _p, b in gh.writes if m == "PUT"]
+        (put,) = [b for m, _p, b in gh.writes if m in ("PUT", "POST")]
         self.assertEqual(put["bypass_actors"], [ADMIN])  # the migration window: admin bypass comes back
+        self.assertLessEqual(HISTORY_RULES, rule_types(put))
 
 
 class AutoMerge(unittest.TestCase):

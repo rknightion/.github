@@ -69,21 +69,32 @@ removed. Per-repo extras survive, for example portina-iac's Integration bypasses
 history, meraki-dashboard-ha's `validate-success`, or brewmdm-control-plane's eleven named checks.
 
 **Tracker repos are the exception.** A repo whose `LOOP.md` on the default branch declares
-`tracker: github` lands every change by pull request with no bypass actor (`landing: pr` alone does
-not count: those repos still push board-only commits straight to main). There the aligner adds no admin bypass and removes the standard's own one from every
+`tracker: github` lands every change by pull request, with no bypass actor except the machine
+writers listed for it in `tracker_bypass_allow` below (`landing: pr` alone does not count: those
+repos still push board-only commits straight to main). There the aligner adds no admin bypass and removes the standard's own one from every
 default-branch ruleset. Any other bypass actor is left in place and reported as `tracker-bypass`
 for a human to decide. The key is read the way agent-docs `loop-lint` reads them (opening
 `key: value` lines before the first `## `, fences skipped). An unreadable `LOOP.md` stops the
 rulesets pass for that repo rather than guessing.
 
 `rulesets.tracker_bypass_allow` in the JSON is the per-repo exception to that: machine writers that
-keep pushing straight to `main` after a repo's people and agents move to pull requests. For a listed
-tracker repo the aligner ensures each listed actor (type, id and `bypass_mode`) is on **every**
-default-branch ruleset, since a push has to clear each active ruleset separately, and does not report
-it as `tracker-bypass`. It still removes the standard admin bypass, and any unlisted actor is still
-reported. The list never applies to a repo that is not listed, or to a listed repo before its
-`LOOP.md` declares `tracker: github`. An `Integration` actor's id is the GitHub App id
-(`gh api apps/<slug> --jq .id`), not its installation id. Current entries:
+keep pushing straight to `main` after a repo's people and agents move to pull requests. A bypass
+covers a whole ruleset, not one rule, so a writer on a ruleset that also blocks deletion and
+force-push could delete or rewrite `main`. For a listed tracker repo the aligner therefore:
+
+1. Ensures a companion default-branch ruleset named by `rulesets.history_name` (`main-history`)
+   holding exactly `deletion` and `non_fast_forward`, active, with **no bypass actor at all** (not the
+   admin, not the writers). It does this first, so the branch is never left without those rules.
+2. Moves `deletion` and `non_fast_forward` off every other default-branch ruleset and ensures each
+   listed actor (type, id and `bypass_mode`) on all of them, since a push has to clear each active
+   ruleset separately. It still removes the standard admin bypass from them.
+
+The writers' ordinary pushes then pass: they bypass the pull-request and check rulesets, and the
+history ruleset never blocks a fast-forward push. A force-push or a deletion is refused for everyone.
+Listed actors are not reported as `tracker-bypass`; any unlisted actor still is. The list never
+applies to a repo that is not listed, or to a listed repo before its `LOOP.md` declares
+`tracker: github`. An `Integration` actor's id is the GitHub App id, not its installation id: run
+`gh api apps/APP_SLUG --jq .id` with APP_SLUG replaced by the App's slug. Current entries:
 
 | Repo | Actor | Why |
 |---|---|---|
