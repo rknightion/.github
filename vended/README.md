@@ -2,7 +2,8 @@
 
 Files under `vended/` are copied into enrolled `rknightion` and `m7kni` repositories, so that any
 person or coding agent can contribute from a clone alone. `scripts/vend/vend.py` does the copying
-and `.github/workflows/vend-sync.yml` runs it after each release of this repository.
+and `.github/workflows/vend-sync.yml` runs it on every push to `main` that changes `vended/` or
+`scripts/vend/`, and by hand.
 
 ## What lands in an enrolled repository
 
@@ -14,7 +15,7 @@ and `.github/workflows/vend-sync.yml` runs it after each release of this reposit
 | `AGENTS-block.md` | `AGENTS.md` | Only the text between `<!-- BEGIN vended: rknightion/.github -->` and `<!-- END vended: rknightion/.github -->` is managed. Without the markers the block goes after the first H1 and its first paragraph, or at the top when there is no H1. A missing `AGENTS.md` is created with the repository name as its H1. |
 | `privacy/sweep` | `.github/privacy/sweep` | Copied for local runs. CI runs the reusable `privacy-sweep.yml` instead. |
 | `privacy/identifier-patterns.txt` | `.github/privacy/identifier-patterns.txt` | Copied beside the sweep, which reads it as its default patterns. |
-| (none) | `.vended.json` | The record of what was vended: source, release tag, commit and a SHA-256 for each managed file. |
+| (none) | `.vended.json` | The record of what was vended: source, ref, commit and a SHA-256 for each managed file. |
 
 The engine never writes `.github/privacy/patterns.txt` or `.github/privacy/allow.txt`; those
 belong to the repository. Line endings of an existing `CONTRIBUTING.md` or `AGENTS.md` are kept.
