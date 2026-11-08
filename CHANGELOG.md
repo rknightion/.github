@@ -1,5 +1,17 @@
 # Changelog
 
+## [1.28.0](https://github.com/rknightion/.github/compare/v1.27.0...v1.28.0) (2026-11-08)
+
+
+### Features
+
+* **zizmor:** runs-on and harden inputs for self-hosted callers ([b853d60](https://github.com/rknightion/.github/commit/b853d6058245846888d92f631d926a4d9edd5aa9))
+
+
+### Miscellaneous
+
+* **vended:** enrol rknightion/synthkit in the contributor kit ([6207f0f](https://github.com/rknightion/.github/commit/6207f0f0b1681b7a2577b728c33fd0d6e9643ecf))
+
 ## [1.27.0](https://github.com/rknightion/.github/compare/v1.26.12...v1.27.0) (2026-11-08)
 
 
