@@ -846,6 +846,25 @@ class FactoryAndAwsinfra(unittest.TestCase):
         self.run_rulesets(gh, AWSINFRA)
         self.assertNotIn("20", self.puts_by_id(gh))  # the live admin entry stays, as on main
 
+    def test_flagged_admin_on_a_conflicting_other_ruleset_is_kept_exactly(self):
+        # A non-target ruleset wider than the default branch, carrying history and push-blocking rules:
+        # the flagged admin entry stays exactly as found (mode included), is named in the conflict
+        # finding, and is not reported as an unlisted bypass.
+        split = tracker_gate(10, bypass=(ADMIN, RENOVATE, BROKER))
+        split["name"] = "main"
+        live_admin = dict(ADMIN, bypass_mode="pull_request")
+        wide = tracker_gate(20, bypass=(live_admin, OTHER_APP))
+        wide["conditions"]["ref_name"]["include"].append("refs/heads/release/*")
+        wide["rules"] += [{"type": "deletion"}, {"type": "non_fast_forward"}]
+        gh = FakeGH([split, wide], loopmd=LOOPMD)
+        al, _ = self.run_rulesets(gh, AWSINFRA)
+        self.assertNotIn("20", self.puts_by_id(gh))
+        (c,) = [f for f in al.findings if f["kind"] == "tracker-bypass-allow-conflict"]
+        self.assertIn("RepositoryRole:5", c["detail"])
+        (b,) = [f for f in al.findings if f["kind"] == "tracker-bypass"]
+        self.assertIn("Integration:999", b["detail"])
+        self.assertNotIn("RepositoryRole:5", b["detail"])
+
     def test_change_text_never_claims_a_kept_admin_was_removed(self):
         main = tracker_gate(10, bypass=(ADMIN,))
         main["name"] = "main"
