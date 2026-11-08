@@ -59,7 +59,7 @@ test:
     python3 -m unittest discover -s fleet -p 'test_*.py'
     python3 -m unittest discover -s .github/actions/bao-secret -p 'test_*.py'
     python3 -m unittest discover -s tests -p 'test_*.py'
-    node --test scripts/ac-evidence/
+    node --test scripts/ac-evidence/ac-evidence-check.test.mjs
     python3 -m unittest discover -s scripts/vend -p 'test_*.py'
     python3 -m unittest discover -s scripts/privacy -p 'test_*.py'
     python3 vended/privacy/sweep --self-test

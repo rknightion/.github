@@ -191,4 +191,4 @@ Related to #12
 just test
 ```
 
-runs `node --test scripts/ac-evidence/`. Node 20 or newer; no dependencies.
+runs `node --test scripts/ac-evidence/ac-evidence-check.test.mjs`. Node 20 or newer; no dependencies.
