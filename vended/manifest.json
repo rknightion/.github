@@ -3,5 +3,6 @@
   {"repo": "rknightion/transceiver-exporter"},
   {"repo": "m7kni/m7kni-net-site"},
   {"repo": "m7kni/jffrip", "privacy_sweep": false},
-  {"repo": "rknightion/paperless-ngx-dedupe"}
+  {"repo": "rknightion/paperless-ngx-dedupe"},
+  {"repo": "rknightion/graph2otel"}
 ]}
