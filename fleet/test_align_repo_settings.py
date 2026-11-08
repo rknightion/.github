@@ -673,6 +673,7 @@ class TrackerBypassAllow(unittest.TestCase):
         self.assertFalse(hit(rs(["refs/heads/[z-a]", 5, None]), "main"))  # malformed: no match, no raise
         self.assertFalse(hit(rs(["refs/heads/*"], ["refs/heads/main"]), "main"))
         self.assertFalse(hit(rs(["refs/heads/*"], ["~DEFAULT_BRANCH"]), "main"))
+        self.assertFalse(hit(rs(["refs/heads/*"], ["refs/heads/main*\\"]), "main"))  # GitHub excludes main too
         self.assertFalse(hit({"target": "tag", "conditions": rs(["~ALL"])["conditions"]}, "main"))
 
     def test_ref_pattern_match_is_ruby_fnmatch_pathname(self):
@@ -692,6 +693,15 @@ class TrackerBypassAllow(unittest.TestCase):
             self.assertIs(align.ref_pattern_match(ref, pat), want, pat)
         self.assertIs(align.ref_pattern_match("refs/heads/release/1", "refs/heads/**"), False)
         self.assertIs(align.ref_pattern_match("refs/heads/release/1", "refs/heads/**/1"), True)
+        # A trailing backslash escapes nothing and Ruby 3.3/3.4 ignore it (checked against
+        # File.fnmatch in ruby:3.3-slim and ruby:3.4-slim): these all match, as GitHub would.
+        for pat in ("refs/heads/main*\\", "refs/heads/main\\", "refs/heads/*\\", "refs/heads/m*\\"):
+            self.assertIs(align.ref_pattern_match(ref, pat), True, pat)
+        self.assertIs(align.ref_pattern_match(ref, "refs/heads/main\\*"), False)  # escaped star is literal
+        # After '**/' a further '/' is a literal empty segment, not skipped (Ruby 3.3).
+        self.assertIs(align.ref_pattern_match(ref, "refs/heads/**//main"), False)
+        self.assertIs(align.ref_pattern_match(ref, "**//main"), False)
+        self.assertIs(align.ref_pattern_match(ref, "refs/heads/**/**/main"), True)
         self.assertIs(align.ref_pattern_match("refs/heads/.hidden", "refs/heads/*"), False)  # leading period
         self.assertIs(align.ref_pattern_match("refs/heads/.hidden", "refs/heads/.*"), True)
         for bad in (5, None, ["x"]):

@@ -384,10 +384,8 @@ def ref_pattern_match(ref: str, pattern) -> bool:
         ptmp = stmp = None
         while True:
             if p.startswith("**/", pi):
-                while p.startswith("**/", pi):
+                while p.startswith("**/", pi):  # Ruby 3.3 does not skip a further "/" here
                     pi += 3
-                    while pi < len(p) and p[pi] == "/":
-                        pi += 1
                 ptmp, stmp = pi, si
             ok, npi, nsi = _fnm_segment(p, pi, s, si)
             if ok:
