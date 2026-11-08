@@ -206,10 +206,12 @@ def resync(root: Path, source: str, sha: str, url: str | None, adds: dict[str, s
         src_entry["sha"] = sha
         src_entry["license_sha256"] = hashlib.sha256(license_bytes).hexdigest()
         if not dry_run:
+            for name in trees:  # check every destination before touching any
+                dest = root / "skills" / name
+                if dest.is_symlink() or (root / "skills").is_symlink():
+                    raise Refused(f"{dest}: a symlink, not a skill directory")
             for name in trees:
                 dest = root / "skills" / name
-                if dest.is_symlink():
-                    raise Refused(f"{dest}: a symlink, not a skill directory")
                 if dest.exists():
                     shutil.rmtree(dest)
                 if lock["skills"][name]["vend"]:

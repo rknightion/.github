@@ -271,7 +271,10 @@ def load_lock(root: Path, out: list[str]) -> dict:
         return {"sources": {}, "skills": {}}
     sources, skills = lock.get("sources", {}), lock.get("skills", {})
     if (not isinstance(sources, dict) or not isinstance(skills, dict)
-            or not all(isinstance(v, dict) for v in (*sources.values(), *skills.values()))):
+            or not all(isinstance(v, dict) for v in (*sources.values(), *skills.values()))
+            or not all(isinstance(e.get("files", {}), dict)
+                       and all(isinstance(f, dict) for f in e.get("files", {}).values())
+                       for e in skills.values())):
         out.append(f"{p}:1: sources and skills must be objects of objects")
         return {"sources": {}, "skills": {}}
     for name, entry in sorted((lock.get("skills") or {}).items()):

@@ -298,6 +298,20 @@ class TestResync(ResyncCase):
         self.assertIn("its vended copy is removed", out)
         self.assertFalse((self.root / "skills/one").exists())
 
+    def test_symlinked_destination_refuses_before_any_swap(self) -> None:
+        self.assertEqual(self.run_resync("--sha", self.sha1)[0], 0)
+        (self.root / "skills/one/SKILL.md").write_text("local edit\n")
+        lock = self.lock()
+        lock["skills"]["zz"] = {"source": "ex/skills", "path": "skills/eng/two", "vend": True, "files": {}}
+        (self.root / "upstream.lock.json").write_text(json.dumps(lock))
+        outside = Path(self.tmp.name) / "outside"
+        outside.mkdir()
+        os.symlink(outside, self.root / "skills/zz")
+        rc, _, err = self.run_resync("--sha", self.sha1)
+        self.assertEqual(rc, 1, err)
+        self.assertIn("a symlink", err)
+        self.assertEqual((self.root / "skills/one/SKILL.md").read_text(), "local edit\n")
+
     def test_result_passes_check_skills(self) -> None:
         import check_skills
         self.run_resync("--sha", self.sha1)

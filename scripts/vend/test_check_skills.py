@@ -314,7 +314,9 @@ class TestPortableNames(LintCase):
 
     def test_non_object_lock_parts_are_a_finding(self) -> None:
         for lock in ({"schema": 1, "skills": []}, {"schema": 1, "sources": {"s": "x"}},
-                     {"schema": 1, "skills": {"a": "x"}}):
+                     {"schema": 1, "skills": {"a": "x"}},
+                     {"schema": 1, "skills": {"a": {"files": {"SKILL.md": "x"}}}},
+                     {"schema": 1, "skills": {"a": {"files": []}}}):
             with self.subTest(lock=lock):
                 (self.root / "upstream.lock.json").write_text(json.dumps(lock))
                 self.assertFinding("sources and skills must be objects of objects")
