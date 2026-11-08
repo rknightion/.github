@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.26.1](https://github.com/rknightion/.github/compare/v1.26.0...v1.26.1) (2026-11-08)
+
+
+### Miscellaneous
+
+* **backlog:** GHC-0010, GHC-0011 latent aligner ruleset edges ([3b15b63](https://github.com/rknightion/.github/commit/3b15b6377c86e113ec800ebbd172fe8ccc97f116))
+* **vended:** enrol the two tracker-probe repositories ([27722c1](https://github.com/rknightion/.github/commit/27722c1a7515bf9be0d34d0413beab7905d243a0))
+
 ## [1.26.0](https://github.com/rknightion/.github/compare/v1.25.34...v1.26.0) (2026-11-08)
 
 
