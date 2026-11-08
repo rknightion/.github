@@ -39,9 +39,11 @@ Default base: upstream/HEAD when an upstream remote exists; else the remote gh r
 base repository (remote.<name>.gh-resolved = base); else origin/HEAD when gh reports that origin is
 not a fork; otherwise it refuses with exit 2 and names the fix. The chosen base is printed on stderr.
 
-A finding prints path:line:column: rule, never the matched text, because the output lands in CI
-logs. A finding in a file name prints path:0:0: rule (file name); that prints the path, matched text
-included, because the path is already public in the diff and the file list of the change.
+A finding prints finding: path:line:column: rule, never the matched text, because the output lands
+in CI logs. A finding in a file name prints finding: path:0:0: rule (file name); that prints the
+path, matched text included, because the path is already public in the diff and the file list of the
+change. The fixed prefix means no output line starts with the path, so a file named like a workflow
+command (::error::...) cannot issue one; control characters in a path are escaped.
 
 Content starting with a UTF-16 or UTF-32 byte order mark is decoded and swept whole, and its raw
 bytes are swept too, line by line in both NUL views below, because UTF-8 bytes behind a byte order
@@ -74,6 +76,9 @@ HERE = Path(__file__).resolve().parent
 DEFAULT_PATTERNS = HERE / "identifier-patterns.txt"
 REPO_PATTERNS = Path(".github/privacy/patterns.txt")
 REPO_ALLOW = Path(".github/privacy/allow.txt")
+# Every finding line starts with this, so no path (a file named "::error::x") can begin a line and be
+# read as a GitHub workflow command.
+FINDING = "finding: "
 HINT = "Write the shape, not the instance; a documentation address (RFC 5737) or an example.com mailbox is allowed."
 
 # The pattern subset Python re and Rust regex (ripgrep) read the same way, kept identical to the
@@ -414,7 +419,7 @@ def run(lines, rules, allow, strict, names=()):
         files.add(name)
         for _, rule in findings(name, rules, allow, strict):
             count += 1
-            print(f"{printable(name)}:0:0: {rule} (file name)")
+            print(f"{FINDING}{printable(name)}:0:0: {rule} (file name)")
     for path, number, views in lines:
         swept += 1
         files.add(path)
@@ -428,7 +433,7 @@ def run(lines, rules, allow, strict, names=()):
                     continue
                 this_view.append(key)
                 count += 1
-                print(f"{printable(path)}:{number}:{column}: {rule}")
+                print(f"{FINDING}{printable(path)}:{number}:{column}: {rule}")
             earlier += this_view
     if count:
         print(f"privacy sweep: {count} finding(s) in {swept} line(s) from {len(files)} file(s). {HINT}", file=sys.stderr)

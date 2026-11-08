@@ -24,6 +24,7 @@ EMAIL = "someone" + AT + "corp-mail" + DOT + "io"
 PUBLIC_IP = DOT.join(["8", "8", "4", "4"])
 LAN_IP = DOT.join(["192", "168", "1", "20"])
 TOKEN = "gh" + "p_" + "A" * 36
+F = "finding: "  # every finding line starts with this
 
 
 class Repo:
@@ -74,7 +75,7 @@ class SweepTest(unittest.TestCase):
     def assert_finding(self, result, path, rule, secret):
         code, out, err = result
         self.assertEqual(code, 1, out + err)
-        self.assertTrue(any(line.startswith(path + ":") and line.endswith(": " + rule) for line in out.splitlines()), out)
+        self.assertTrue(any(line.startswith(F + path + ":") and line.endswith(": " + rule) for line in out.splitlines()), out)
         self.assertNotIn(secret, out + err)
 
     def test_clean_diff_passes(self):
@@ -89,7 +90,7 @@ class SweepTest(unittest.TestCase):
         self.repo.commit("email")
         code, out, err = self.branch_sweep()
         self.assertEqual(code, 1, out + err)
-        self.assertEqual(out.strip(), "notes.md:2:9: email")
+        self.assertEqual(out.strip(), F + "notes.md:2:9: email")
         self.assertNotIn(EMAIL, out + err)
 
     def test_email_after_nul_byte_found(self):
@@ -108,9 +109,9 @@ class SweepTest(unittest.TestCase):
         self.repo.commit("addresses")
         code, out, err = self.branch_sweep()
         self.assertEqual(code, 1, out + err)
-        self.assertEqual(out.strip(), "net.md:1:5: address")
+        self.assertEqual(out.strip(), F + "net.md:1:5: address")
         code, out, err = self.branch_sweep("--strict-addresses")
-        self.assertEqual(out.strip().splitlines(), ["net.md:1:5: address", "net.md:2:5: address"])
+        self.assertEqual(out.strip().splitlines(), [F + "net.md:1:5: address", F + "net.md:2:5: address"])
         self.assertNotIn(PUBLIC_IP, out + err)
         self.assertNotIn(LAN_IP, out + err)
 
@@ -155,7 +156,7 @@ class SweepTest(unittest.TestCase):
         self.repo.commit("host")
         code, out, err = self.repo.sweep("--base", base)
         self.assertEqual(code, 1, out + err)
-        self.assertEqual(out.strip(), "inventory.md:1:9: pattern:patterns.txt:2")
+        self.assertEqual(out.strip(), F + "inventory.md:1:9: pattern:patterns.txt:2")
         self.assertNotIn("host-42", (out + err).lower())
 
     def test_extra_patterns_flag_applied(self):
@@ -191,7 +192,7 @@ class SweepTest(unittest.TestCase):
         self.repo.commit("named")
         code, out, err = self.branch_sweep()
         self.assertEqual(code, 1, out + err)
-        self.assertEqual(out.strip(), name + ":0:0: address (file name)")
+        self.assertEqual(out.strip(), F + name + ":0:0: address (file name)")
 
     def test_control_characters_in_a_path_are_escaped(self):
         name = "x\n::error::y-" + PUBLIC_IP + ".md"
@@ -202,13 +203,23 @@ class SweepTest(unittest.TestCase):
         self.assertEqual(out.count("\n"), 1, out)
         self.assertIn("x\\x0a::error::y-", out)
 
+    def test_no_finding_line_starts_a_workflow_command(self):
+        name = "::error::y-" + PUBLIC_IP + ".md"
+        self.repo.write(name, "contact " + EMAIL + "\n")
+        self.repo.commit("crafted")
+        for result in (self.branch_sweep(), self.repo.sweep("--files", name)):
+            code, out, err = result
+            self.assertEqual(code, 1, out + err)
+            self.assertTrue(out.strip(), out)
+            self.assertFalse(any(line.lstrip().startswith("::") for line in (out + err).splitlines()), out + err)
+
     def test_empty_added_file_name_is_swept(self):
         name = "contact-" + EMAIL + ".txt"
         self.repo.write(name, "")
         self.repo.commit("empty")
         code, out, err = self.branch_sweep()
         self.assertEqual(code, 1, out + err)
-        self.assertEqual(out.strip(), name + ":0:0: email (file name)")
+        self.assertEqual(out.strip(), F + name + ":0:0: email (file name)")
 
     def test_renamed_to_file_name_is_swept(self):
         self.repo.git("mv", "README.md", "notes-" + PUBLIC_IP + ".md")
@@ -233,10 +244,10 @@ class SweepTest(unittest.TestCase):
         self.repo.commit("utf-16")
         code, out, err = self.branch_sweep()
         self.assertEqual(code, 1, out + err)
-        self.assertEqual(out.strip(), "notes.txt:2:9: email")
+        self.assertEqual(out.strip(), F + "notes.txt:2:9: email")
         self.assertNotIn(EMAIL, out + err)
         code, out, err = self.repo.sweep("--files", "notes.txt")
-        self.assertEqual((code, out.strip()), (1, "notes.txt:2:9: email"), err)
+        self.assertEqual((code, out.strip()), (1, F + "notes.txt:2:9: email"), err)
 
     def test_utf16_bom_over_utf8_bytes_is_swept_raw_too(self):
         # A UTF-16 byte order mark in front of UTF-8 bytes of even length decodes without error into
@@ -250,7 +261,7 @@ class SweepTest(unittest.TestCase):
             for result in (self.branch_sweep(), self.repo.sweep("--files", "crafted.txt")):
                 code, out, err = result
                 self.assertEqual(code, 1, out + err)
-                self.assertEqual(out.strip().splitlines(), ["crafted.txt:2:9: email"], out)
+                self.assertEqual(out.strip().splitlines(), [F + "crafted.txt:2:9: email"], out)
                 self.assertNotIn(EMAIL, out + err)
 
     def test_nul_heavy_without_bom_is_swept_with_nuls_stripped(self):
@@ -273,7 +284,7 @@ class SweepTest(unittest.TestCase):
                         + ("first line\n" * 3 + "中文" * 200 + " " + EMAIL + "\n").encode("utf-16-le"))
         self.repo.commit("append cjk and an email")
         code, out, err = self.repo.sweep("--base", base)
-        self.assertEqual((code, out.strip()), (1, "notes.txt:4:402: email"), err)
+        self.assertEqual((code, out.strip()), (1, F + "notes.txt:4:402: email"), err)
         self.assertNotIn(EMAIL, out + err)
 
     def test_nul_next_to_a_letter_does_not_hide_an_address(self):
@@ -287,8 +298,8 @@ class SweepTest(unittest.TestCase):
             self.assertEqual(code, 1, out + err)
             found = out.strip().splitlines()
             self.assertEqual(len(found), 2, out)
-            self.assertTrue(found[0].startswith("blob.dat:1:") and found[0].endswith(": address"), out)
-            self.assertTrue(found[1].startswith("blob.dat:2:") and found[1].endswith(": email"), out)
+            self.assertTrue(found[0].startswith(F + "blob.dat:1:") and found[0].endswith(": address"), out)
+            self.assertTrue(found[1].startswith(F + "blob.dat:2:") and found[1].endswith(": email"), out)
             self.assertNotIn(PUBLIC_IP, out + err)
 
     def test_nul_heavy_rows_in_a_text_file_are_swept(self):
@@ -325,7 +336,7 @@ class SweepTest(unittest.TestCase):
         self.repo.write("net.md", "ip_" + PUBLIC_IP + "\n")
         self.repo.commit("underscore")
         code, out, err = self.branch_sweep()
-        self.assertEqual((code, out.strip()), (1, "net.md:1:4: address"), err)
+        self.assertEqual((code, out.strip()), (1, F + "net.md:1:4: address"), err)
 
     def test_empty_default_patterns_cannot_sweep(self):
         copy = Path(self.scratch) / "copy"

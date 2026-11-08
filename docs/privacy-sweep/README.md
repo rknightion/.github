@@ -143,9 +143,11 @@ renames to.
 
 ## Output and exit codes
 
-A finding prints `path:line:column: rule` and never the matched text, because the output lands in CI
-logs. A finding in a file name prints `path:0:0: rule (file name)`; the path is already public in the
-diff. The summary goes to stderr.
+A finding prints `finding: path:line:column: rule` and never the matched text, because the output
+lands in CI logs. A finding in a file name prints `finding: path:0:0: rule (file name)`; the path is
+already public in the diff. The fixed prefix keeps a file named like a workflow command
+(`::error::...`) from starting a line, and control characters in a path are escaped. The summary goes
+to stderr.
 
 | Exit | Meaning |
 | --- | --- |
