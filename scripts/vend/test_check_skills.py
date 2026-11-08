@@ -302,6 +302,23 @@ class TestReferences(LintCase):
                 self.assertFinding(f"cites {name!r}, which is not a vended skill")
 
 
+class TestPortableNames(LintCase):
+    def test_unportable_file_names_are_findings(self) -> None:
+        for bad in ("a b.md", "CON:x.md", ".hidden", "trail.", "back\\slash.md"):
+            with self.subTest(name=bad):
+                d = self.add_skill("names-skill")
+                (d / bad).write_text("x\n")
+                self.assertFinding("is not portable")
+                (d / bad).unlink()
+        self.assertEqual(self.lint()[0], 0)
+
+    def test_unsafe_lock_skill_name_is_a_finding(self) -> None:
+        lock = {"schema": 1, "sources": {"ex/s": {"url": "u", "sha": "a" * 40}},
+                "skills": {"Bad..Name": {"source": "ex/s", "path": "p", "vend": False, "files": {}}}}
+        (self.root / "upstream.lock.json").write_text(json.dumps(lock))
+        self.assertFinding("must be lower-case letters, digits and hyphens")
+
+
 class TestLinks(LintCase):
     def test_link_to_vended_skill_ok(self) -> None:
         self.add_skill("caller-skill", body="Read [it](../good-skill/SKILL.md).\n")

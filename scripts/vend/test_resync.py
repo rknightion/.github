@@ -237,16 +237,40 @@ class TestResync(ResyncCase):
         return commit
 
     def test_hostile_tree_names_write_nothing_outside(self) -> None:
+        import tempfile as _tempfile
+        from unittest import mock
         target = Path(self.tmp.name) / "pwned"
-        for bad in (str(target).encode(), b"../../../pwned", b".git"):
-            with self.subTest(name=bad):
-                sha = self.hostile_commit(bad)
-                for mode in ((), ("--dry-run",)):
-                    rc, _, err = self.run_resync("--sha", sha, *mode)
-                    self.assertEqual(rc, 1, err)
-                    self.assertFalse(target.exists())
-                    self.assertFalse((self.root / "skills/one").exists())
-                sh("git", "reset", "-q", "--hard", self.sha1, cwd=self.up)
+        escape = Path(_tempfile.gettempdir()) / "pwned"  # where `../../../pwned` lands from staging
+        self.assertFalse(escape.exists(), "a stray pwned file predates the test")
+        names = (str(target).encode(), b"../../../pwned", b".git", b".GIT", b"git~1", b".git.",
+                 b"a\\..\\x", b"CON:x", b"new\nline")
+        # With fetch-time fsck on, and off so the in-tool path checks are what refuses.
+        for fsck in (resync.FSCK, ()):
+            for bad in names:
+                with self.subTest(name=bad, fsck=bool(fsck)), mock.patch.object(resync, "FSCK", fsck):
+                    sha = self.hostile_commit(bad)
+                    for mode in ((), ("--dry-run",)):
+                        rc, _, err = self.run_resync("--sha", sha, *mode)
+                        self.assertEqual(rc, 1, err)
+                        self.assertFalse(target.exists())
+                        self.assertFalse(escape.exists())
+                        self.assertFalse((self.root / "skills/one").exists())
+                    sh("git", "reset", "-q", "--hard", self.sha1, cwd=self.up)
+
+    def test_safe_rel_accepts_portable_paths_only(self) -> None:
+        for good in ("SKILL.md", "references/rules.md", "a_b/c-d.v2.txt", "scripts/run.sh"):
+            self.assertEqual(resync.safe_rel(good), good)
+        for bad in ("/abs", "../x", "a/../b", ".", "..", "", "a//b", ".git", ".GIT", "git~1",
+                    ".gitmodules", "x.", "a b", "a\\b", "CON:x", "new\nline", "\u2025"):
+            with self.subTest(path=bad), self.assertRaises(resync.Refused):
+                resync.safe_rel(bad)
+
+    def test_stage_refuses_a_write_outside_its_directory(self) -> None:
+        dest = Path(self.tmp.name) / "stage" / "one"
+        from unittest import mock
+        with mock.patch.object(resync, "safe_rel", lambda p: p), self.assertRaises(resync.Refused):
+            resync.stage_skill(dest, {"../../escape": ("100644", b"x")}, b"L")
+        self.assertFalse((Path(self.tmp.name) / "escape").exists())
 
     def test_unsafe_lock_skill_name_is_refused(self) -> None:
         self.assertRefusedClean("--sha", self.sha1, "--add", "../escape=skills/eng/one",

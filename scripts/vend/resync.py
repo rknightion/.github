@@ -36,7 +36,10 @@ DEFAULT_ROOT = Path(__file__).resolve().parent.parent.parent / "vended"
 DEFAULT_SOURCE = "dzhng/skills"
 REGULAR = ("100644", "100755")
 NAME_RE = re.compile(r"^[a-z0-9][a-z0-9-]*$")
-# Refuse tree entries named with a slash, `..`, `.` or `.git` while fetching, before they reach disk.
+# One path component of a vended file: portable on every OS and filesystem git checks out to.
+COMPONENT_RE = re.compile(r"^[A-Za-z0-9_][A-Za-z0-9._-]*$")
+# A full (unfiltered) fetch with fsck refusing entries named with a slash, `..`, `.` or `.git`;
+# safe_rel checks every vended path again before anything is written.
 FSCK = ("-c", "fetch.fsckObjects=true", "-c", "fetch.fsck.fullPathname=error",
         "-c", "fetch.fsck.hasDotdot=error", "-c", "fetch.fsck.hasDot=error")
 GIT_ENV = {"GIT_CONFIG_NOSYSTEM": "1", "GIT_CONFIG_GLOBAL": "/dev/null", "GIT_TERMINAL_PROMPT": "0",
@@ -57,9 +60,10 @@ def git(*args: str, cwd: Path) -> str:
 
 
 def safe_rel(path: str) -> str:
-    """A repository-relative POSIX path with no absolute start, `..`, `.`, `.git` or empty component."""
+    """A relative POSIX path whose every component is portable: letters, digits, `.`, `_`, `-`,
+    not starting with a dot, not ending with one, and no `git~1` alias."""
     parts = path.split("/")
-    if path.startswith("/") or any(p in ("", ".", "..") or p.lower() == ".git" for p in parts):
+    if any(not COMPONENT_RE.match(p) or p.endswith(".") or p.lower() == "git~1" for p in parts):
         raise Refused(f"{path!r}: not a safe repository-relative path")
     return path
 
@@ -75,11 +79,11 @@ def fetch(url: str, sha: str, repo: Path) -> None:
     repo.mkdir(parents=True)
     git("init", "-q", "--bare", cwd=repo)
     git("remote", "add", "origin", url, cwd=repo)
-    git(*FSCK, "fetch", "-q", "--filter=blob:none", "origin", "HEAD:refs/remotes/origin/HEAD", cwd=repo)
+    git(*FSCK, "fetch", "-q", "origin", "HEAD:refs/remotes/origin/HEAD", cwd=repo)
     try:
         git("cat-file", "-e", f"{sha}^{{commit}}", cwd=repo)
     except subprocess.CalledProcessError:
-        git(*FSCK, "fetch", "-q", "--filter=blob:none", "origin", sha, cwd=repo)
+        git(*FSCK, "fetch", "-q", "origin", sha, cwd=repo)
     try:
         git("merge-base", "--is-ancestor", sha, "refs/remotes/origin/HEAD", cwd=repo)
     except subprocess.CalledProcessError:
@@ -238,8 +242,8 @@ def main(argv: list[str] | None = None) -> int:
         print(f"refused: git {' '.join(exc.cmd[3:])} failed: {err}", file=sys.stderr)
         return 1
     except OSError as exc:
-        print(f"failed while writing: {exc}; restore with `git checkout -- vended/` and rerun",
-              file=sys.stderr)
+        print(f"failed while writing: {exc}; restore {root} from git (checkout, and remove any new "
+              f"skill directory) and rerun", file=sys.stderr)
         return 1
     return 0
 

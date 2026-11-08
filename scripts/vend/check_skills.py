@@ -182,6 +182,11 @@ def check_skill(d: Path, names: dict[str, bool], out: list[str], terms: tuple[st
     if not (d / "LICENSE").is_file():
         out.append(f"{d}:0: missing LICENSE")
     for f in skill_entries(d):
+        for part in f.relative_to(d).parts:
+            if not re.match(r"^[A-Za-z0-9_][A-Za-z0-9._-]*$", part) or part.endswith("."):
+                out.append(f"{f}:0: name {part!r} is not portable (letters, digits, '.', '_', '-'; "
+                           "no leading or trailing dot)")
+                break
         if f.is_symlink():
             out.append(f"{f}:0: symlink; vended skills hold regular files only")
             continue
