@@ -154,6 +154,64 @@ class TestResync(ResyncCase):
         self.assertEqual(lock["sources"]["ex/skills"]["sha"], self.sha1)
         self.assertEqual(len(lock["sources"]["ex/skills"]["license_sha256"]), 64)
 
+    def assertRefusedClean(self, *args: str, needle: str) -> None:
+        before = (self.root / "upstream.lock.json").read_bytes()
+        rc, _, err = self.run_resync(*args)
+        self.assertEqual(rc, 1, err)
+        self.assertIn(needle, err)
+        self.assertEqual((self.root / "upstream.lock.json").read_bytes(), before)
+        self.assertFalse((self.root / "skills/one").exists())
+
+    def test_symlinked_license_is_refused(self) -> None:
+        secret = Path(self.tmp.name) / "host-secret"
+        secret.write_text("PRIVATE KEY\n")
+        (self.up / "LICENSE").unlink()
+        os.symlink(secret, self.up / "LICENSE")
+        sha2 = self.commit("license link")
+        self.assertRefusedClean("--sha", sha2, needle="LICENSE: mode 120000")
+
+    def test_symlinked_skill_root_is_refused(self) -> None:
+        host = Path(self.tmp.name) / "host-dir"
+        host.mkdir()
+        (host / "SKILL.md").write_text("host file\n")
+        sh("git", "rm", "-rq", "skills/eng/one", cwd=self.up)
+        os.symlink(host, self.up / "skills/eng/one")
+        sha2 = self.commit("root link")
+        self.assertRefusedClean("--sha", sha2, needle="skills/eng/one: mode 120000")
+
+    def test_symlinked_parent_dir_is_refused(self) -> None:
+        host = Path(self.tmp.name) / "host-eng"
+        (host / "one").mkdir(parents=True)
+        (host / "one/SKILL.md").write_text("host file\n")
+        sh("git", "rm", "-rq", "skills/eng", cwd=self.up)
+        (self.up / "skills").mkdir(exist_ok=True)
+        os.symlink(host, self.up / "skills/eng")
+        sha2 = self.commit("parent link")
+        self.assertRefusedClean("--sha", sha2, needle="skills/eng: mode 120000")
+
+    def test_symlink_inside_skill_is_refused(self) -> None:
+        os.symlink("/etc/hostname", self.up / "skills/eng/one/extra.md")
+        sha2 = self.commit("inner link")
+        self.assertRefusedClean("--sha", sha2, needle="extra.md: mode 120000")
+
+    def test_skill_level_license_is_refused(self) -> None:
+        self.write_up("skills/eng/one/LICENSE", "Other licence\n")
+        sha2 = self.commit("own licence")
+        self.assertRefusedClean("--sha", sha2, needle="a skill-level licence")
+
+    def test_unsafe_paths_are_refused(self) -> None:
+        for path in ("../outside", "/abs/path", "skills/../x", "skills//x"):
+            with self.subTest(path=path):
+                self.assertRefusedClean("--sha", self.sha1, "--add", f"bad={path}",
+                                        needle="not a safe repository-relative path")
+
+    def test_commit_off_the_default_branch_is_refused(self) -> None:
+        sh("git", "checkout", "-q", "-b", "side", cwd=self.up)
+        self.write_up("skills/eng/one/SKILL.md", "---\nname: one\ndescription: d\n---\nSide.\n")
+        side = self.commit("side")
+        sh("git", "checkout", "-q", "main", cwd=self.up)
+        self.assertRefusedClean("--sha", side, needle="not on the default branch")
+
     def test_result_passes_check_skills(self) -> None:
         import check_skills
         self.run_resync("--sha", self.sha1)

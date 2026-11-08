@@ -8,16 +8,17 @@ license: Apache-2.0
 
 Source: https://github.com/getsentry/skills/blob/main/skills/gha-security-review/SKILL.md (Apache-2.0; attack patterns credited there to the StepSecurity HackerBot Claw campaign analysis, https://www.stepsecurity.io/blog/hackerbot-claw-github-actions-exploitation).
 
-Changes from the source: cut to the checks zizmor and actionlint do not cover, since every enrolled repository fails pull requests on zizmor findings; added the `workflow_run`, startup-permission and sink-tracing traps and the account's self-hosted runner rule.
+Changes from the source: cut to the checks zizmor and actionlint do not cover, since both run on every pull request; added the `workflow_run`, startup-permission and sink-tracing traps and the account's self-hosted runner rule.
 
 Find exploitable vulnerabilities. Every exploit finding must carry a concrete exploitation scenario; if you cannot build the attack, do not report it.
 
 ## Scope
 
 Workflows under `.github/workflows/`, local actions, and the files they load (`AGENTS.md`,
-`CLAUDE.md`, `justfile`, shell under `.github/`). zizmor (which fails the pull request) and
-actionlint already check action pinning, excessive permissions, direct template injection in
-`run:`, dangerous checkouts and known-vulnerable actions: do not repeat them. Report only what
+`CLAUDE.md`, `justfile`, shell under `.github/`). zizmor and actionlint already check action
+pinning, excessive permissions, direct template injection in `run:`, dangerous checkouts and
+known-vulnerable actions: do not repeat them, but an unresolved zizmor finding on the pull request
+is never a pass, whether or not this repository makes it fail the build. Report only what
 someone without write access can exploit (a fork pull request, an issue or comment, a branch name,
 title or commit message, a compromised third-party action). Your proof is `just lint` plus the job's
 command run locally; never trigger a workflow to test it.

@@ -7,10 +7,16 @@
 Every locked skill of the source is re-read at SHA. A skill with `"vend": true` is copied byte for
 byte into `<root>/skills/<name>/` with the source's root LICENSE beside it; a `"vend": false` skill is
 pinned for other consumers (the owner's agent homes) and not vended. `--add` adds an entry with
-vend false; flip it to true by editing the lock. Upstream code is cloned, never executed.
+vend false; flip it to true by editing the lock.
+
+Upstream is read from git objects at SHA, never from a checkout, so no symlink, submodule or
+checkout filter can pull in anything but the committed bytes, and no upstream code runs. SHA must be
+reachable from the source's default branch. Vended copies are staged and swapped in only after every
+skill has been read and checked.
 
 Prints one line per skill (`unchanged`, `changed`, `added`). Exit 0 on success, 1 when it refuses
-(a missing upstream path or a symlink upstream) and writes nothing, 2 on a usage error.
+(a missing upstream path, a symlink or submodule, an unreachable SHA, an unsafe path) and writes
+nothing, 2 on a usage error.
 """
 
 from __future__ import annotations
@@ -27,56 +33,107 @@ from pathlib import Path
 LOCK_NAME = "upstream.lock.json"
 DEFAULT_ROOT = Path(__file__).resolve().parent.parent.parent / "vended"
 DEFAULT_SOURCE = "dzhng/skills"
+REGULAR = ("100644", "100755")
+GIT_ENV = {"GIT_CONFIG_NOSYSTEM": "1", "GIT_CONFIG_GLOBAL": "/dev/null", "GIT_TERMINAL_PROMPT": "0",
+           "PATH": "/usr/bin:/bin:/usr/local/bin:/opt/homebrew/bin"}
 
 
 class Refused(Exception):
     """Resync cannot go ahead; nothing was written."""
 
 
+def git_bytes(*args: str, cwd: Path) -> bytes:
+    return subprocess.run(["git", "-c", "core.hooksPath=/dev/null", *args], cwd=cwd,
+                          env={**GIT_ENV, "HOME": str(cwd)}, check=True, capture_output=True).stdout
+
+
 def git(*args: str, cwd: Path) -> str:
-    env = {"GIT_CONFIG_NOSYSTEM": "1", "GIT_CONFIG_GLOBAL": "/dev/null", "GIT_TERMINAL_PROMPT": "0",
-           "PATH": "/usr/bin:/bin:/usr/local/bin:/opt/homebrew/bin", "HOME": str(cwd)}
-    return subprocess.run(["git", "-c", "core.hooksPath=/dev/null", *args], cwd=cwd, env=env,
-                          check=True, capture_output=True, text=True).stdout
+    return git_bytes(*args, cwd=cwd).decode("utf-8", "surrogateescape")
 
 
-def fetch(url: str, sha: str, dest: Path) -> None:
-    """Check out `sha` of `url` into `dest` without running any of its code."""
-    dest.mkdir(parents=True)
-    git("init", "-q", cwd=dest)
-    git("remote", "add", "origin", url, cwd=dest)
-    git("fetch", "-q", "--depth", "1", "origin", sha, cwd=dest)
-    git("checkout", "-q", "FETCH_HEAD", cwd=dest)
-    got = git("rev-parse", "HEAD", cwd=dest).strip()
-    if got != sha:
-        raise Refused(f"fetched {got}, wanted {sha}")
+def safe_rel(path: str) -> str:
+    """A repository-relative POSIX path with no absolute start, `..`, `.` or empty component."""
+    parts = path.split("/")
+    if path.startswith("/") or any(p in ("", ".", "..") for p in parts):
+        raise Refused(f"{path!r}: not a safe repository-relative path")
+    return path
 
 
-def read_tree(skill_dir: Path) -> dict[str, dict[str, str]]:
-    """{relpath: {sha256, mode}} for every regular file under an upstream skill dir."""
-    if not skill_dir.is_dir():
-        raise Refused(f"{skill_dir.name}: no such directory upstream")
-    files: dict[str, dict[str, str]] = {}
-    for f in sorted(skill_dir.rglob("*")):
-        if f.is_symlink():
-            raise Refused(f"{f}: symlink upstream; vended skills hold regular files only")
-        if f.is_file():
-            files[f.relative_to(skill_dir).as_posix()] = {
-                "sha256": hashlib.sha256(f.read_bytes()).hexdigest(),
-                "mode": "100755" if f.stat().st_mode & 0o111 else "100644",
-            }
+def fetch(url: str, sha: str, repo: Path) -> None:
+    """Fetch `sha` and the default branch into a bare repo; `sha` must be on that branch."""
+    repo.mkdir(parents=True)
+    git("init", "-q", "--bare", cwd=repo)
+    git("remote", "add", "origin", url, cwd=repo)
+    git("fetch", "-q", "--filter=blob:none", "origin", "HEAD:refs/remotes/origin/HEAD", cwd=repo)
+    try:
+        git("cat-file", "-e", f"{sha}^{{commit}}", cwd=repo)
+    except subprocess.CalledProcessError:
+        git("fetch", "-q", "--filter=blob:none", "origin", sha, cwd=repo)
+    try:
+        git("merge-base", "--is-ancestor", sha, "refs/remotes/origin/HEAD", cwd=repo)
+    except subprocess.CalledProcessError:
+        raise Refused(f"{sha}: not on the default branch of {url}") from None
+
+
+def entries(repo: Path, sha: str, *args: str) -> list[tuple[str, str, str, str]]:
+    """(mode, type, object, path) records from `git ls-tree -z` at `sha`."""
+    out = git("ls-tree", "-z", "--full-tree", *args, sha, cwd=repo) if not args else \
+        git("ls-tree", "-z", "--full-tree", *args[:-1], sha, "--", args[-1], cwd=repo)
+    recs = []
+    for rec in filter(None, out.split("\0")):
+        meta, name = rec.split("\t", 1)
+        mode, kind, obj = meta.split()
+        recs.append((mode, kind, obj, name))
+    return recs
+
+
+def check_parents(repo: Path, sha: str, path: str) -> None:
+    """Every directory on the way to `path` must be a real tree, not a symlink or submodule."""
+    parts = path.split("/")
+    for i in range(1, len(parts) + 1):
+        prefix = "/".join(parts[:i])
+        recs = entries(repo, sha, prefix)
+        if not recs or recs[0][3] != prefix:
+            raise Refused(f"{path}: no such directory upstream")
+        if recs[0][1] != "tree":
+            raise Refused(f"{prefix}: mode {recs[0][0]} upstream; only plain directories are followed")
+
+
+def read_tree(repo: Path, sha: str, path: str) -> dict[str, tuple[str, bytes]]:
+    """{relpath: (git mode, bytes)} for every file under the directory `path` at `sha`."""
+    check_parents(repo, sha, path)
+    files: dict[str, tuple[str, bytes]] = {}
+    for mode, kind, obj, name in entries(repo, sha, "-r", f"{path}/"):
+        if mode not in REGULAR or kind != "blob":
+            raise Refused(f"{name}: mode {mode} upstream; only regular files are vended")
+        files[name[len(path) + 1:]] = (mode, git_bytes("cat-file", "blob", obj, cwd=repo))
+    if not files:
+        raise Refused(f"{path}: empty upstream")
+    if "LICENSE" in files:
+        raise Refused(f"{path}/LICENSE: a skill-level licence would be replaced by the root one")
     return files
 
 
-def copy_skill(src: Path, dest: Path, files: dict[str, dict[str, str]], license_src: Path) -> None:
-    if dest.exists():
-        shutil.rmtree(dest)
-    for rel, spec in files.items():
+def read_file(repo: Path, sha: str, path: str) -> bytes:
+    """A regular file at `sha`; a symlink or anything else is refused."""
+    if "/" in path:
+        check_parents(repo, sha, path.rsplit("/", 1)[0])
+    recs = entries(repo, sha, path)
+    if not recs or recs[0][3] != path:
+        raise Refused(f"{path}: no such file upstream")
+    mode, kind, obj, _ = recs[0]
+    if mode not in REGULAR or kind != "blob":
+        raise Refused(f"{path}: mode {mode} upstream; only a regular file is accepted")
+    return git_bytes("cat-file", "blob", obj, cwd=repo)
+
+
+def stage_skill(dest: Path, files: dict[str, tuple[str, bytes]], license_bytes: bytes) -> None:
+    for rel, (mode, data) in files.items():
         out = dest / rel
         out.parent.mkdir(parents=True, exist_ok=True)
-        out.write_bytes((src / rel).read_bytes())
-        out.chmod(0o755 if spec["mode"] == "100755" else 0o644)
-    (dest / "LICENSE").write_bytes(license_src.read_bytes())
+        out.write_bytes(data)
+        out.chmod(0o755 if mode == "100755" else 0o644)
+    (dest / "LICENSE").write_bytes(license_bytes)
     (dest / "LICENSE").chmod(0o644)
 
 
@@ -93,31 +150,35 @@ def resync(root: Path, source: str, sha: str, url: str | None, adds: dict[str, s
     for name, path in adds.items():
         if name in lock["skills"]:
             raise Refused(f"{name}: already in the lock")
-        lock["skills"][name] = {"source": source, "path": path, "vend": False, "files": {}}
+        lock["skills"][name] = {"source": source, "path": safe_rel(path), "vend": False, "files": {}}
     report: list[str] = []
     with tempfile.TemporaryDirectory(prefix="vend-resync-") as tmp:
-        checkout = Path(tmp) / "src"
-        fetch(fetch_url, sha, checkout)
-        license_src = checkout / src_entry.get("license_path", "LICENSE")
-        if not license_src.is_file():
-            raise Refused(f"{src_entry.get('license_path', 'LICENSE')}: no licence file upstream")
-        trees = {}
-        for name, entry in sorted(lock["skills"].items()):
-            if entry["source"] != source:
-                continue
-            trees[name] = read_tree(checkout / entry["path"])
-        # Everything read; only now write.
-        src_entry["sha"] = sha
-        src_entry["license_sha256"] = hashlib.sha256(license_src.read_bytes()).hexdigest()
+        repo = Path(tmp) / "src.git"
+        fetch(fetch_url, sha, repo)
+        license_bytes = read_file(repo, sha, safe_rel(src_entry.get("license_path", "LICENSE")))
+        trees = {name: read_tree(repo, sha, safe_rel(entry["path"]))
+                 for name, entry in sorted(lock["skills"].items()) if entry["source"] == source}
+        # Everything is read and checked. Stage the vended copies, then swap them in.
+        staging = Path(tmp) / "stage"
         for name, files in trees.items():
             entry = lock["skills"][name]
-            state = "added" if name in adds else ("unchanged" if entry["files"] == files else "changed")
-            entry["files"] = files
+            locked = {rel: {"sha256": hashlib.sha256(data).hexdigest(), "mode": mode}
+                      for rel, (mode, data) in files.items()}
+            state = "added" if name in adds else ("unchanged" if entry["files"] == locked else "changed")
+            entry["files"] = locked
             report.append(f"{name}: {state}{'' if entry['vend'] else ' (not vended)'}")
-            if entry["vend"] and not dry_run:
-                copy_skill(checkout / entry["path"], root / "skills" / name, files, license_src)
-    if not dry_run:
-        lock_path.write_text(json.dumps(lock, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+            if entry["vend"]:
+                stage_skill(staging / name, files, license_bytes)
+        src_entry["sha"] = sha
+        src_entry["license_sha256"] = hashlib.sha256(license_bytes).hexdigest()
+        if not dry_run:
+            for name in trees:
+                if lock["skills"][name]["vend"]:
+                    dest = root / "skills" / name
+                    if dest.exists():
+                        shutil.rmtree(dest)
+                    shutil.move(str(staging / name), str(dest))
+            lock_path.write_text(json.dumps(lock, indent=2, sort_keys=True) + "\n", encoding="utf-8")
     return report
 
 
@@ -155,7 +216,8 @@ def main(argv: list[str] | None = None) -> int:
         print(f"refused: {exc}", file=sys.stderr)
         return 1
     except subprocess.CalledProcessError as exc:
-        print(f"refused: git {' '.join(exc.cmd[3:])} failed: {exc.stderr.strip()}", file=sys.stderr)
+        err = exc.stderr.decode("utf-8", "replace").strip() if isinstance(exc.stderr, bytes) else exc.stderr
+        print(f"refused: git {' '.join(exc.cmd[3:])} failed: {err}", file=sys.stderr)
         return 1
     return 0
 

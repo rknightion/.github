@@ -41,6 +41,9 @@ this file and in the `repo-conventions` skill override any other skill where the
 - Before you say a change works: run the check on the current tree after your last edit, read its
   exit code, and see any new check fail first. A timeout, cancellation, skipped job or missing
   required check is not a pass. Say what you ran and what you could not run.
+- Another agent's report that work is done is a claim, not evidence: read the diff and rerun the
+  check. A check that also fails on the base is not yours: report both runs. Only a maintainer
+  claims live evidence from a deployed environment.
 
 Read each skill below, where present in `.agents/skills/`, before the moment it names, together
 with `repo-conventions`:
