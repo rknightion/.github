@@ -1,1 +1,4 @@
-{"schema": 1, "repos": []}
+{"schema": 1, "repos": [
+  {"repo": "rknightion/tracker-probe"},
+  {"repo": "m7kni/tracker-probe"}
+]}
