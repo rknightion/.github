@@ -12,5 +12,6 @@
   {"repo": "rknightion/genai-otel-bridge"},
   {"repo": "rknightion/cf2otel"},
   {"repo": "m7kni/gc-gitsync-m7kni", "privacy_sweep": false},
-  {"repo": "rknightion/grafana-cloud-org-insights"}
+  {"repo": "rknightion/grafana-cloud-org-insights"},
+  {"repo": "m7kni/factory", "privacy_sweep": false}
 ]}
