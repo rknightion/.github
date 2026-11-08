@@ -464,18 +464,27 @@ class TrackerBypassAllow(unittest.TestCase):
         self.assert_writers_never_exempt_from_history(gh)
 
     def test_foreign_history_named_ruleset_is_reported_and_untouched(self):
-        for foreign in ({"target": "tag"}, {"include": ["~DEFAULT_BRANCH", "refs/heads/release/*"]}):
+        for foreign in ({"target": "tag"}, {"include": ["~DEFAULT_BRANCH", "refs/heads/release/*"]},
+                        {"exclude": ["refs/heads/main"]}):
             hist = history_ruleset(bypass=(ADMIN,))
             if "target" in foreign:
                 hist["target"] = foreign["target"]
-            else:
+            elif "include" in foreign:
                 hist["conditions"]["ref_name"]["include"] = foreign["include"]
+            else:
+                hist["conditions"]["ref_name"]["exclude"] = foreign["exclude"]
             gate = tracker_gate()
             gate["name"] = "main"
             gate["rules"].append({"type": "deletion"})
             gh = FakeGH([gate, hist], loopmd=LOOPMD)
             al, _ = self.run_rulesets(gh, LISTED)
-            self.assertNotIn("40", self.puts_by_id(gh), foreign)
+            hput = self.puts_by_id(gh).get("40")
+            if "target" in foreign:
+                self.assertIsNone(hput, foreign)  # not a default-branch ruleset: never touched
+            else:  # still a default-branch ruleset: the ordinary tracker treatment, never adopted
+                self.assertEqual(hput["bypass_actors"], [], foreign)
+                self.assertEqual(hput["conditions"], hist["conditions"], foreign)
+                self.assertEqual(rule_types(hput), HISTORY_RULES, foreign)
             self.assertFalse([w for w in gh.writes if w[0] == "POST"], foreign)  # no second companion
             put = self.puts_by_id(gh)["20"]
             self.assertLessEqual(HISTORY_RULES, rule_types(put), foreign)  # nothing moved off
@@ -489,7 +498,36 @@ class TrackerBypassAllow(unittest.TestCase):
             if b is None or m not in ("PUT", "POST"):
                 continue
             if rule_types(b) & HISTORY_RULES:
-                self.assertEqual(b["bypass_actors"], [], p)  # nobody, not even the admin
+                self.assertFalse([a for a in b["bypass_actors"] if align.is_standard_bypass(a, STD)
+                                  or any(align.same_actor(a, w) for w in (BROKER, GITSYNC))], p)
+
+    def test_foreign_history_named_ruleset_still_reports_unlisted_actors(self):
+        hist = history_ruleset(bypass=(ADMIN, OTHER_APP))
+        hist["conditions"]["ref_name"]["include"].append("refs/heads/release/*")
+        gh = FakeGH([self.split_main(), hist], loopmd=LOOPMD)
+        al, _ = self.run_rulesets(gh, LISTED)
+        self.assertEqual(self.puts_by_id(gh)["40"]["bypass_actors"], [OTHER_APP])
+        self.assertIn("tracker-history-ruleset", self.kinds(al))
+        (f,) = [f for f in al.findings if f["kind"] == "tracker-bypass"]
+        self.assertIn("Integration:999", f["detail"])
+
+    def test_conflict_reports_allowed_writers_already_bypassing_it(self):
+        gate = tracker_gate(bypass=(GITSYNC,))
+        gate["conditions"]["ref_name"]["include"].append("refs/heads/release/*")
+        gate["rules"].append({"type": "deletion"})
+        gh = FakeGH([self.split_main(), gate, history_ruleset()], loopmd=LOOPMD)
+        al, _ = self.run_rulesets(gh, LISTED)
+        (f,) = [f for f in al.findings if f["kind"] == "tracker-bypass-allow-conflict"]
+        self.assertIn("Integration:3512185", f["detail"])
+        self.assertNotIn("Integration:4520356", f["detail"])
+
+    def test_conflict_on_the_main_target_reports_writers_already_there(self):
+        gate = tracker_gate(bypass=(BROKER,))
+        gate["conditions"]["ref_name"]["include"].append("refs/heads/release/*")
+        gh = FakeGH([gate, history_ruleset()], loopmd=LOOPMD)
+        al, _ = self.run_rulesets(gh, LISTED)
+        (f,) = [f for f in al.findings if f["kind"] == "tracker-bypass-allow-conflict"]
+        self.assertIn("Integration:4520356", f["detail"])
 
     def writes_by_name(self, gh):
         return {b["name"]: (m, p, b) for m, p, b in gh.writes if m in ("PUT", "POST")}
@@ -627,6 +665,14 @@ class StandardValidation(unittest.TestCase):
                 align.validate_standard(self.std_with(actors))
         with self.assertRaises(ValueError):
             align.validate_standard(self.std_with([BROKER], full="gc-gitsync-m7kni"))
+        for whole in ([], "", 0, False, [[BROKER]]):  # the whole list must be an object
+            std = json.loads(json.dumps(STD))
+            std["rulesets"]["tracker_bypass_allow"] = whole
+            with self.assertRaises(ValueError, msg=repr(whole)):
+                align.validate_standard(std)
+        std = json.loads(json.dumps(STD))
+        std["rulesets"]["tracker_bypass_allow"] = None  # absent or null: no allow-list
+        align.validate_standard(std)
         std = self.std_with([BROKER])
         del std["rulesets"]["history_name"]
         with self.assertRaises(ValueError):

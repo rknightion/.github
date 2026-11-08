@@ -69,8 +69,9 @@ removed. Per-repo extras survive, for example portina-iac's Integration bypasses
 history, meraki-dashboard-ha's `validate-success`, or brewmdm-control-plane's eleven named checks.
 
 **Tracker repos are the exception.** A repo whose `LOOP.md` on the default branch declares
-`tracker: github` lands its people's and agents' changes by pull request; only the machine writers
-listed for it in `tracker_bypass_allow` below may still push straight to the default branch
+`tracker: github` lands its people's and agents' changes by pull request. The machine writers listed
+for it in `tracker_bypass_allow` below are the sanctioned direct pushers; any other bypass actor
+already on its rulesets keeps working until a human removes it, and is reported (below)
 (`landing: pr` alone does not count: those repos still push board-only commits straight to main). There the aligner adds no admin bypass and removes the standard's own one from every
 default-branch ruleset. Any other bypass actor is left in place and reported as `tracker-bypass`
 for a human to decide. The key is read the way agent-docs `loop-lint` reads them (opening
@@ -86,8 +87,9 @@ force-push could delete or rewrite `main`. For a listed tracker repo the aligner
    `~DEFAULT_BRANCH`, holding exactly `deletion` and `non_fast_forward`, active, with **no bypass
    actor at all** (not the admin, not the writers). It does this first, so the branch is never left
    without those rules. An existing ruleset of that name is adopted only if it already targets
-   exactly `~DEFAULT_BRANCH` (no excludes); anything else is left untouched and reported as
-   `tracker-history-ruleset`, and then no history rule is moved anywhere.
+   exactly `~DEFAULT_BRANCH` (no excludes). Anything else is never adopted or rewritten as the
+   companion, is reported as `tracker-history-ruleset`, and then no history rule is moved anywhere.
+   If it still targets the default branch it is handled like any other ruleset in step 2.
 2. Handles every other default-branch ruleset (a push has to clear each active one separately),
    removing the standard admin bypass from each as for any tracker repo:
    - one whose refs the companion fully covers (`~DEFAULT_BRANCH`, or `refs/heads/<default>` for
@@ -96,8 +98,10 @@ force-push could delete or rewrite `main`. For a listed tracker repo the aligner
    - one that also targets other refs keeps its history rules. If it has no other rule it cannot
      block an ordinary push and is left alone; if it has other rules but no history rules, the
      listed actors are added; if it has both, the listed actors are **not** added and it is
-     reported as `tracker-bypass-allow-conflict` for a human to split. The standard's own target
-     ruleset always keeps its history floor, so on a wider target that is the conflict case.
+     reported as `tracker-bypass-allow-conflict` for a human to split. A listed actor already on
+     such a ruleset is left in place (the aligner never removes a bypass) and named in that finding,
+     since it is exempt from that ruleset's history rules. The standard's own target ruleset always
+     keeps its history floor, so on a wider target that is the conflict case.
 
 The writers' ordinary pushes then pass: they bypass the rulesets that could block them, and the
 history ruleset never blocks a fast-forward push. A force-push or a deletion is refused for everyone.
@@ -105,7 +109,8 @@ history ruleset never blocks a fast-forward push. A force-push or a deletion is 
 Every entry needs exactly `actor_type` (`Integration`, `RepositoryRole` or `Team`), an integer
 `actor_id` and `bypass_mode` (`always` or `pull_request`); the standard admin bypass is not allowed.
 The aligner validates the list before doing anything and exits 2 on a malformed entry.
-Listed actors are not reported as `tracker-bypass`; any unlisted actor still is. The list never
+Listed actors are not reported as `tracker-bypass`; any unlisted actor is left in place, so it can
+still push directly, and is reported as `tracker-bypass` for a human to remove. The list never
 applies to a repo that is not listed, or to a listed repo before its `LOOP.md` declares
 `tracker: github`. An `Integration` actor's id is the GitHub App id, not its installation id: run
 `gh api apps/APP_SLUG --jq .id` with APP_SLUG replaced by the App's slug. Current entries:

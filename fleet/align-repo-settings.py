@@ -27,7 +27,8 @@ Safety rules, each one a way this could otherwise break the fleet:
   default branch, no bypass actor at all), created first, and only off
   rulesets it fully covers. The writers go on every ruleset that can block a
   push and carries no uncovered history rule; one that has both is reported,
-  never bypassed. No other repo is affected.
+  never bypassed (an allowed writer already on it is named). No other repo is
+  affected; unlisted bypass actors stay in place and are reported.
 - Every active default-branch ruleset counts when deciding whether the branch
   is gated, so a second, hand-made gate ruleset is not mistaken for no gate.
   The standard's bypass is only ever added to the aligner's own ruleset (or a
@@ -317,7 +318,8 @@ ALLOW_BYPASS_MODES = ("always", "pull_request")
 def validate_standard(std: dict) -> None:
     """Raise ValueError on a malformed rulesets.tracker_bypass_allow, before anything is written."""
     rcfg = std.get("rulesets") or {}
-    allow = rcfg.get("tracker_bypass_allow") or {}
+    allow = rcfg.get("tracker_bypass_allow")
+    allow = {} if allow is None else allow
     if not isinstance(allow, dict):
         raise ValueError("rulesets.tracker_bypass_allow must be an object of owner/repo -> actor list")
     if allow:
@@ -863,9 +865,12 @@ class Aligner:
                 foreign = named
                 self.finding(full, "tracker-history-ruleset",
                              f"ruleset '{named.get('name')}' exists but does not target exactly the default "
-                             "branch; left untouched, so no history rule is moved for the allowed writers")
+                             "branch; not adopted as the history ruleset, so no history rule is moved for the "
+                             "allowed writers")
         db = repo.get("default_branch")
-        branch = [r for r in detailed if is_default_branch_ruleset(r) and r is not history and r is not foreign]
+        # A foreign ruleset with the companion's name is still an ordinary default-branch ruleset if it
+        # targets the default branch: it gets the normal tracker treatment, it is just never adopted.
+        branch = [r for r in detailed if is_default_branch_ruleset(r) and r is not history]
         main = pick_main_ruleset(branch, ctx, self.std["rulesets"]["main_name"])
         others = [r for r in branch if r is not main]
         live_others = [r for r in others if r.get("enforcement") == "active"]
@@ -888,7 +893,7 @@ class Aligner:
             plan = allow_plan(reconcile_main_ruleset(main, add_ci, self.std, tracker, add_bypass=owned, split=False),
                               db, can_split)
             if plan == "conflict":
-                self.allow_conflict(full, main or {"name": self.std["rulesets"]["main_name"]})
+                self.allow_conflict(full, main or {"name": self.std["rulesets"]["main_name"]}, allow)
         want = reconcile_main_ruleset(main, add_ci, self.std, tracker, add_bypass=owned,
                                       allow=allow if plan in ("split", "add") else [], split=plan == "split")
         if main is None:
@@ -926,11 +931,15 @@ class Aligner:
             self.gh.write("PUT", f"/repos/{full}/rulesets/{existing['id']}", want)
             self.change(full, "rulesets", f"updated '{want['name']}' (deletion and force-push blocked, no bypass)")
 
-    def allow_conflict(self, full: str, rs: dict):
+    def allow_conflict(self, full: str, rs: dict, allow: list[dict]):
+        present = sorted(f"{a.get('actor_type')}:{a.get('actor_id')}" for a in rs.get("bypass_actors") or []
+                         if any(same_actor(a, w) for w in allow))
         self.finding(full, "tracker-bypass-allow-conflict",
                      f"ruleset '{rs.get('name')}' can block a push to the default branch and carries deletion or "
                      "force-push rules the no-bypass history ruleset does not cover; the allowed writers were not "
-                     "added, since a bypass would exempt them from those rules")
+                     "added, since a bypass would exempt them from those rules"
+                     + (f"; allowed writer(s) {', '.join(present)} already bypass it and so are exempt from its "
+                        "deletion or force-push rules" if present else ""))
 
     def strip_tracker_bypass(self, full: str, others: list[dict], main_want: dict, allow: list[dict] = (),
                              default_branch: str | None = None, can_split: bool = False):
@@ -948,7 +957,7 @@ class Aligner:
             stripped = [a for a in actors if not is_standard_bypass(a, self.std)]
             plan = allow_plan(r, default_branch, can_split) if allow else "skip"
             if plan == "conflict":
-                self.allow_conflict(full, r)
+                self.allow_conflict(full, r, allow)
             keep = ensure_actors(stripped, allow if plan in ("split", "add") else [])
             left |= {key(a) for a in keep}
             rules = r.get("rules") or []
