@@ -6,11 +6,15 @@
 Checks every `<root>/skills/<name>/` and, for the dash and term rules, `<root>/CONTRIBUTING.md`
 and `<root>/AGENTS-block.md`. Prints `path:line: message` per finding. Exit 0 clean, 1 findings,
 2 usage. Stdlib only.
+
+VENDED_EXTRA_TERMS_FILE, when set, names a file of further forbidden terms, one per line (# starts
+a comment line), so a maintainer can check names that must not be spelled out in this public repo.
 """
 
 from __future__ import annotations
 
 import argparse
+import os
 import re
 import sys
 from pathlib import Path
@@ -21,7 +25,6 @@ from vend import is_opt_in, parse_frontmatter, split_frontmatter  # noqa: E402
 LICENSES = {"MIT", "Apache-2.0"}
 FORBIDDEN_TERMS = (
     "portina",
-    "grafana-ps",
     "copilot",
     "dsreview",
     "coderabbit",
@@ -29,12 +32,17 @@ FORBIDDEN_TERMS = (
     "merge-hold",
     "gaterun",
     "synthkit",
-    "x-portina",
     "/Users/",
     "~/repos",
 )
 # Names a skill may still cite by mistake after a rename or a drop.
 FORMER_SKILLS = ("audit-choices",)
+# What a LICENSE must contain for each frontmatter licence.
+LICENSE_MARKERS = {
+    "MIT": ("Permission is hereby granted",),
+    "Apache-2.0": ("Apache License", "Version 2.0"),
+}
+EXTRA_TERMS_ENV = "VENDED_EXTRA_TERMS_FILE"
 DASHES = {"–": "en dash", "—": "em dash"}
 FENCE_RE = re.compile(r"^\s*(`{3,}|~{3,})")
 INLINE_CODE_RE = re.compile(r"(`+)(.+?)\1")
@@ -56,8 +64,17 @@ def prose_lines(text: str):
             yield no, INLINE_CODE_RE.sub(" ", line)
 
 
-def text_rules(path: Path, text: str, out: list[str]) -> None:
-    lowered_terms = [(t, t.lower()) for t in FORBIDDEN_TERMS]
+def extra_terms() -> tuple[str, ...]:
+    """Terms from the file VENDED_EXTRA_TERMS_FILE names, if set. OSError when it cannot be read."""
+    name = os.environ.get(EXTRA_TERMS_ENV)
+    if not name:
+        return ()
+    lines = Path(name).read_text(encoding="utf-8").splitlines()
+    return tuple(t.strip() for t in lines if t.strip() and not t.lstrip().startswith("#"))
+
+
+def text_rules(path: Path, text: str, out: list[str], terms: tuple[str, ...] = FORBIDDEN_TERMS) -> None:
+    lowered_terms = [(t, t.lower()) for t in terms]
     for no, line in enumerate(text.splitlines(), 1):
         for ch, name in DASHES.items():
             if ch in line:
@@ -84,21 +101,35 @@ def ref_rules(path: Path, text: str, me: str, names: dict[str, bool], out: list[
                     out.append(f"{path}:{no}: default-set skill cites opt-in skill {name!r}")
 
 
-def check_skill(d: Path, names: dict[str, bool], out: list[str]) -> None:
+def skill_entries(d: Path):
+    """Yield every path under a skill dir without following symlinks, sorted."""
+    for dirpath, dirnames, filenames in os.walk(d, followlinks=False):
+        dirnames.sort()
+        for name in sorted(dirnames + filenames):
+            yield Path(dirpath) / name
+
+
+def check_skill(d: Path, names: dict[str, bool], out: list[str], terms: tuple[str, ...] = FORBIDDEN_TERMS) -> None:
     skill_md = d / "SKILL.md"
-    if not skill_md.is_file():
+    if not skill_md.is_file() or skill_md.is_symlink():
         out.append(f"{d}:0: missing SKILL.md")
     if not (d / "LICENSE").is_file():
         out.append(f"{d}:0: missing LICENSE")
-    for f in sorted(p for p in d.rglob("*") if p.is_file()):
+    for f in skill_entries(d):
+        if f.is_symlink():
+            out.append(f"{f}:0: symlink; vended skills hold regular files only")
+            continue
+        if not f.is_file():
+            continue
         try:
             text = f.read_text(encoding="utf-8")
         except UnicodeDecodeError:
+            out.append(f"{f}:0: not UTF-8; vended skill files are UTF-8 text")
             continue
-        text_rules(f, text, out)
+        text_rules(f, text, out, terms)
         if f.name != "LICENSE":
             ref_rules(f, text, d.name, names, out)
-    if not skill_md.is_file():
+    if not skill_md.is_file() or skill_md.is_symlink():
         return
     text = skill_md.read_text(encoding="utf-8")
     fm, body_start = split_frontmatter(text)
@@ -115,6 +146,17 @@ def check_skill(d: Path, names: dict[str, bool], out: list[str]) -> None:
     parts = lic.split(" AND ") if isinstance(lic, str) else []
     if not parts or any(p.strip() not in LICENSES for p in parts):
         out.append(f"{skill_md}:1: frontmatter license must be MIT or Apache-2.0 (or both joined by AND), not {lic!r}")
+    else:
+        license_file = d / "LICENSE"
+        try:
+            license_text = license_file.read_text(encoding="utf-8") if license_file.is_file() else None
+        except UnicodeDecodeError:
+            license_text = None  # already reported as not UTF-8
+        if license_text is not None:
+            missing = [m for p in parts for m in LICENSE_MARKERS[p.strip()] if m not in license_text]
+            if missing:
+                out.append(f"{license_file}:1: LICENSE text does not match the frontmatter license {lic!r} "
+                           f"(missing {', '.join(repr(m) for m in missing)})")
     if "allowed-tools" in meta:
         out.append(f"{skill_md}:1: frontmatter must not carry allowed-tools")
     body = text.splitlines()[body_start:]
@@ -138,6 +180,7 @@ def skill_names(skills_root: Path) -> dict[str, bool]:
 
 def run(root: Path) -> list[str]:
     out: list[str] = []
+    terms = FORBIDDEN_TERMS + extra_terms()
     skills_root = root / "skills"
     if skills_root.is_dir():
         names = skill_names(skills_root)
@@ -145,11 +188,11 @@ def run(root: Path) -> list[str]:
             if not entry.is_dir() or entry.is_symlink():
                 out.append(f"{entry}:0: not a skill directory")
                 continue
-            check_skill(entry, names, out)
+            check_skill(entry, names, out, terms)
     for name in ("CONTRIBUTING.md", "AGENTS-block.md"):
         p = root / name
         if p.is_file():
-            text_rules(p, p.read_text(encoding="utf-8"), out)
+            text_rules(p, p.read_text(encoding="utf-8"), out, terms)
     return out
 
 
@@ -168,7 +211,11 @@ def main(argv: list[str] | None = None) -> int:
     if not root.is_dir():
         print(f"error: {root} is not a directory", file=sys.stderr)
         return 2
-    findings = run(root)
+    try:
+        findings = run(root)
+    except (OSError, UnicodeDecodeError) as exc:
+        print(f"error: {exc}", file=sys.stderr)
+        return 2
     for f in findings:
         print(f)
     return 1 if findings else 0

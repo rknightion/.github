@@ -269,6 +269,38 @@ class TestLocalEdits(VendCase):
         (self.tgt / ".vended.json").write_text(json.dumps(rec))
         self.assertEqual(self.run_vend()[0], 2)
 
+    def test_forged_record_cannot_delete_outside_the_vended_set(self) -> None:
+        self.run_vend()
+        victims = {"README.md": b"readme\n", ".github/workflows/ci.yml": b"on: push\n",
+                   ".git/config": b"[core]\n"}
+        for rel, data in victims.items():
+            p = self.tgt / rel
+            p.parent.mkdir(parents=True, exist_ok=True)
+            p.write_bytes(data)
+        rec = json.loads((self.tgt / ".vended.json").read_text())
+        for rel, data in victims.items():
+            rec["files"][rel] = vend.sha256(data)  # hashes match, so only the key check stands
+        (self.tgt / ".vended.json").write_text(json.dumps(rec))
+        rc, _, err = self.run_vend()
+        self.assertEqual(rc, 2)
+        self.assertIn("not a path the engine vends", err)
+        rc, summary, _ = self.run_vend("--force")
+        self.assertEqual(rc, 0)
+        for rel, data in victims.items():
+            self.assertEqual((self.tgt / rel).read_bytes(), data, rel)
+            self.assertNotIn(rel, summary["removed"])
+        self.assertFalse(any(k in victims for k in json.loads((self.tgt / ".vended.json").read_text())["files"]))
+
+    def test_recordable_paths(self) -> None:
+        for good in (".agents/skills/alpha-skill/SKILL.md", ".agents/skills/x/references/a.sh",
+                     ".github/privacy/sweep", ".github/privacy/identifier-patterns.txt",
+                     "CONTRIBUTING.md", "AGENTS.md"):
+            self.assertTrue(vend.recordable(good), good)
+        for bad in ("README.md", ".github/workflows/ci.yml", ".git/config", ".github/privacy/patterns.txt",
+                    ".github/privacy/allow.txt", ".agents/skills/x", ".agents/skills/Bad_Name/SKILL.md",
+                    ".agents/other/x", ".claude/skills/x"):
+            self.assertFalse(vend.recordable(bad), bad)
+
 
 class TestSymlinks(VendCase):
     def test_real_dir_clash_refused(self) -> None:
@@ -338,6 +370,27 @@ class TestContributing(VendCase):
         self.assertEqual(summary["refused"][0]["path"], "CONTRIBUTING.md")
         self.assertEqual(self.run_vend("--force")[0], 0)
         self.assertEqual((self.tgt / "CONTRIBUTING.md").read_text(), TEMPLATE)
+
+    def test_unrecorded_marked_file_differing_outside_region_refused_then_forced(self) -> None:
+        theirs = TEMPLATE.replace("Intro.", "Our own intro.").replace("PLACEHOLDER", "Our facts.")
+        (self.tgt / "CONTRIBUTING.md").write_text(theirs)
+        rc, summary, _ = self.run_vend()
+        self.assertEqual(rc, 1)
+        self.assertEqual(summary["refused"][0]["path"], "CONTRIBUTING.md")
+        self.assertIn("differs from the template outside the repo-facts region", summary["refused"][0]["reason"])
+        self.assertEqual((self.tgt / "CONTRIBUTING.md").read_text(), theirs)
+        self.assertEqual(self.run_vend("--force")[0], 0)
+        got = (self.tgt / "CONTRIBUTING.md").read_text()
+        self.assertIn("Our facts.", got)
+        self.assertNotIn("Our own intro.", got)
+
+    def test_preseeded_exact_template_adopted_without_force(self) -> None:
+        seeded = TEMPLATE.replace("PLACEHOLDER", "Seeded facts.")
+        (self.tgt / "CONTRIBUTING.md").write_text(seeded)
+        rc, summary, _ = self.run_vend()
+        self.assertEqual(rc, 0)
+        self.assertEqual((self.tgt / "CONTRIBUTING.md").read_text(), seeded)
+        self.assertNotIn("CONTRIBUTING.md", summary["changed"])
 
     def test_edit_outside_region_refused(self) -> None:
         self.run_vend()

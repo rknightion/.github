@@ -173,6 +173,67 @@ class SweepTest(unittest.TestCase):
         self.repo.write("blob.bin", b"\x00\xff\xfe " + EMAIL.encode() + b"\n")
         self.assert_finding(self.repo.sweep("--files", "blob.bin"), "blob.bin", "email", EMAIL)
 
+    # File names (a), UTF-16 and NUL-heavy content (b), underscore boundary (c) ---------------------
+
+    def test_added_file_name_is_swept(self):
+        name = "hosts-" + PUBLIC_IP + ".md"
+        self.repo.write(name, "nothing here\n")
+        self.repo.commit("named")
+        code, out, err = self.branch_sweep()
+        self.assertEqual(code, 1, out + err)
+        self.assertEqual(out.strip(), name + ":0:0: address (file name)")
+
+    def test_empty_added_file_name_is_swept(self):
+        name = "contact-" + EMAIL + ".txt"
+        self.repo.write(name, "")
+        self.repo.commit("empty")
+        code, out, err = self.branch_sweep()
+        self.assertEqual(code, 1, out + err)
+        self.assertEqual(out.strip(), name + ":0:0: email (file name)")
+
+    def test_renamed_to_file_name_is_swept(self):
+        self.repo.git("mv", "README.md", "notes-" + PUBLIC_IP + ".md")
+        self.repo.commit("rename")
+        code, out, err = self.branch_sweep()
+        self.assertEqual(code, 1, out + err)
+        self.assertIn(":0:0: address (file name)", out)
+        self.repo.git("mv", "notes-" + PUBLIC_IP + ".md", "README.md")
+        self.assertEqual(self.repo.sweep("--staged")[0], 0)
+
+    def test_modified_file_name_is_not_a_new_finding(self):
+        name = "hosts-" + PUBLIC_IP + ".md"
+        self.repo.write(name, "one\n")
+        self.repo.commit("named")
+        base = self.repo.git("rev-parse", "HEAD").strip()
+        self.repo.write(name, "one\ntwo\n")
+        self.repo.commit("edit")
+        self.assertEqual(self.repo.sweep("--base", base)[0], 0)
+
+    def test_utf16_with_bom_is_decoded_and_swept(self):
+        self.repo.write("notes.txt", ("first\ncontact " + EMAIL + "\n").encode("utf-16"))
+        self.repo.commit("utf-16")
+        code, out, err = self.branch_sweep()
+        self.assertEqual(code, 1, out + err)
+        self.assertEqual(out.strip(), "notes.txt:2:9: email")
+        self.assertNotIn(EMAIL, out + err)
+        code, out, err = self.repo.sweep("--files", "notes.txt")
+        self.assertEqual((code, out.strip()), (1, "notes.txt:2:9: email"), err)
+
+    def test_nul_heavy_without_bom_cannot_sweep(self):
+        self.repo.write("notes.txt", ("contact " + EMAIL + "\n").encode("utf-16-le"))
+        self.repo.commit("utf-16 no bom")
+        for result in (self.branch_sweep(), self.repo.sweep("--files", "notes.txt")):
+            code, out, err = result
+            self.assertEqual(code, 2, out + err)
+            self.assertIn("cannot sweep", err)
+            self.assertIn("notes.txt", err)
+
+    def test_underscore_before_address_is_a_boundary(self):
+        self.repo.write("net.md", "ip_" + PUBLIC_IP + "\n")
+        self.repo.commit("underscore")
+        code, out, err = self.branch_sweep()
+        self.assertEqual((code, out.strip()), (1, "net.md:1:4: address"), err)
+
     def test_empty_default_patterns_cannot_sweep(self):
         copy = Path(self.scratch) / "copy"
         copy.mkdir()

@@ -129,12 +129,17 @@ when `gh` reports that origin is not a fork. Otherwise it refuses and prints the
 prints the base it chose on stderr. It never assumes `origin` on a fork.
 
 Diffs are read with `git diff --text --no-ext-diff --no-textconv`, so a NUL byte or a `-diff` or
-`binary` attribute set by the same change cannot hide a line.
+`binary` attribute set by the same change cannot hide a line. A file whose content starts with a
+UTF-16 or UTF-32 byte order mark is decoded and swept whole. Content in which NUL bytes are a fifth
+or more of the bytes (binary, or UTF-16 without a byte order mark) cannot be read as text, so the
+sweep exits 2 and names the file rather than passing it. A branch or staged sweep also checks the
+path of every file the change adds, copies or renames to.
 
 ## Output and exit codes
 
 A finding prints `path:line:column: rule` and never the matched text, because the output lands in CI
-logs. The summary goes to stderr.
+logs. A finding in a file name prints `path:0:0: rule (file name)`; the path is already public in the
+diff. The summary goes to stderr.
 
 | Exit | Meaning |
 | --- | --- |

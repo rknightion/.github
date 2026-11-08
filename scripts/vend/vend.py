@@ -346,6 +346,24 @@ class UnsafePath(Exception):
     pass
 
 
+def recordable(rel: str) -> bool:
+    """True for a path the engine can own, so a record key outside it is never deleted.
+
+    Skill files under .agents/skills/<name>/, the two vended privacy files, CONTRIBUTING.md and
+    AGENTS.md. The .claude/skills/ links are not recorded; they are found from the skill names.
+    """
+    if rel in (CONTRIBUTING_PATH, AGENTS_PATH) or rel in {f"{PRIVACY_DEST}/{n}" for n in PRIVACY_FILES}:
+        return True
+    parts = PurePosixPath(rel).parts
+    return (
+        len(parts) >= 4
+        and "/".join(parts[:2]) == SKILLS_DIR
+        and bool(SKILL_RE.match(parts[2]))
+        and "\\" not in rel
+        and ".." not in parts
+    )
+
+
 def safe_target(target: Path, rel: str) -> Path:
     """Return target/rel after refusing escapes and symlinked parents."""
     check_rel(rel)
@@ -462,6 +480,14 @@ def plan_contributing(target: Path, template: str, recorded: dict, force: bool, 
             if rec is not None and have not in (rec, want_now) and not force:
                 plan.refuse(rel, "edited outside the repo-facts region since the last sync; pass --force")
                 return
+            if rec is None and have != want_now:
+                # Adoption without a record: only an exact copy of the template outside the
+                # region is ours to take over (how a migration pre-seeds the file).
+                if not force:
+                    plan.refuse(rel, "was not vended and differs from the template outside the repo-facts "
+                                     "region; make it match or pass --force")
+                    return
+                plan.notes.append(f"{rel}: --force replaced unvended text outside the repo-facts region")
         new_lf = tparts[0] + inner + tparts[2]
     plan.record_files[rel] = sha256((tparts[0] + tparts[2]).encode())
     data = from_lf(new_lf, crlf).encode("utf-8")
@@ -553,6 +579,15 @@ def build_plan(source: Path, target: Path, repo: str, force: bool) -> Plan:
             check_rel(rel)
         except UnsafePath as exc:
             raise UsageError(f"{RECORD_PATH}: {exc}") from exc
+    foreign = sorted(rel for rel in recorded if not recordable(rel))
+    if foreign:
+        # --force may drop the record, never use it as authority to delete outside the vended set.
+        if not force:
+            raise UsageError(
+                f"{RECORD_PATH}: {', '.join(foreign)}: not a path the engine vends; fix the record or pass --force"
+            )
+        plan.notes.append(f"{RECORD_PATH} names paths the engine does not vend; --force treats it as absent")
+        recorded = {}
 
     def guarded(fn, rel, *args):
         try:

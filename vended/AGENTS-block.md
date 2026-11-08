@@ -22,8 +22,9 @@ or coding agent working in this repository. `CONTRIBUTING.md` has the longer ver
 
 ### Skills
 
-The skills live in `.agents/skills/` (Claude Code reads them through `.claude/skills/`). Read the
-skill before the moment it names:
+The skills live in `.agents/skills/` (Claude Code reads them through `.claude/skills/`). A
+repository may carry only some of them. Read each skill below, where present in `.agents/skills/`,
+before the moment it names:
 
 - `verification-before-completion` before you say a change works or is done.
 - `commit-and-pr` before you commit, open a pull request or write its title and body.

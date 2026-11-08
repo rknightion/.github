@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import contextlib
 import io
+import os
 import sys
 import tempfile
 import unittest
@@ -14,6 +15,9 @@ import check_skills  # noqa: E402
 
 DASH_EM = "—"
 DASH_EN = "–"
+MIT_TEXT = "MIT License\n\nCopyright (c) 2026 Example\n\nPermission is hereby granted, free of charge, ...\n"
+APACHE_TEXT = "                                 Apache License\n                           Version 2.0, January 2004\n"
+LICENSE_TEXTS = {"MIT": MIT_TEXT, "Apache-2.0": APACHE_TEXT, "Apache-2.0 AND MIT": APACHE_TEXT + MIT_TEXT}
 
 
 def skill_text(name: str, *, license: str = "MIT", extra_meta: str = "", body: str = "",
@@ -35,12 +39,15 @@ class LintCase(unittest.TestCase):
     def tearDown(self) -> None:
         self.tmp.cleanup()
 
-    def add_skill(self, name: str, text: str | None = None, *, license_file: bool = True, **kw) -> Path:
+    def add_skill(self, name: str, text: str | None = None, *, license_file: bool = True,
+                  license_text: str | None = None, **kw) -> Path:
         d = self.root / "skills" / name
         d.mkdir(parents=True, exist_ok=True)
         (d / "SKILL.md").write_text(text if text is not None else skill_text(name, **kw))
         if license_file:
-            (d / "LICENSE").write_text("MIT License\n\nCopyright (c) 2026 Example\n")
+            if license_text is None:
+                license_text = LICENSE_TEXTS.get(kw.get("license", "MIT"), MIT_TEXT)
+            (d / "LICENSE").write_text(license_text)
         return d
 
     def lint(self) -> tuple[int, str]:
@@ -112,6 +119,31 @@ class TestStructure(LintCase):
         self.add_skill("both-skill", license="Apache-2.0 AND MIT")
         self.assertEqual(self.lint()[0], 0)
 
+    def test_license_text_must_match_frontmatter(self) -> None:
+        for name, lic, text in (("mit-apache-skill", "MIT", APACHE_TEXT),
+                                ("apache-mit-skill", "Apache-2.0", MIT_TEXT),
+                                ("both-mit-only-skill", "Apache-2.0 AND MIT", MIT_TEXT),
+                                ("both-apache-only-skill", "Apache-2.0 AND MIT", APACHE_TEXT)):
+            with self.subTest(name=name):
+                d = self.add_skill(name, license=lic, license_text=text)
+                self.assertFinding(f"{name}/LICENSE:1: LICENSE text does not match")
+                (d / "LICENSE").write_text(LICENSE_TEXTS[lic])
+                self.assertEqual(self.lint()[0], 0, name)
+
+    def test_symlink_anywhere_in_skill_flagged(self) -> None:
+        d = self.add_skill("link-skill")
+        (d / "references").mkdir()
+        os.symlink("../SKILL.md", d / "references" / "again.md")
+        self.assertFinding("link-skill/references/again.md:0: symlink")
+        (d / "references" / "again.md").unlink()
+        os.symlink("..", d / "references" / "up")
+        self.assertFinding("link-skill/references/up:0: symlink")
+
+    def test_non_utf8_file_flagged(self) -> None:
+        d = self.add_skill("bytes-skill")
+        (d / "data.bin").write_bytes(b"\xff\xfe\x00bad")
+        self.assertFinding("bytes-skill/data.bin:0: not UTF-8")
+
     def test_allowed_tools(self) -> None:
         self.add_skill("tools-skill", extra_meta="allowed-tools:\n  - Bash\n")
         self.assertFinding("must not carry allowed-tools")
@@ -162,6 +194,31 @@ class TestTextRules(LintCase):
             with self.subTest(term=term):
                 self.add_skill("term-skill", body=f"See {term.upper()} for more.\n")
                 self.assertFinding(f"forbidden term {term!r}")
+
+    def test_public_list_is_exactly_the_generic_terms(self) -> None:
+        # Estate-specific names go in VENDED_EXTRA_TERMS_FILE, never in this public list.
+        self.assertEqual(set(check_skills.FORBIDDEN_TERMS), {
+            "portina", "copilot", "dsreview", "coderabbit", "kodus", "merge-hold", "gaterun", "synthkit",
+            "/Users/", "~/repos"})
+
+    def test_extra_terms_file(self) -> None:
+        terms = Path(self.tmp.name) / "terms.txt"
+        terms.write_text("# private names\n\nwidgetcorp\n")
+        self.add_skill("extra-skill", body="Ask WidgetCorp.\n")
+        self.assertEqual(self.lint()[0], 0)
+        old = os.environ.get("VENDED_EXTRA_TERMS_FILE")
+        os.environ["VENDED_EXTRA_TERMS_FILE"] = str(terms)
+        try:
+            self.assertFinding("forbidden term 'widgetcorp'")
+            terms.unlink()
+            err = io.StringIO()
+            with contextlib.redirect_stderr(err):
+                self.assertEqual(check_skills.main(["--root", str(self.root)]), 2)
+        finally:
+            if old is None:
+                os.environ.pop("VENDED_EXTRA_TERMS_FILE")
+            else:
+                os.environ["VENDED_EXTRA_TERMS_FILE"] = old
 
     def test_contributing_and_block_are_linted(self) -> None:
         (self.root / "CONTRIBUTING.md").write_text(f"Ask Kodus {DASH_EM} now.\n")
