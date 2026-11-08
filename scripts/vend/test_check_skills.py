@@ -313,10 +313,12 @@ class TestPortableNames(LintCase):
         self.assertEqual(self.lint()[0], 0)
 
     def test_unsafe_lock_skill_name_is_a_finding(self) -> None:
-        lock = {"schema": 1, "sources": {"ex/s": {"url": "u", "sha": "a" * 40}},
-                "skills": {"Bad..Name": {"source": "ex/s", "path": "p", "vend": False, "files": {}}}}
-        (self.root / "upstream.lock.json").write_text(json.dumps(lock))
-        self.assertFinding("must be lower-case letters, digits and hyphens")
+        for name in ("Bad..Name", "foo\n"):
+            with self.subTest(name=name):
+                lock = {"schema": 1, "sources": {"ex/s": {"url": "u", "sha": "a" * 40}},
+                        "skills": {name: {"source": "ex/s", "path": "p", "vend": False, "files": {}}}}
+                (self.root / "upstream.lock.json").write_text(json.dumps(lock))
+                self.assertFinding("must be lower-case letters, digits and hyphens")
 
 
 class TestLinks(LintCase):
