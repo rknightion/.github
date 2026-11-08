@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.26.5](https://github.com/rknightion/.github/compare/v1.26.4...v1.26.5) (2026-11-08)
+
+
+### Miscellaneous
+
+* **vended:** enrol transceiver-exporter ([5103c69](https://github.com/rknightion/.github/commit/5103c695888d7852c86ee016b9fd351454ddd6d3))
+
 ## [1.26.4](https://github.com/rknightion/.github/compare/v1.26.3...v1.26.4) (2026-11-08)
 
 
