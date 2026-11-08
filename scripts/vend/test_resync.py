@@ -279,6 +279,25 @@ class TestResync(ResyncCase):
                 self.assertRefusedClean("--sha", self.sha1, "--add", f"{name}=skills/eng/one",
                                         needle="a skill name is lower-case")
 
+    def test_unsafe_source_urls_are_refused_and_run_nothing(self) -> None:
+        marker = Path(self.tmp.name) / "ran"
+        for url in (f"ext::sh -c touch% {marker}", "--upload-pack=touch", "ssh://h/x", "git@h:x",
+                    "http://h/x", "relative/path", "https://h/x y"):
+            with self.subTest(url=url):
+                self.assertRefusedClean("--sha", self.sha1, f"--url={url}", needle="source url must be")
+                self.assertFalse(marker.exists())
+
+    def test_flipping_to_vend_false_removes_the_vended_copy(self) -> None:
+        self.assertEqual(self.run_resync("--sha", self.sha1)[0], 0)
+        self.assertTrue((self.root / "skills/one").is_dir())
+        lock = self.lock()
+        lock["skills"]["one"]["vend"] = False
+        (self.root / "upstream.lock.json").write_text(json.dumps(lock))
+        rc, out, err = self.run_resync("--sha", self.sha1)
+        self.assertEqual(rc, 0, err)
+        self.assertIn("its vended copy is removed", out)
+        self.assertFalse((self.root / "skills/one").exists())
+
     def test_result_passes_check_skills(self) -> None:
         import check_skills
         self.run_resync("--sha", self.sha1)

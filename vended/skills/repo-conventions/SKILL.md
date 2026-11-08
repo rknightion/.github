@@ -40,7 +40,8 @@ Every new or changed check is seen failing for the right reason before it passes
    production file out of the tree (restore cannot remove a file the base never had).
 3. Run the check and see it fail for the expected reason. If the red numbers equal the green
    numbers, the pathspec reverted nothing: fix it and rerun.
-4. Copy every file back with `cp -p`, run again and see it pass.
+4. Copy every file back with `cp -p`, delete again any file the change deletes (the restore
+   brought it back), run again and see it pass.
 5. Confirm `git status` and `git diff --cached` match what they were before.
 
 Never use `git stash` (every worktree of the clone shares it) or `git checkout <base> -- <paths>`

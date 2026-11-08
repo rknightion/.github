@@ -79,8 +79,9 @@ check-vended:
 
 # pin the upstream skills in vended/upstream.lock.json at an upstream commit, then lint
 [group('gen')]
+[positional-arguments]
 vend-resync sha *args:
-    python3 scripts/vend/resync.py --sha {{ sha }} {{ args }}
+    python3 scripts/vend/resync.py --sha "$@"
     python3 scripts/vend/check_skills.py
 
 # sweep the lines this branch adds for identifiers, addresses and credentials

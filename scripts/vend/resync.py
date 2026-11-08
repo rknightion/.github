@@ -42,8 +42,18 @@ COMPONENT_RE = re.compile(r"^[A-Za-z0-9_][A-Za-z0-9._-]*$")
 # safe_rel checks every vended path again before anything is written.
 FSCK = ("-c", "fetch.fsckObjects=true", "-c", "fetch.fsck.fullPathname=error",
         "-c", "fetch.fsck.hasDotdot=error", "-c", "fetch.fsck.hasDot=error")
+# Only https and local paths may be fetched: never ext::, ssh or any other transport.
 GIT_ENV = {"GIT_CONFIG_NOSYSTEM": "1", "GIT_CONFIG_GLOBAL": "/dev/null", "GIT_TERMINAL_PROMPT": "0",
+           "GIT_ALLOW_PROTOCOL": "https:file", "GIT_PROTOCOL_FROM_USER": "0",
            "PATH": "/usr/bin:/bin:/usr/local/bin:/opt/homebrew/bin"}
+
+
+def safe_url(url: str) -> str:
+    """An https URL or an absolute local path; nothing git could read as an option or a transport."""
+    if not (re.fullmatch(r"https://[A-Za-z0-9.-]+/[A-Za-z0-9._/-]+", url)
+            or re.fullmatch(r"/[A-Za-z0-9._/-]+", url)):
+        raise Refused(f"{url!r}: the source url must be https:// or an absolute local path")
+    return url
 
 
 class Refused(Exception):
@@ -78,12 +88,12 @@ def fetch(url: str, sha: str, repo: Path) -> None:
     """Fetch `sha` and the default branch into a bare repo; `sha` must be on that branch."""
     repo.mkdir(parents=True)
     git("init", "-q", "--bare", cwd=repo)
-    git("remote", "add", "origin", url, cwd=repo)
+    git("remote", "add", "--end-of-options", "origin", safe_url(url), cwd=repo)
     git(*FSCK, "fetch", "-q", "origin", "HEAD:refs/remotes/origin/HEAD", cwd=repo)
     try:
         git("cat-file", "-e", f"{sha}^{{commit}}", cwd=repo)
     except subprocess.CalledProcessError:
-        git(*FSCK, "fetch", "-q", "origin", sha, cwd=repo)
+        git(*FSCK, "fetch", "-q", "origin", "--end-of-options", sha, cwd=repo)
     try:
         git("merge-base", "--is-ancestor", sha, "refs/remotes/origin/HEAD", cwd=repo)
     except subprocess.CalledProcessError:
@@ -191,14 +201,18 @@ def resync(root: Path, source: str, sha: str, url: str | None, adds: dict[str, s
             report.append(f"{name}: {state}{'' if entry['vend'] else ' (not vended)'}")
             if entry["vend"] and not dry_run:
                 stage_skill(staging / name, files, license_bytes)
+            elif not entry["vend"] and (root / "skills" / name).exists():
+                report[-1] += "; its vended copy is removed"
         src_entry["sha"] = sha
         src_entry["license_sha256"] = hashlib.sha256(license_bytes).hexdigest()
         if not dry_run:
             for name in trees:
+                dest = root / "skills" / name
+                if dest.is_symlink():
+                    raise Refused(f"{dest}: a symlink, not a skill directory")
+                if dest.exists():
+                    shutil.rmtree(dest)
                 if lock["skills"][name]["vend"]:
-                    dest = root / "skills" / name
-                    if dest.exists():
-                        shutil.rmtree(dest)
                     shutil.move(str(staging / name), str(dest))
             lock_path.write_text(json.dumps(lock, indent=2, sort_keys=True) + "\n", encoding="utf-8")
     return report
