@@ -219,14 +219,22 @@ class SweepTest(unittest.TestCase):
         code, out, err = self.repo.sweep("--files", "notes.txt")
         self.assertEqual((code, out.strip()), (1, "notes.txt:2:9: email"), err)
 
-    def test_nul_heavy_without_bom_cannot_sweep(self):
+    def test_nul_heavy_without_bom_is_swept_with_nuls_stripped(self):
         self.repo.write("notes.txt", ("contact " + EMAIL + "\n").encode("utf-16-le"))
         self.repo.commit("utf-16 no bom")
         for result in (self.branch_sweep(), self.repo.sweep("--files", "notes.txt")):
             code, out, err = result
-            self.assertEqual(code, 2, out + err)
-            self.assertIn("cannot sweep", err)
-            self.assertIn("notes.txt", err)
+            self.assertEqual(code, 1, out + err)
+            self.assertIn("notes.txt:1:", out)
+            self.assertIn(": email", out)
+            self.assertNotIn(EMAIL, out + err)
+
+    def test_binary_without_identifiers_passes(self):
+        self.repo.write("icon.bin", bytes([0, 1, 0, 2, 0, 0, 0, 255, 0, 10]) * 50)
+        self.repo.commit("binary")
+        for result in (self.branch_sweep(), self.repo.sweep("--files", "icon.bin")):
+            code, out, err = result
+            self.assertEqual(code, 0, out + err)
 
     def test_underscore_before_address_is_a_boundary(self):
         self.repo.write("net.md", "ip_" + PUBLIC_IP + "\n")

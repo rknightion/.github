@@ -45,7 +45,7 @@ included, because the path is already public in the diff and the file list of th
 
 Content starting with a UTF-16 or UTF-32 byte order mark is decoded and swept whole. Other content
 in which NUL bytes make up a fifth or more of the bytes (binary, or UTF-16 without a byte order
-mark) cannot be read as text, so the sweep exits 2 naming the path instead of passing it. In a diff
+mark) is swept with its NUL bytes removed, so ASCII text inside it still matches. In a diff
 sweep either case sweeps the whole file at the head, with file line numbers.
 
 Exit 0 clean, 1 findings, 2 cannot sweep (the reason is printed; nothing counts as clean).
@@ -110,7 +110,7 @@ def needs_whole_decode(data):
 
 
 def decode_text(data, label):
-    """Decode file bytes for sweeping, or refuse content that cannot be read as text."""
+    """Decode file bytes for sweeping; NUL-heavy content is read with its NUL bytes removed."""
     for bom, codec in _BOMS:
         if data.startswith(bom):
             try:
@@ -118,7 +118,8 @@ def decode_text(data, label):
             except UnicodeDecodeError:
                 raise CannotSweep(f"{label} starts with a {codec} byte order mark but does not decode as {codec}") from None
     if nul_heavy(data):
-        raise CannotSweep(f"{label} is NUL-heavy (binary, or UTF-16 without a byte order mark) and cannot be read as text")
+        # Binary, or UTF-16 without a byte order mark: drop the NULs so ASCII text inside still matches.
+        return data.replace(b"\0", b"").decode("utf-8", "replace")
     return data.decode("utf-8", "replace")
 
 
