@@ -26,6 +26,19 @@ With `enforce-all-prs: true` a pull request that closes nothing must say
 `Task: none, <reason>` on a line of its own. With `false`, a pull request with no closing keyword is not
 checked at all (the default). Public repositories get outside and bot pull requests, so they keep `false`; a private repository with no outside contributors sets `true`.
 
+The checker reads closing keywords in the pull request body only. GitHub also closes an issue on merge
+through paths the checker never sees, so with `enforce-all-prs: false` a pull request that closes an
+issue only through one of these is not checked at all (with `true` it passes on a `Task: none` line):
+
+- a closing keyword in the squash or merge commit message, which can differ from the body;
+- an issue linked to the pull request in the Development sidebar;
+- a closing keyword the checker reads as commented out: it removes every `<!-- ... -->` before
+  looking and does not know about code fences or inline code, so a `<!--` inside a code block hides
+  everything up to the next `-->`, a keyword outside the block included. A keyword inside a code block
+  that no comment hides is read and owes evidence.
+
+Treat an issue closed through any of these as closed without checked evidence.
+
 The body is read live from the API (a re-run of a job keeps the original event payload, so the payload goes
 stale after an edit), parsed as data, and printed only through an escaped workflow annotation. It never
 reaches a shell. After editing the body, re-run the job.

@@ -6,9 +6,13 @@ applyTo: "**"
 
 Your verdict line is advisory guidance for the author; no check reads it.
 
-Applies only when the pull request description closes an issue, in any of the closing forms (a keyword
-such as Closes, Fixes or Resolves before the issue, outside an HTML comment). When it does not, say
-nothing about this.
+Applies only when the pull request description closes an issue. A closing form is one keyword, then
+the issue, on a single line outside an HTML comment. The keyword is `close`, `closes`, `closed`, `fix`,
+`fixes`, `fixed`, `resolve`, `resolves` or `resolved` in any letter case, not glued to a preceding word,
+optionally followed by a colon. Spaces or tabs separate it from the issue, which is `#N`,
+`<owner>/<repo>#N` naming this repository, or the issue's `https://github.com/<owner>/<repo>/issues/N`
+address. A number followed by a letter or digit is not a number. When the description has no closing
+form, say nothing about this.
 
 The description then holds an "Acceptance evidence" table with the columns issue, AC, AC text, evidence
 class and proof, one row per acceptance criterion of each closed issue. The `Acceptance evidence` CI
