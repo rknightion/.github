@@ -1,5 +1,33 @@
 # Changelog
 
+## [1.26.0](https://github.com/rknightion/.github/compare/v1.25.34...v1.26.0) (2026-11-08)
+
+
+### Features
+
+* **ac-evidence:** reusable acceptance-evidence check for pull requests that close issues ([980256a](https://github.com/rknightion/.github/commit/980256a1a33342f190dccb9646054e209c85752d))
+* **vended:** contributor kit vended to every migrated repo ([88185d0](https://github.com/rknightion/.github/commit/88185d0ab1a57937e960bca2982298c8b61777d6))
+
+
+### Bug Fixes
+
+* **ac-evidence:** annotate each run with the pull request and head it judged ([18f3b95](https://github.com/rknightion/.github/commit/18f3b95fdac414cb19baa18ec41df35e9542ef96))
+* **ac-evidence:** fixture commits ignore commit signing; caller docs say to write a caller from the example ([eaa1f73](https://github.com/rknightion/.github/commit/eaa1f739a54319d2573d66ab957ed9dceb89d6e9))
+* **ac-evidence:** pin the checker with job.workflow_sha; state that auto-close is not bound to the checker ([c604de7](https://github.com/rknightion/.github/commit/c604de7fc7dc268cebfe7b1c664e54281bf00eb1))
+* **check:** name the ac-evidence test file for node --test ([4c427b8](https://github.com/rknightion/.github/commit/4c427b8baf2c54965056e0fc729a48b51fef930c))
+* **check:** pii-check reads NUL-bearing files as text ([54d4eec](https://github.com/rknightion/.github/commit/54d4eecfdd0b405e29202e28841ad003d09fd30e))
+* **privacy:** sweep NUL-heavy content instead of refusing it ([01df3fa](https://github.com/rknightion/.github/commit/01df3fa019247129e9ceee2fff79ab839255e0d0))
+* **vended:** address review findings ([b795e30](https://github.com/rknightion/.github/commit/b795e30de8572e1fde32496a9ec662ca85e16173))
+* **vended:** allowlist spans on the original text; lint reports missing paths ([a2e31bf](https://github.com/rknightion/.github/commit/a2e31bf2b4edff43d3841b3972acdf32b0cdc4bc))
+* **vended:** close review findings on the sync, record, sweep and skill lint ([1ac6646](https://github.com/rknightion/.github/commit/1ac6646c08cc26683a339fd2bad4e973d004e619))
+* **vended:** close the second review's findings ([e83da5a](https://github.com/rknightion/.github/commit/e83da5a5387b799cd8bdf1ea614679882e6ba25c))
+* **vended:** close the third review's sweep, sync and contributor findings ([160a427](https://github.com/rknightion/.github/commit/160a4271ca50dbe182db552732c43600c547d772))
+
+
+### Documentation
+
+* **vended:** contributors write Refs #N in the default guide; sweep docs match its NUL handling ([006f803](https://github.com/rknightion/.github/commit/006f8034c138ff93b5d0360d00d05b39babcd3ad))
+
 ## [1.25.34](https://github.com/rknightion/.github/compare/v1.25.33...v1.25.34) (2026-11-06)
 
 
