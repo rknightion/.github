@@ -25,6 +25,18 @@ repository's callers of the reusable workflows here are written by hand when it 
 
 ## Skills
 
+There are two kinds of skill under `skills/`:
+
+- **Pinned upstream skills** are copied unchanged from an upstream repository at the commit
+  recorded in `upstream.lock.json`, with that repository's `LICENSE` beside them. Today they all
+  come from [dzhng/skills](https://github.com/dzhng/skills). Never edit one: change the pin with
+  `just vend-resync <sha>` (which runs `scripts/vend/resync.py` and then the checker) and review the
+  upstream diff in the pull request. The lock also pins upstream skills marked `"vend": false`;
+  those are not vended to repositories, but the owner's agent homes install the same pin.
+- **Our own skills** carry a `Source:` line, a "Changes from the source" note and a `LICENSE`
+  matching their frontmatter `license:`. `repo-conventions` holds everything the pinned skills get
+  wrong for these repositories, and the vended `AGENTS.md` block says it overrides them.
+
 Every directory under `skills/` is in the default set unless its `SKILL.md` frontmatter says
 
 ```yaml
@@ -33,12 +45,20 @@ metadata:
 ```
 
 `postgres-query-and-schema` is opt-in: a repository gets it only when its manifest entry lists it
-in `skills`. No skill in the default set may cite an opt-in skill. `just check-vended` runs
-`scripts/vend/check_skills.py`, which checks frontmatter, licences, the `Source:` line and the
-"Changes from the source" note, banned characters and terms, and cross references between skills.
-It also checks that each `LICENSE` holds the text of the frontmatter licence, and flags any symlink
-or non-UTF-8 file under a skill. Each skill keeps its upstream `LICENSE`; changes made here are
-released under the same licence.
+in `skills`. No skill in the default set may cite or link an opt-in skill.
+
+`just check-vended` runs `scripts/vend/check_skills.py`:
+
+- A pinned skill must match the lock byte for byte, file modes included, plus the source's
+  `LICENSE`. It skips the provenance, licence-frontmatter and name-mention rules.
+- Our own skills need frontmatter, a licence of MIT or Apache-2.0 whose text is in `LICENSE`, the
+  `Source:` line and the "Changes" note, and may not name a skill that is not vended.
+- Every skill: no `allowed-tools`, no symlink, UTF-8 only, no banned term, and every
+  `](../<name>/...)` link must reach a vended skill. Upstream links to `review` and
+  `find-overengineering` are allowed on purpose; the `AGENTS.md` block says what they mean here. A
+  repository that takes only some skills can still receive a link to one it lacks.
+- `CONTRIBUTING.md` and `AGENTS-block.md` are read by people, so they also may not use an em dash,
+  en dash or double hyphen. Skills are read only by agents and are exempt.
 
 The banned terms in `check_skills.py` are generic. To also check names that must not be spelled out
 in this public repository, list them one per line in a private file (`#` starts a comment line) and

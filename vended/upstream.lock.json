@@ -1,0 +1,213 @@
+{
+  "schema": 1,
+  "skills": {
+    "audit-decisions": {
+      "files": {
+        "SKILL.md": {
+          "mode": "100644",
+          "sha256": "f35213621fc18c667a4c8b706474ca74ce7fccac48ed8f9064d3aa61812b08b2"
+        }
+      },
+      "path": "skills/engineering/audit-decisions",
+      "source": "dzhng/skills",
+      "vend": true
+    },
+    "audit-performance": {
+      "files": {
+        "SKILL.md": {
+          "mode": "100644",
+          "sha256": "4904d5c24de53f4341fc9d36e87781cad34b2106f3679ede1584bc6ffceba08c"
+        }
+      },
+      "path": "skills/engineering/audit-performance",
+      "source": "dzhng/skills",
+      "vend": true
+    },
+    "audit-tests": {
+      "files": {
+        "SKILL.md": {
+          "mode": "100644",
+          "sha256": "25cf914e1acfcf4b7c5199bc5e38dfe50400c6b7af987fd47142e21d070916b2"
+        }
+      },
+      "path": "skills/engineering/audit-tests",
+      "source": "dzhng/skills",
+      "vend": true
+    },
+    "auto-research": {
+      "files": {
+        "SKILL.md": {
+          "mode": "100644",
+          "sha256": "73da6a4e28275666816dbdd37f52c7bd3324b9b90a298c061b3335604cef3dbd"
+        }
+      },
+      "path": "skills/engineering/auto-research",
+      "source": "dzhng/skills",
+      "vend": false
+    },
+    "code-review": {
+      "files": {
+        "SKILL.md": {
+          "mode": "100644",
+          "sha256": "5b7c5de0b735d8788466bc575e8877843c08b1ea02de29fc50fb6124bad03012"
+        }
+      },
+      "path": "skills/engineering/code-review",
+      "source": "dzhng/skills",
+      "vend": false
+    },
+    "eli5": {
+      "files": {
+        "SKILL.md": {
+          "mode": "100644",
+          "sha256": "268c996bcc62796e31ca74105929c77907e4b4e1abda3341b9a01b9cd2059004"
+        }
+      },
+      "path": "skills/engineering/eli5",
+      "source": "dzhng/skills",
+      "vend": true
+    },
+    "eval-skills": {
+      "files": {
+        "SKILL.md": {
+          "mode": "100644",
+          "sha256": "2e9bf33371fce396b434f9f34d4b87cd4761626c30cc1f4f64df55c726696074"
+        }
+      },
+      "path": "skills/authoring/eval-skills",
+      "source": "dzhng/skills",
+      "vend": false
+    },
+    "explore-unknowns": {
+      "files": {
+        "SKILL.md": {
+          "mode": "100644",
+          "sha256": "ad23dca57cbb5adc6cc077d861e8a54f1c81e7c9cbd59db7b9802512b7aeb7ae"
+        },
+        "references/after-the-walk.md": {
+          "mode": "100644",
+          "sha256": "f93ae84b932e3d7e0009921e8c505089bd26ae27ee157fd9f5bc16f5a538faed"
+        },
+        "references/stage-1-known-knowns.md": {
+          "mode": "100644",
+          "sha256": "bf64d44b5a879757fd9f53a59c145af57087560c7ccc5b9949d938625e4c187e"
+        },
+        "references/stage-2-known-unknowns.md": {
+          "mode": "100644",
+          "sha256": "4351e5fcf023eb581382e5d9d4f826fb4c5538b4f0b88af3efc51a0996b7179f"
+        },
+        "references/stage-3-unknown-knowns.md": {
+          "mode": "100644",
+          "sha256": "3b505102aa34492de3a961677227fba134f20ebb1eb6716dc5ddaf97df7f5d38"
+        },
+        "references/stage-4-unknown-unknowns.md": {
+          "mode": "100644",
+          "sha256": "05670dc3d83d020ef5a2987cf459dd2e8e8b1f1eccc82a6071d1fd9a497eed45"
+        },
+        "references/stage-5-hand-over-the-map.md": {
+          "mode": "100644",
+          "sha256": "ff7cab21490e898903fb708c8bcbadea17815975261bfeaf5abe7cf51dc1e8bf"
+        }
+      },
+      "path": "skills/engineering/explore-unknowns",
+      "source": "dzhng/skills",
+      "vend": false
+    },
+    "find-overengineering": {
+      "files": {
+        "SKILL.md": {
+          "mode": "100644",
+          "sha256": "3d163c45ef9bf57b7dd5fc75b14ea97056017b6066f8fa86fe5b57e82b1d7654"
+        }
+      },
+      "path": "skills/engineering/find-overengineering",
+      "source": "dzhng/skills",
+      "vend": false
+    },
+    "find-state-machines": {
+      "files": {
+        "SKILL.md": {
+          "mode": "100644",
+          "sha256": "3a56d325ba257b86da0c2bfca909369b01b72e7bc7fd9e8a1dcca0c41a1e9f39"
+        }
+      },
+      "path": "skills/engineering/find-state-machines",
+      "source": "dzhng/skills",
+      "vend": true
+    },
+    "port-features": {
+      "files": {
+        "SKILL.md": {
+          "mode": "100644",
+          "sha256": "22adfedaef95c943e86fed39253f8c04a74ff50b17034a2c045ac6fe260fc691"
+        }
+      },
+      "path": "skills/engineering/port-features",
+      "source": "dzhng/skills",
+      "vend": false
+    },
+    "refactor-clean": {
+      "files": {
+        "SKILL.md": {
+          "mode": "100644",
+          "sha256": "03e70a60e2d83d0c84ce92e8d199935bc8e0aef2bf57ef263aa0da7599c1fd41"
+        }
+      },
+      "path": "skills/engineering/refactor-clean",
+      "source": "dzhng/skills",
+      "vend": true
+    },
+    "review": {
+      "files": {
+        "SKILL.md": {
+          "mode": "100644",
+          "sha256": "793308592d5603b83a1aad9a34f710ce808ea074382f096075080e62c4408552"
+        }
+      },
+      "path": "skills/engineering/review",
+      "source": "dzhng/skills",
+      "vend": false
+    },
+    "write-docs": {
+      "files": {
+        "SKILL.md": {
+          "mode": "100644",
+          "sha256": "522d8171a7067b20880b17f389009d7aaa8d38ec4ffdc46af9ae4147e5353eb7"
+        }
+      },
+      "path": "skills/engineering/write-docs",
+      "source": "dzhng/skills",
+      "vend": true
+    },
+    "write-skills": {
+      "files": {
+        "SKILL.md": {
+          "mode": "100644",
+          "sha256": "3bacf02ad5bf749ef274958d234a96673e5aa59e03ed250dd3919cafc4e24e17"
+        }
+      },
+      "path": "skills/authoring/write-skills",
+      "source": "dzhng/skills",
+      "vend": false
+    },
+    "write-tests": {
+      "files": {
+        "SKILL.md": {
+          "mode": "100644",
+          "sha256": "56a08e2276b2aa64e666ad184f768b53d89668b25da21c3d38ec01dd5779955e"
+        }
+      },
+      "path": "skills/engineering/write-tests",
+      "source": "dzhng/skills",
+      "vend": true
+    }
+  },
+  "sources": {
+    "dzhng/skills": {
+      "license_path": "LICENSE",
+      "license_sha256": "653bb41fb060605c0e01fd72e6e6be72bffef192e0ab6ae8b0cd4abf9ba8d040",
+      "sha": "828e386301530b406b2fbd6d48136eae75720262",
+      "url": "https://github.com/dzhng/skills.git"
+    }
+  }
+}

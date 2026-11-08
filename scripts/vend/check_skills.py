@@ -3,9 +3,14 @@
 
     check_skills.py [--root VENDED_DIR]
 
-Checks every `<root>/skills/<name>/` and, for the dash and term rules, `<root>/CONTRIBUTING.md`
-and `<root>/AGENTS-block.md`. Prints `path:line: message` per finding. Exit 0 clean, 1 findings,
+Checks every `<root>/skills/<name>/`, and `<root>/CONTRIBUTING.md` and `<root>/AGENTS-block.md`
+for the dash and term rules. Prints `path:line: message` per finding. Exit 0 clean, 1 findings,
 2 usage. Stdlib only.
+
+Skills are read only by agents, so the dash rules apply only to the two human-read files. A skill
+named in `<root>/upstream.lock.json` with `"vend": true` is a pinned upstream copy: it must match
+the lock byte for byte (plus the source's LICENSE) and skips the provenance, licence-frontmatter and
+name-mention rules, which upstream text cannot meet. Every skill's `../<name>/` links must resolve.
 
 VENDED_EXTRA_TERMS_FILE, when set, names a file of further forbidden terms, one per line (# starts
 a comment line), so a maintainer can check names that must not be spelled out in this public repo.
@@ -14,6 +19,8 @@ a comment line), so a maintainer can check names that must not be spelled out in
 from __future__ import annotations
 
 import argparse
+import hashlib
+import json
 import os
 import re
 import sys
@@ -36,7 +43,12 @@ FORBIDDEN_TERMS = (
     "~/repos",
 )
 # Names a skill may still cite by mistake after a rename or a drop.
-FORMER_SKILLS = ("audit-choices",)
+FORMER_SKILLS = ("audit-choices", "receiving-code-review", "verification-before-completion")
+# Upstream skills link these by `../<name>/`; they are deliberately not vended, and the AGENTS
+# block says what each means here.
+DELIBERATELY_ABSENT = frozenset({"find-overengineering", "review"})
+LOCK_NAME = "upstream.lock.json"
+LINK_RE = re.compile(r"\]\(\.\./([A-Za-z0-9_.-]+)/")
 # What a LICENSE must contain for each frontmatter licence.
 LICENSE_MARKERS = {
     "MIT": ("Permission is hereby granted",),
@@ -78,19 +90,37 @@ def extra_terms() -> tuple[str, ...]:
     return tuple(t.strip() for t in lines if t.strip() and not t.lstrip().startswith("#"))
 
 
-def text_rules(path: Path, text: str, out: list[str], terms: tuple[str, ...] = FORBIDDEN_TERMS) -> None:
+def text_rules(path: Path, text: str, out: list[str], terms: tuple[str, ...] = FORBIDDEN_TERMS,
+               dashes: bool = True) -> None:
+    """Forbidden terms always; the dash rules only for text a human reads (`dashes=True`)."""
     lowered_terms = [(t, t.lower()) for t in terms]
     for no, line in enumerate(text.splitlines(), 1):
-        for ch, name in DASHES.items():
-            if ch in line:
-                out.append(f"{path}:{no}: {name} (U+{ord(ch):04X}); use a spaced hyphen or rewrite")
+        if dashes:
+            for ch, name in DASHES.items():
+                if ch in line:
+                    out.append(f"{path}:{no}: {name} (U+{ord(ch):04X}); use a spaced hyphen or rewrite")
         low = line.lower()
         for term, lt in lowered_terms:
             if lt in low:
                 out.append(f"{path}:{no}: forbidden term {term!r}")
+    if not dashes:
+        return
     for no, line in prose_lines(text):
         if " -- " in line or line.rstrip().endswith(" --") or line.startswith("-- "):
             out.append(f"{path}:{no}: double hyphen outside code; rewrite the sentence")
+
+
+def link_rules(path: Path, text: str, me: str, names: dict[str, bool], out: list[str]) -> None:
+    """Every `](../<name>/...)` link must reach a vended skill a default-set skill may cite."""
+    my_opt_in = names.get(me, False)
+    for no, line in enumerate(text.splitlines(), 1):
+        for target in LINK_RE.findall(line):
+            if target in DELIBERATELY_ABSENT or target == me:
+                continue
+            if target not in names:
+                out.append(f"{path}:{no}: links {target!r}, which is not a vended skill")
+            elif names[target] and not my_opt_in:
+                out.append(f"{path}:{no}: default-set skill links opt-in skill {target!r}")
 
 
 def ref_rules(path: Path, text: str, me: str, names: dict[str, bool], out: list[str]) -> None:
@@ -114,7 +144,38 @@ def skill_entries(d: Path):
             yield Path(dirpath) / name
 
 
-def check_skill(d: Path, names: dict[str, bool], out: list[str], terms: tuple[str, ...] = FORBIDDEN_TERMS) -> None:
+def file_mode(f: Path) -> str:
+    """The git file mode of a regular file: 100755 when any execute bit is set, else 100644."""
+    return "100755" if f.stat().st_mode & 0o111 else "100644"
+
+
+def sha256_file(f: Path) -> str:
+    return hashlib.sha256(f.read_bytes()).hexdigest()
+
+
+def pinned_rules(d: Path, entry: dict, source: dict, out: list[str]) -> None:
+    """A pinned skill holds exactly the locked files plus the source's LICENSE, unchanged."""
+    want = entry.get("files") or {}
+    have = {f.relative_to(d).as_posix() for f in skill_entries(d) if f.is_file() and not f.is_symlink()}
+    for rel in sorted(have - set(want) - {"LICENSE"}):
+        out.append(f"{d / rel}:0: not in {LOCK_NAME}; a pinned skill holds only upstream files")
+    for rel in sorted(set(want) - have):
+        out.append(f"{d / rel}:0: missing; {LOCK_NAME} pins it")
+    for rel in sorted(set(want) & have):
+        f = d / rel
+        spec = want[rel]
+        if sha256_file(f) != spec.get("sha256"):
+            out.append(f"{f}:0: differs from upstream at the locked commit; resync, do not edit")
+        if file_mode(f) != spec.get("mode", "100644"):
+            out.append(f"{f}:0: mode {file_mode(f)} differs from the locked {spec.get('mode', '100644')}")
+    lic = d / "LICENSE"
+    if lic.is_file() and sha256_file(lic) != source.get("license_sha256"):
+        out.append(f"{lic}:0: differs from the upstream LICENSE recorded in {LOCK_NAME}")
+
+
+def check_skill(d: Path, names: dict[str, bool], out: list[str], terms: tuple[str, ...] = FORBIDDEN_TERMS,
+                pinned: tuple[dict, dict] | None = None) -> None:
+    """Lint one skill dir. `pinned` is (lock entry, lock source) for a pinned upstream copy."""
     skill_md = d / "SKILL.md"
     if not skill_md.is_file() or skill_md.is_symlink():
         out.append(f"{d}:0: missing SKILL.md")
@@ -131,9 +192,13 @@ def check_skill(d: Path, names: dict[str, bool], out: list[str], terms: tuple[st
         except UnicodeDecodeError:
             out.append(f"{f}:0: not UTF-8; vended skill files are UTF-8 text")
             continue
-        text_rules(f, text, out, terms)
+        text_rules(f, text, out, terms, dashes=False)
         if f.name != "LICENSE":
-            ref_rules(f, text, d.name, names, out)
+            link_rules(f, text, d.name, names, out)
+            if pinned is None:
+                ref_rules(f, text, d.name, names, out)
+    if pinned is not None:
+        pinned_rules(d, pinned[0], pinned[1], out)
     if not skill_md.is_file() or skill_md.is_symlink():
         return
     text = skill_md.read_text(encoding="utf-8")
@@ -147,6 +212,10 @@ def check_skill(d: Path, names: dict[str, bool], out: list[str], terms: tuple[st
     desc = meta.get("description")
     if not isinstance(desc, str) or not desc.strip():
         out.append(f"{skill_md}:1: frontmatter description is missing or empty")
+    if "allowed-tools" in meta:
+        out.append(f"{skill_md}:1: frontmatter must not carry allowed-tools")
+    if pinned is not None:
+        return  # the lock carries provenance and licence for a pinned upstream copy
     lic = meta.get("license")
     parts = lic.split(" AND ") if isinstance(lic, str) else []
     if not parts or any(p.strip() not in LICENSES for p in parts):
@@ -162,8 +231,6 @@ def check_skill(d: Path, names: dict[str, bool], out: list[str], terms: tuple[st
             if missing:
                 out.append(f"{license_file}:1: LICENSE text does not match the frontmatter license {lic!r} "
                            f"(missing {', '.join(repr(m) for m in missing)})")
-    if "allowed-tools" in meta:
-        out.append(f"{skill_md}:1: frontmatter must not carry allowed-tools")
     # Provenance counts only in prose: a Source line inside a code block is not attribution.
     body = [line for no, line in prose_lines(text) if no > body_start]
     if not any(re.match(r"^\s*(?:[*_]{1,2})?Sources?:", line) for line in body):
@@ -184,9 +251,31 @@ def skill_names(skills_root: Path) -> dict[str, bool]:
     return names
 
 
+def load_lock(root: Path, out: list[str]) -> dict:
+    """The upstream lock, or an empty one when absent. A malformed lock is a finding."""
+    p = root / LOCK_NAME
+    if not p.is_file():
+        return {"sources": {}, "skills": {}}
+    try:
+        lock = json.loads(p.read_text(encoding="utf-8"))
+    except json.JSONDecodeError as exc:
+        out.append(f"{p}:{exc.lineno}: not valid JSON ({exc.msg})")
+        return {"sources": {}, "skills": {}}
+    if not isinstance(lock, dict) or lock.get("schema") != 1:
+        out.append(f"{p}:1: schema must be 1")
+        return {"sources": {}, "skills": {}}
+    for name, entry in sorted((lock.get("skills") or {}).items()):
+        if entry.get("source") not in (lock.get("sources") or {}):
+            out.append(f"{p}:0: skill {name!r} names unknown source {entry.get('source')!r}")
+    return lock
+
+
 def run(root: Path) -> list[str]:
     out: list[str] = []
     terms = FORBIDDEN_TERMS + extra_terms()
+    lock = load_lock(root, out)
+    sources = lock.get("sources") or {}
+    locked = lock.get("skills") or {}
     skills_root = root / "skills"
     if not skills_root.is_dir():
         out.append(f"{skills_root}:0: missing (the skills directory)")
@@ -196,7 +285,15 @@ def run(root: Path) -> list[str]:
             if not entry.is_dir() or entry.is_symlink():
                 out.append(f"{entry}:0: not a skill directory")
                 continue
-            check_skill(entry, names, out, terms)
+            spec = locked.get(entry.name)
+            if spec is not None and not spec.get("vend"):
+                out.append(f"{entry}:0: {LOCK_NAME} marks {entry.name!r} vend false; it must not be here")
+                continue
+            pinned = (spec, sources.get(spec.get("source"), {})) if spec is not None else None
+            check_skill(entry, names, out, terms, pinned)
+        for name, spec in sorted(locked.items()):
+            if spec.get("vend") and not (skills_root / name).is_dir():
+                out.append(f"{skills_root / name}:0: missing; {LOCK_NAME} vends it")
     for name in ("CONTRIBUTING.md", "AGENTS-block.md"):
         p = root / name
         if not p.is_file():

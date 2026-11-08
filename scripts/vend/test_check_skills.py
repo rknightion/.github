@@ -3,7 +3,9 @@
 from __future__ import annotations
 
 import contextlib
+import hashlib
 import io
+import json
 import os
 import sys
 import tempfile
@@ -81,9 +83,9 @@ class TestClean(LintCase):
             self.assertEqual(check_skills.main(["--bogus"]), 2)
 
     def test_output_format(self) -> None:
-        self.add_skill("bad-skill", body=f"Line {DASH_EM} here.\n")
+        self.add_skill("bad-skill", body="Line names Kodus here.\n")
         _, out = self.lint()
-        self.assertRegex(out, r"bad-skill/SKILL\.md:\d+: em dash")
+        self.assertRegex(out, r"bad-skill/SKILL\.md:\d+: forbidden term 'kodus'")
 
 
 class TestStructure(LintCase):
@@ -188,28 +190,33 @@ class TestStructure(LintCase):
 
 
 class TestTextRules(LintCase):
+    # The dash rules cover text a human reads (CONTRIBUTING.md, AGENTS-block.md). Skills are read
+    # only by agents and are exempt.
+    def block(self, text: str) -> None:
+        (self.root / "AGENTS-block.md").write_text(text)
+
     def test_em_dash(self) -> None:
-        self.add_skill("em-skill", body=f"a {DASH_EM} b\n")
-        self.assertFinding("em dash")
+        self.block(f"a {DASH_EM} b\n")
+        self.assertFinding("AGENTS-block.md:1: em dash")
 
     def test_en_dash_even_in_code(self) -> None:
-        self.add_skill("en-skill", body=f"`1{DASH_EN}2`\n")
+        self.block(f"`1{DASH_EN}2`\n")
         self.assertFinding("en dash")
 
     def test_double_hyphen_in_prose(self) -> None:
-        self.add_skill("dh-skill", body="this -- that\n")
+        self.block("this -- that\n")
         self.assertFinding("double hyphen outside code")
 
     def test_double_hyphen_after_closed_fence(self) -> None:
-        self.add_skill("fence-skill", body="```\nx -- y\n```\n\nafter -- fence\n")
+        self.block("```\nx -- y\n```\n\nafter -- fence\n")
         self.assertFinding("double hyphen outside code")
 
     def test_fence_line_with_trailing_text_does_not_close_a_fence(self) -> None:
         # A closing fence carries nothing but whitespace after its marks. "```bash title" inside a block is
         # content; read as a closer, it flipped every later fence and hid the prose after the block.
-        self.add_skill("info-skill", body="```\nexample\n```bash title\nstill code -- here\n```\n\nafter -- fence\n")
+        self.block("```\nexample\n```bash title\nstill code -- here\n```\n\nafter -- fence\n")
         out = check_skills.run(self.root)
-        self.assertEqual([f for f in out if "double hyphen" in f], [f"{self.root / 'skills' / 'info-skill' / 'SKILL.md'}:19: double hyphen outside code; rewrite the sentence"], out)
+        self.assertEqual([f for f in out if "double hyphen" in f], [f"{self.root / 'AGENTS-block.md'}:7: double hyphen outside code; rewrite the sentence"], out)
 
     def test_shorter_or_other_fence_does_not_close(self) -> None:
         lines = list(check_skills.prose_lines("````md\n```\nin -- code\n````\nout\n~~~\n```\nx\n~~~\nlast\n"))
@@ -219,11 +226,11 @@ class TestTextRules(LintCase):
         lines = list(check_skills.prose_lines("```bash title=x\na -- b\n```  \nprose\n"))
         self.assertEqual(lines, [(4, "prose")])
 
-    def test_dash_in_references_file(self) -> None:
-        d = self.add_skill("ref-skill")
+    def test_dashes_in_skills_are_allowed(self) -> None:
+        d = self.add_skill("dash-skill", body=f"a {DASH_EM} b, `1{DASH_EN}2`, this -- that\n")
         (d / "references").mkdir()
         (d / "references" / "notes.md").write_text(f"x {DASH_EM} y\n")
-        self.assertFinding("references/notes.md:1: em dash")
+        self.assertEqual(self.lint(), (0, ""))
 
     def test_each_forbidden_term(self) -> None:
         for term in check_skills.FORBIDDEN_TERMS:
@@ -287,6 +294,140 @@ class TestReferences(LintCase):
     def test_name_inside_longer_word_is_not_a_reference(self) -> None:
         self.add_skill("caller-skill", body="not-opt-skill-thing\n")
         self.assertEqual(self.lint()[0], 0)
+
+    def test_former_skills_include_the_dropped_ones(self) -> None:
+        for name in ("receiving-code-review", "verification-before-completion"):
+            with self.subTest(name=name):
+                self.add_skill("caller-skill", body=f"Then run {name}.\n")
+                self.assertFinding(f"cites {name!r}, which is not a vended skill")
+
+
+class TestLinks(LintCase):
+    def test_link_to_vended_skill_ok(self) -> None:
+        self.add_skill("caller-skill", body="Read [it](../good-skill/SKILL.md).\n")
+        self.assertEqual(self.lint()[0], 0)
+
+    def test_dangling_link(self) -> None:
+        self.add_skill("caller-skill", body="Read [it](../write-spec/SKILL.md).\n")
+        self.assertFinding("links 'write-spec', which is not a vended skill")
+
+    def test_deliberately_absent_link_passes(self) -> None:
+        self.add_skill("caller-skill", body="Run [review](../review/SKILL.md) and "
+                       "[find-overengineering](../find-overengineering/SKILL.md).\n")
+        self.assertEqual(self.lint()[0], 0)
+
+    def test_default_links_opt_in(self) -> None:
+        self.add_skill("caller-skill", body="See [sql](../opt-skill/SKILL.md).\n")
+        self.assertFinding("default-set skill links opt-in skill 'opt-skill'")
+
+
+def sha(data: bytes) -> str:
+    return hashlib.sha256(data).hexdigest()
+
+
+UPSTREAM_SKILL = "---\nname: up-skill\ndescription: An upstream skill \u2014 unchanged.\n---\n\n# Up\n\nNo provenance lines; see [d](../review/SKILL.md).\n"
+
+
+class TestPinned(LintCase):
+    """A skill in upstream.lock.json with vend true is an unchanged upstream copy."""
+
+    def setUp(self) -> None:
+        super().setUp()
+        self.up = self.root / "skills" / "up-skill"
+        self.up.mkdir(parents=True)
+        (self.up / "SKILL.md").write_text(UPSTREAM_SKILL)
+        (self.up / "LICENSE").write_text(MIT_TEXT)
+        self.lock = {
+            "schema": 1,
+            "sources": {"ex/skills": {"url": "https://example.com/skills.git", "sha": "a" * 40,
+                                      "license_path": "LICENSE", "license_sha256": sha(MIT_TEXT.encode())}},
+            "skills": {"up-skill": {"source": "ex/skills", "path": "skills/up-skill", "vend": True,
+                                    "files": {"SKILL.md": {"sha256": sha(UPSTREAM_SKILL.encode()), "mode": "100644"}}}},
+        }
+        self.write_lock()
+
+    def write_lock(self) -> None:
+        (self.root / "upstream.lock.json").write_text(json.dumps(self.lock))
+
+    def test_unchanged_pinned_skill_passes_without_provenance_or_license_field(self) -> None:
+        self.assertEqual(self.lint(), (0, ""))
+
+    def test_tampered_file(self) -> None:
+        (self.up / "SKILL.md").write_text(UPSTREAM_SKILL + "Local edit.\n")
+        self.assertFinding("up-skill/SKILL.md:0: differs from upstream at the locked commit")
+
+    def test_extra_file(self) -> None:
+        (self.up / "notes.md").write_text("x\n")
+        self.assertFinding("up-skill/notes.md:0: not in upstream.lock.json")
+
+    def test_missing_file(self) -> None:
+        self.lock["skills"]["up-skill"]["files"]["references/a.md"] = {"sha256": "0" * 64, "mode": "100644"}
+        self.write_lock()
+        self.assertFinding("up-skill/references/a.md:0: missing; upstream.lock.json pins it")
+
+    def test_wrong_mode(self) -> None:
+        os.chmod(self.up / "SKILL.md", 0o755)
+        self.assertFinding("mode 100755 differs from the locked 100644")
+
+    def test_license_mismatch(self) -> None:
+        (self.up / "LICENSE").write_text(APACHE_TEXT)
+        self.assertFinding("up-skill/LICENSE:0: differs from the upstream LICENSE")
+
+    def test_missing_license(self) -> None:
+        (self.up / "LICENSE").unlink()
+        self.assertFinding("up-skill:0: missing LICENSE")
+
+    def test_vend_true_without_dir(self) -> None:
+        self.lock["skills"]["gone-skill"] = {"source": "ex/skills", "path": "skills/gone-skill", "vend": True, "files": {}}
+        self.write_lock()
+        self.assertFinding("gone-skill:0: missing; upstream.lock.json vends it")
+
+    def test_vend_false_with_dir(self) -> None:
+        self.lock["skills"]["up-skill"]["vend"] = False
+        self.write_lock()
+        self.assertFinding("marks 'up-skill' vend false; it must not be here")
+
+    def test_vend_false_without_dir_is_fine(self) -> None:
+        self.lock["skills"]["plugin-only"] = {"source": "ex/skills", "path": "skills/plugin-only", "vend": False, "files": {}}
+        self.write_lock()
+        self.assertEqual(self.lint()[0], 0)
+
+    def test_forbidden_term_still_checked(self) -> None:
+        text = UPSTREAM_SKILL + "Ask Kodus.\n"
+        (self.up / "SKILL.md").write_text(text)
+        self.lock["skills"]["up-skill"]["files"]["SKILL.md"]["sha256"] = sha(text.encode())
+        self.write_lock()
+        self.assertFinding("forbidden term 'kodus'")
+
+    def test_allowed_tools_still_checked(self) -> None:
+        text = UPSTREAM_SKILL.replace("---\n\n# Up", "allowed-tools: Read Bash\n---\n\n# Up")
+        (self.up / "SKILL.md").write_text(text)
+        self.lock["skills"]["up-skill"]["files"]["SKILL.md"]["sha256"] = sha(text.encode())
+        self.write_lock()
+        self.assertFinding("must not carry allowed-tools")
+
+    def test_dangling_link_still_checked(self) -> None:
+        text = UPSTREAM_SKILL + "Then [spec](../write-spec/SKILL.md).\n"
+        (self.up / "SKILL.md").write_text(text)
+        self.lock["skills"]["up-skill"]["files"]["SKILL.md"]["sha256"] = sha(text.encode())
+        self.write_lock()
+        self.assertFinding("links 'write-spec', which is not a vended skill")
+
+    def test_name_mentions_not_checked_in_pinned(self) -> None:
+        text = UPSTREAM_SKILL + "Upstream prose naming audit-choices.\n"
+        (self.up / "SKILL.md").write_text(text)
+        self.lock["skills"]["up-skill"]["files"]["SKILL.md"]["sha256"] = sha(text.encode())
+        self.write_lock()
+        self.assertEqual(self.lint()[0], 0)
+
+    def test_malformed_lock(self) -> None:
+        (self.root / "upstream.lock.json").write_text("{not json")
+        self.assertFinding("upstream.lock.json:1: not valid JSON")
+
+    def test_unknown_source(self) -> None:
+        self.lock["skills"]["up-skill"]["source"] = "nobody/skills"
+        self.write_lock()
+        self.assertFinding("names unknown source 'nobody/skills'")
 
 
 if __name__ == "__main__":
