@@ -17,5 +17,6 @@
   {"repo": "rknightion/meraki-dashboard-ha"},
   {"repo": "rknightion/tailscale2otel"},
   {"repo": "rknightion/opnsense2otel"},
-  {"repo": "m7kni/synthkit-hosted", "privacy_sweep": false}
+  {"repo": "m7kni/synthkit-hosted", "privacy_sweep": false},
+  {"repo": "BroTEK-Solutions/ha-addons"}
 ]}
