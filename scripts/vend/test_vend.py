@@ -351,6 +351,10 @@ class TestSymlinks(VendCase):
 
 
 class TestContributing(VendCase):
+    def test_malformed_template_is_a_usage_error(self) -> None:
+        (self.src / "vended/CONTRIBUTING.md").write_text(TEMPLATE.replace("<!-- vended:repo-facts:end -->", ""))
+        self.assertEqual(self.run_vend()[0], 2)
+
     def test_repo_facts_kept_and_rest_replaced(self) -> None:
         mine = TEMPLATE.replace("PLACEHOLDER", "Needs Go 1.25.\nSlow tier: just e2e.")
         (self.tgt / "CONTRIBUTING.md").write_text(mine)

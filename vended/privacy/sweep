@@ -101,6 +101,15 @@ _BOMS = ((codecs.BOM_UTF32_LE, "utf-32"), (codecs.BOM_UTF32_BE, "utf-32"),
          (codecs.BOM_UTF16_LE, "utf-16"), (codecs.BOM_UTF16_BE, "utf-16"))
 
 
+def printable(path):
+    """A path with control characters escaped, so a crafted file name cannot start a new log line."""
+    out = []
+    for c in path:
+        o = ord(c)
+        out.append(c if c.isprintable() and c != "\\" else f"\\x{o:02x}" if o < 256 else f"\\u{o:04x}")
+    return "".join(out)
+
+
 def nul_heavy(data):
     return data.count(0) * 5 >= len(data) > 0
 
@@ -384,13 +393,13 @@ def run(lines, rules, allow, strict, names=()):
         files.add(name)
         for _, rule in findings(name, rules, allow, strict):
             count += 1
-            print(f"{name}:0:0: {rule} (file name)")
+            print(f"{printable(name)}:0:0: {rule} (file name)")
     for path, number, text in lines:
         swept += 1
         files.add(path)
         for column, rule in findings(text, rules, allow, strict):
             count += 1
-            print(f"{path}:{number}:{column}: {rule}")
+            print(f"{printable(path)}:{number}:{column}: {rule}")
     if count:
         print(f"privacy sweep: {count} finding(s) in {swept} line(s) from {len(files)} file(s). {HINT}", file=sys.stderr)
         return 1

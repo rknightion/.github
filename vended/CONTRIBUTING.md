@@ -57,7 +57,7 @@ in particular: the tools and versions `just setup` expects to find, anything slo
 
 - The first time you contribute, a maintainer has to approve the CI run before it starts. That is
   normal; it is not a sign anything is wrong.
-- A pull request from a fork gets no repository secrets. Checks that need one either skip or are
+- Workflows run for a pull request from a fork get no repository secrets. Checks that need one either skip or are
   not required, so a skipped or missing check is not a failure on your side. A maintainer runs
   anything that needs credentials.
 - A missing, skipped or cancelled required check is not a pass. Wait for the required checks to go

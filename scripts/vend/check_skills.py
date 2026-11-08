@@ -159,7 +159,8 @@ def check_skill(d: Path, names: dict[str, bool], out: list[str], terms: tuple[st
                            f"(missing {', '.join(repr(m) for m in missing)})")
     if "allowed-tools" in meta:
         out.append(f"{skill_md}:1: frontmatter must not carry allowed-tools")
-    body = text.splitlines()[body_start:]
+    # Provenance counts only in prose: a Source line inside a code block is not attribution.
+    body = [line for no, line in prose_lines(text) if no > body_start]
     if not any(re.match(r"^\s*(?:[*_]{1,2})?Sources?:", line) for line in body):
         out.append(f"{skill_md}:{body_start + 1}: body has no 'Source:' line")
     if not any("changes from the source" in line.lower() for line in body):

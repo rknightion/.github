@@ -450,7 +450,10 @@ def plan_whole_file(target: Path, rel: str, data: bytes, mode: int, recorded: di
 
 def plan_contributing(target: Path, template: str, recorded: dict, force: bool, plan: Plan) -> None:
     rel = CONTRIBUTING_PATH
-    tparts = contributing_parts(template)
+    try:
+        tparts = contributing_parts(template)
+    except RegionError as exc:
+        raise UsageError(f"vended/CONTRIBUTING.md (the template): {exc}") from exc
     if tparts is None:
         raise UsageError("vended/CONTRIBUTING.md has no repo-facts region")
     current = read_target(target, rel)

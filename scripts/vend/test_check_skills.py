@@ -160,6 +160,12 @@ class TestStructure(LintCase):
                        "Changes from the source: y\n")
         self.assertFinding("no 'Source:' line")
 
+    def test_source_only_inside_a_code_block_does_not_count(self) -> None:
+        self.add_skill("codesrc-skill",
+                       "---\nname: codesrc-skill\ndescription: d\nlicense: MIT\n---\n\n"
+                       "```\nSource: x\n```\n\nChanges from the source: y\n")
+        self.assertFinding("no 'Source:' line")
+
     def test_no_changes_note(self) -> None:
         self.add_skill("nochg-skill",
                        "---\nname: nochg-skill\ndescription: d\nlicense: MIT\n---\n\nSource: x\n")

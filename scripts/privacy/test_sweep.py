@@ -183,6 +183,15 @@ class SweepTest(unittest.TestCase):
         self.assertEqual(code, 1, out + err)
         self.assertEqual(out.strip(), name + ":0:0: address (file name)")
 
+    def test_control_characters_in_a_path_are_escaped(self):
+        name = "x\n::error::y-" + PUBLIC_IP + ".md"
+        self.repo.write(name, "nothing here\n")
+        self.repo.commit("crafted")
+        code, out, err = self.branch_sweep()
+        self.assertEqual(code, 1, out + err)
+        self.assertEqual(out.count("\n"), 1, out)
+        self.assertIn("x\\x0a::error::y-", out)
+
     def test_empty_added_file_name_is_swept(self):
         name = "contact-" + EMAIL + ".txt"
         self.repo.write(name, "")
