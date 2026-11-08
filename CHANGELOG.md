@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.26.4](https://github.com/rknightion/.github/compare/v1.26.3...v1.26.4) (2026-11-08)
+
+
+### Bug Fixes
+
+* **privacy:** the PyPI token pattern needs the token's real prefix ([0a8adaf](https://github.com/rknightion/.github/commit/0a8adafaa1056700bd5599c060fd99e34a77a8c2))
+
 ## [1.26.3](https://github.com/rknightion/.github/compare/v1.26.2...v1.26.3) (2026-11-08)
 
 
