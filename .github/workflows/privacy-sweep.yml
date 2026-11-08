@@ -8,7 +8,9 @@ name: privacy-sweep (reusable)
 # job.workflow_sha, the commit of this workflow the caller named in `uses:`, together with its
 # default patterns file. The caller's own .github/privacy/patterns.txt and allow.txt are read from the
 # pull request's BASE commit, so a pull request cannot loosen its own sweep through those files. The
-# head checkout supplies only the diff; nothing from it runs.
+# head checkout supplies only the diff; nothing from it runs. It goes into its own directory (head/) beside
+# the sweep's (judge/), never around it, so nothing the pull request commits (a file or a symlink) can land
+# on or redirect the sweep checkout.
 #
 # Limit: on a pull_request event the caller's workflow file comes from the PR head, so a PR can repoint
 # `uses:`, pass other inputs or replace the job with a stub of the same name. That is the same limit
@@ -81,22 +83,25 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: ${{ github.event.pull_request.head.sha }}
+          path: head
           # The sweep diffs from the merge base, which a shallow clone cannot resolve.
           fetch-depth: 0
           persist-credentials: false
 
-      # The sweep comes from the commit of this reusable workflow the caller named, never from the caller's tree.
+      # The sweep comes from the commit of this reusable workflow the caller named, never from the caller's tree,
+      # and sits beside the pull request tree (head/), not inside it.
       - name: Checkout the sweep at the pinned reusable commit
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           repository: rknightion/.github
           ref: ${{ job.workflow_sha }}
-          path: .privacy-sweep-judge
+          path: judge
           persist-credentials: false
           sparse-checkout: vended/privacy/
           sparse-checkout-cone-mode: false
 
       - name: Sweep the lines this pull request adds
+        working-directory: head
         env:
           BASE_SHA: ${{ github.event.pull_request.base.sha }}
           HEAD_SHA: ${{ github.event.pull_request.head.sha }}
@@ -124,4 +129,4 @@ jobs:
           done
           if [[ "$STRICT_ADDRESSES" == true ]]; then args+=(--strict-addresses); fi
           # -I: the pinned sweep runs isolated from PYTHON* variables and the working directory.
-          python3 -I .privacy-sweep-judge/vended/privacy/sweep "${args[@]}" < /dev/null
+          python3 -I ../judge/vended/privacy/sweep "${args[@]}" < /dev/null

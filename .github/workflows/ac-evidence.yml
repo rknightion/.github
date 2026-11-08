@@ -11,7 +11,11 @@ name: ac-evidence (reusable)
 # Actions run that references rknightion/.github/.github/workflows/ac-evidence.yml at a commit on this
 # repo's main, and refuses a PR that changed .github/workflows or .github/actions. Make the check required in
 # a branch ruleset so GitHub's own Closes-#N auto-close also waits for it. The caller's head commit is checked
-# out only as the files a proof may cite.
+# out only as the files a proof may cite, into its own directory beside the checker's, never around it, so
+# nothing the pull request commits (a file or a symlink) can land on or redirect the checker.
+#
+# Only pull_request events are judged. Any other event fails the job loudly, because a skipped required
+# check reports success.
 #
 # Caller permissions are mandatory (a called workflow is capped by its caller and validated at startup):
 # contents: read, issues: read, pull-requests: read.
@@ -64,7 +68,6 @@ concurrency:
 jobs:
   ac-evidence:
     name: Acceptance evidence
-    if: github.event_name == 'pull_request'
     runs-on: ${{ inputs.runs-on }}
     timeout-minutes: 5
     permissions:
@@ -77,6 +80,15 @@ jobs:
         uses: step-security/harden-runner@46b06cea07f9e64621fdf066ba77ac6915163d43 # v2.22.3
         with:
           egress-policy: audit
+
+      - name: Refuse anything but a pull request
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+        run: |
+          if [[ "$EVENT_NAME" != "pull_request" ]]; then
+            echo "::error title=Acceptance evidence::this check judges pull_request events only, not ${EVENT_NAME}; call it from a pull_request trigger"
+            exit 1
+          fi
 
       # Check runs belong to a commit, not a pull request, so two pull requests at one head share them.
       # This annotation names the pull request this run judged; `tracker close --pr` requires it to match.
@@ -95,6 +107,7 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: ${{ github.event.pull_request.head.sha }}
+          path: head
           persist-credentials: false
 
       - name: Refuse to run without the pinned reusable commit
@@ -106,13 +119,14 @@ jobs:
             exit 1
           fi
 
-      # The checker comes from the commit of this reusable workflow the caller named, never from the caller's tree.
+      # The checker comes from the commit of this reusable workflow the caller named, never from the caller's tree,
+      # and sits beside the pull request tree (head/), not inside it.
       - name: Checkout the checker at the pinned reusable commit
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           repository: rknightion/.github
           ref: ${{ job.workflow_sha }}
-          path: .ac-evidence-judge
+          path: judge
           persist-credentials: false
           sparse-checkout: scripts/ac-evidence/ac-evidence-check.mjs
           sparse-checkout-cone-mode: false
@@ -130,4 +144,5 @@ jobs:
           PR_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
           AC_EVIDENCE_ENFORCE_ALL_PRS: ${{ inputs.enforce-all-prs && 'true' || 'false' }}
           AC_EVIDENCE_RELEASE_AUTHOR: ${{ inputs.release-please-author }}
-        run: node .ac-evidence-judge/scripts/ac-evidence/ac-evidence-check.mjs < /dev/null
+          AC_EVIDENCE_TREE: head
+        run: node judge/scripts/ac-evidence/ac-evidence-check.mjs < /dev/null

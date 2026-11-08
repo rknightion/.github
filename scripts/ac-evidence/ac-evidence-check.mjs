@@ -16,6 +16,7 @@
 // the API (a re-run of a job keeps the original event payload, so the payload goes stale after an edit), parsed
 // as data, and only ever printed through an escaped workflow annotation. It is never put into a shell.
 import { execFile } from "node:child_process";
+import { resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { promisify } from "node:util";
 
@@ -361,7 +362,9 @@ async function main(env) {
   if (!/^[0-9a-f]{40}$/.test(sha ?? "")) return usage("PR_HEAD_SHA must be the 40 character head commit");
   if (!/^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/.test(repo ?? "")) return usage("GITHUB_REPOSITORY must be owner/name");
   const base = (env.GITHUB_API_URL || "https://api.github.com").replace(/\/+$/, "");
-  const workspace = env.GITHUB_WORKSPACE || process.cwd();
+  // The pull request tree: the workflow checks it out into its own directory beside the checker's and names it in
+  // AC_EVIDENCE_TREE. Without it (a local run), the workspace or the current directory.
+  const workspace = resolve(env.AC_EVIDENCE_TREE || env.GITHUB_WORKSPACE || process.cwd());
 
   let body;
   let pull;

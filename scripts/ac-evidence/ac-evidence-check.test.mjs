@@ -426,6 +426,28 @@ test("the head file check uses git on the head commit, so a file only in the wor
   assert.match(r.out, /untracked_test\.go/);
 });
 
+test("the head file check reads the pull request tree AC_EVIDENCE_TREE names, not the workspace around it", async (t) => {
+  // The workflow checks the pull request out into head/ beside the checker's judge/, so the workspace root is not
+  // a repository and the tree has to be named.
+  const workspace = mkdtempSync(join(tmpdir(), "ac-evidence-ws-"));
+  t.after(() => rmSync(workspace, { recursive: true, force: true }));
+  const repo = join(workspace, "head");
+  mkdirSync(join(repo, "internal/runs"), { recursive: true });
+  mkdirSync(join(repo, "web/src/pages"), { recursive: true });
+  const git = (...args) => spawnSync("git", ["-C", repo, ...args], { encoding: "utf8" });
+  git("init", "-q");
+  git("config", "user.email", "x@example.invalid");
+  git("config", "user.name", "x");
+  git("config", "commit.gpgsign", "false");
+  writeFileSync(join(repo, "internal/runs/summary_test.go"), "package runs\n");
+  writeFileSync(join(repo, "web/src/pages/pull.test.tsx"), "x\n");
+  git("add", ".");
+  assert.equal(git("commit", "-qm", "head").status, 0);
+  const sha = git("rev-parse", "HEAD").stdout.trim();
+  const r = await run({ PR_HEAD_SHA: sha, GITHUB_WORKSPACE: workspace, AC_EVIDENCE_TREE: repo, __body: prBody("Closes #101", table(...row101)) });
+  assert.equal(r.status, 0, r.out);
+});
+
 // The templates are what authors fill in, so the checker must read what they produce.
 test("the pull request template carries an evidence table the checker reads, and its example row fails until replaced", async () => {
   const template = repoFile("docs/ac-evidence/pull_request_template.md");
