@@ -241,21 +241,23 @@ def resync(root: Path, source: str, sha: str, url: str | None, adds: dict[str, s
             report.append(f"{name}: {state}{'' if entry['vend'] else ' (not vended)'}")
             if entry["vend"] and not dry_run:
                 stage_skill(staging / name, files, license_bytes)
-            elif not entry["vend"] and (root / "skills" / name).exists():
+            elif not entry["vend"] and name in ours:
                 report[-1] += "; its vended copy is removed"
         src_entry["sha"] = sha
         src_entry["license_sha256"] = hashlib.sha256(license_bytes).hexdigest()
         if not dry_run:
-            for name in trees:  # check every destination before touching any
+            if (root / "skills").is_symlink():
+                raise Refused(f"{root / 'skills'}: a symlink, not the skills directory")
+            for name in trees:  # every refusal happens before any directory is touched
                 dest = root / "skills" / name
-                if dest.is_symlink() or (root / "skills").is_symlink():
+                if dest.is_symlink():
                     raise Refused(f"{dest}: a symlink, not a skill directory")
+                if dest.exists() and name not in ours and lock["skills"][name]["vend"]:
+                    raise Refused(f"{dest}: exists but is not the pinned copy; not replacing it")
             for name in trees:
                 dest = root / "skills" / name
-                if dest.exists() and name not in ours and not lock["skills"][name]["vend"]:
-                    continue  # not a pinned copy: not ours to remove
                 if dest.exists() and name not in ours:
-                    raise Refused(f"{dest}: exists but is not the pinned copy; not replacing it")
+                    continue  # not a pinned copy (vend false): not ours to remove
                 if dest.exists():
                     shutil.rmtree(dest)
                 if lock["skills"][name]["vend"]:

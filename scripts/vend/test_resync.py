@@ -309,8 +309,9 @@ class TestResync(ResyncCase):
         os.symlink(outside, self.root / "skills/zz")
         rc, _, err = self.run_resync("--sha", self.sha1)
         self.assertEqual(rc, 1, err)
-        self.assertIn("a symlink", err)
+        self.assertIn("refused", err)
         self.assertEqual((self.root / "skills/one/SKILL.md").read_text(), "local edit\n")
+        self.assertEqual(list(outside.iterdir()), [])
 
     def test_add_never_replaces_or_removes_a_hand_written_skill(self) -> None:
         three = self.root / "skills/three"
@@ -342,6 +343,29 @@ class TestResync(ResyncCase):
                 self.assertEqual(rc, 1, err)
                 self.assertIn("refused", err)
                 self.assertNotIn("Traceback", err)
+
+    def test_ownership_refusal_touches_nothing(self) -> None:
+        self.assertEqual(self.run_resync("--sha", self.sha1)[0], 0)
+        (self.root / "skills/one/SKILL.md").write_bytes((self.root / "skills/one/SKILL.md").read_bytes())
+        before = (self.root / "skills/one/SKILL.md").stat().st_ino
+        own = self.root / "skills/two"
+        own.mkdir()
+        (own / "SKILL.md").write_text("ours\n")
+        lock = self.lock()
+        lock["skills"]["two"]["vend"] = True
+        (self.root / "upstream.lock.json").write_text(json.dumps(lock))
+        rc, _, err = self.run_resync("--sha", self.sha1)
+        self.assertEqual(rc, 1, err)
+        self.assertEqual((self.root / "skills/one/SKILL.md").stat().st_ino, before)
+
+    def test_hand_written_vend_false_dir_is_not_reported_removed(self) -> None:
+        own = self.root / "skills/two"
+        own.mkdir(parents=True)
+        (own / "SKILL.md").write_text("ours\n")
+        rc, out, err = self.run_resync("--sha", self.sha1)
+        self.assertEqual(rc, 0, err)
+        self.assertNotIn("removed", out)
+        self.assertTrue(own.exists())
 
     def test_names_differing_only_by_case_are_refused(self) -> None:
         self.write_up("skills/eng/one/README.md", "a\n")
