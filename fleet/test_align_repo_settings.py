@@ -612,7 +612,7 @@ class TrackerBypassAllow(unittest.TestCase):
     def test_history_ruleset_is_restored_to_no_bypass(self):
         main = self.split_main()  # gated main, already split
         hist = history_ruleset(bypass=(ADMIN, GITSYNC), enforcement="disabled")
-        hist["rules"].append({"type": "pull_request", "parameters": {}})  # would block the writers
+        hist["rules"] = [{"type": "deletion"}]
         gh = FakeGH([main, hist], loopmd=LOOPMD)
         al, _ = self.run_rulesets(gh, LISTED)
         (put,) = [(p, b) for m, p, b in gh.writes if m == "PUT"]
@@ -620,8 +620,23 @@ class TrackerBypassAllow(unittest.TestCase):
         self.assertEqual(put[1]["bypass_actors"], [])
         self.assertEqual(put[1]["enforcement"], "active")
         self.assertEqual(rule_types(put[1]), HISTORY_RULES)
-        (f,) = [f for f in al.findings if f["kind"] == "tracker-history-ruleset"]  # never silent
+        self.assertEqual(self.kinds(al), [])
+
+    def test_history_named_ruleset_with_other_rules_is_never_adopted(self):
+        main = tracker_gate(10, bypass=(GITSYNC, BROKER))
+        main["name"] = "main"
+        main["rules"] += [{"type": "deletion"}, {"type": "non_fast_forward"}]
+        hist = history_ruleset(bypass=(GITSYNC,))
+        hist["rules"].append({"type": "pull_request", "parameters": {"required_approving_review_count": 1}})
+        gh = FakeGH([main, hist], loopmd=LOOPMD)
+        al, _ = self.run_rulesets(gh, LISTED)
+        self.assertFalse([w for w in gh.writes if w[0] == "POST"])  # no second companion
+        self.assertNotIn("40", self.puts_by_id(gh))                  # its rules and bypass untouched
+        main_put = self.puts_by_id(gh).get("10")
+        self.assertTrue(main_put is None or HISTORY_RULES <= rule_types(main_put))  # nothing split onto it
+        (f,) = [f for f in al.findings if f["kind"] == "tracker-history-ruleset"]
         self.assertIn("pull_request", f["detail"])
+        self.assertIn("tracker-bypass-allow-conflict", self.kinds(al))
 
     def test_conflict_on_the_main_target_keeps_live_entries_verbatim(self):
         live = dict(GITSYNC, bypass_mode="pull_request")
@@ -640,6 +655,21 @@ class TrackerBypassAllow(unittest.TestCase):
         gh = FakeGH([self.split_main(), gate, history_ruleset()], loopmd=LOOPMD)
         self.run_rulesets(gh, LISTED)
         self.assertNotIn("20", self.puts_by_id(gh))
+
+    def test_ref_patterns_follow_github_path_semantics(self):
+        def rs(include, exclude=()):
+            return {"target": "branch", "conditions": {"ref_name": {"include": list(include), "exclude": list(exclude)}}}
+        hit = align.applies_to_default_branch
+        self.assertTrue(hit(rs(["refs/heads/*"]), "main"))
+        self.assertTrue(hit(rs(["refs/heads/ma?n"]), "main"))
+        self.assertTrue(hit(rs(["refs/**"]), "main"))
+        self.assertTrue(hit(rs(["~ALL"]), "main"))
+        self.assertFalse(hit(rs(["refs/*"]), "main"))                  # * never crosses '/'
+        self.assertFalse(hit(rs(["refs/heads/*"]), "release/1"))
+        self.assertTrue(hit(rs(["refs/heads/**"]), "release/1"))
+        self.assertFalse(hit(rs(["refs/heads/*"], ["refs/heads/main"]), "main"))
+        self.assertFalse(hit(rs(["refs/heads/*"], ["~DEFAULT_BRANCH"]), "main"))
+        self.assertFalse(hit({"target": "tag", "conditions": rs(["~ALL"])["conditions"]}, "main"))
 
     def test_blocking_ruleset_beyond_the_default_branch_set_is_reported(self):
         for include in (["~ALL"], ["refs/heads/*"]):

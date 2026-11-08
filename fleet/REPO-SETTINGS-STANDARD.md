@@ -74,7 +74,7 @@ in `tracker_bypass_allow` below (machine writers, and the admin role only where 
 are the sanctioned direct pushers; any other bypass actor
 already on its rulesets keeps working until a human removes it, and is reported (below)
 (`landing: pr` alone does not count: those repos still push board-only commits straight to main). There the aligner adds no admin bypass and removes the standard's own one from every
-default-branch ruleset. Any other bypass actor is left in place and reported as `tracker-bypass`
+default-branch ruleset, except as `tracker_bypass_allow_admin` below allows for a flagged repo. Any other bypass actor is left in place and reported as `tracker-bypass`
 for a human to decide. The key is read the way agent-docs `loop-lint` reads them (opening
 `key: value` lines before the first `## `, fences skipped). An unreadable `LOOP.md` stops the
 rulesets pass for that repo rather than guessing.
@@ -83,8 +83,9 @@ rulesets pass for that repo rather than guessing.
 pushing straight to `main` after a repo's issues and agents move to GitHub. A bypass covers a whole
 ruleset, not one rule, so a writer on a ruleset that also blocks deletion and force-push could delete
 or rewrite `main`. For a listed tracker repo the aligner sorts every default-branch ruleset (a push
-has to clear each active one separately), and removes the standard admin bypass from each as for any
-tracker repo:
+has to clear each active one separately). It removes the standard admin bypass from each as for any
+tracker repo, except that on a repo flagged in `tracker_bypass_allow_admin` the admin role is a listed
+actor: it is ensured where listed actors are ensured, and left exactly as found on a conflict ruleset:
 
 - **History rules only** (`deletion`, `non_fast_forward`) or no rules: it never blocks a
   fast-forward push, so no writer needs to bypass it and none is added. One with history rules
@@ -110,13 +111,15 @@ admin, not the writers). The aligner uses, in order: a ruleset named by `ruleset
 (`main-history`) that targets exactly `~DEFAULT_BRANCH` with no excludes (the aligner owns that name
 and keeps it in shape whenever it exists); else an existing history-only ruleset on exactly
 `~DEFAULT_BRANCH` under any other name, such as a hand-made `main-integrity`, which is adopted under
-its own name rather than duplicated; else it creates `main-history`. Adopting one removes its bypass
-actors, and the change line names them. Any other rule found on it is removed too and reported as
-`tracker-history-ruleset`, since the companion must never block an ordinary push. A `main-history` that targets anything else is never adopted
-or rewritten as the companion, is reported as `tracker-history-ruleset`, and then nothing is split;
-if it still targets the default branch it is sorted like any other ruleset above.
+its own name rather than duplicated; else it creates `main-history`. Only a ruleset whose rules are
+`deletion` and/or `non_fast_forward` is ever adopted. Adopting one removes its bypass actors, and the
+change line names them. A `main-history` that targets anything else, or carries any other rule (a
+review requirement, a check), is never adopted or rewritten as the companion, is reported as
+`tracker-history-ruleset`, and then nothing is split; if it still targets the default branch it is
+sorted like any other ruleset above (so it keeps its rules, and loses only an unflagged admin bypass).
 
-A ruleset that reaches the default branch only through a wider pattern (`~ALL`, `refs/heads/*`) is
+A ruleset that reaches the default branch only through a wider pattern (`~ALL`, `refs/heads/*`,
+matched as GitHub does, where `*` never crosses `/` and `**` does) is
 outside the aligner's default-branch set and is never changed. On a listed tracker repo, an active one
 that can block a push is reported as `tracker-bypass-allow-unreached`: the listed writers are not on
 it, so their pushes may be refused until a human adds them or narrows it.
@@ -148,9 +151,10 @@ Current entries:
 admin bypass (or adds a no-bypass pull-request ruleset), then `LOOP.md` declares `tracker: github`.
 In between the aligner still treats the repo as a Backlog repo, so a run may re-add the admin bypass
 to a ruleset named `main` (or the repo's only default-branch ruleset). That is expected; land the
-`LOOP.md` change promptly. After cutover the next run removes the admin bypass again (a repo in
-`tracker_bypass_allow_admin` gets it back only on rulesets that can block a push) and, for a listed
-repo, adds the allowed actors.
+`LOOP.md` change promptly. After cutover the next run removes the admin bypass again and, for a listed
+repo, adds the allowed actors. On a repo in `tracker_bypass_allow_admin` the admin bypass is instead
+kept or added on rulesets the listed actors go on, kept as found on a conflict ruleset, and removed
+only from history-only rulesets.
 
 Every active default-branch ruleset counts as a gate. The standard is reconciled onto one ruleset,
 chosen in this order: an active one already requiring `ci-success` (the one named `main` first),

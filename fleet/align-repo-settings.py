@@ -278,6 +278,37 @@ def is_default_branch_ruleset(rs: dict) -> bool:
     return "~DEFAULT_BRANCH" in inc or any(i in ("refs/heads/main", "refs/heads/master") for i in inc)
 
 
+def ref_pattern_match(ref: str, pattern: str) -> bool:
+    """GitHub ruleset ref patterns are fnmatch with FNM_PATHNAME: `*` and `?` never cross `/`,
+    `**` does. Python's fnmatch lets `*` cross `/`, so translate instead."""
+    out, i = [], 0
+    while i < len(pattern):
+        c = pattern[i]
+        if pattern.startswith("**", i):
+            out.append(".*")
+            i += 2
+            continue
+        if c == "*":
+            out.append("[^/]*")
+        elif c == "?":
+            out.append("[^/]")
+        elif c == "[":
+            j = pattern.find("]", i + 2 if pattern[i + 1:i + 2] in ("!", "^") else i + 1)
+            if j == -1:
+                out.append(re.escape(c))
+            else:
+                body = pattern[i + 1:j]
+                if body[:1] in ("!", "^"):
+                    body = "^" + body[1:]
+                out.append("[" + body.replace("\\", "\\\\") + "]")
+                i = j + 1
+                continue
+        else:
+            out.append(re.escape(c))
+        i += 1
+    return re.fullmatch("".join(out), ref) is not None
+
+
 def applies_to_default_branch(rs: dict, default_branch: str | None) -> bool:
     """A branch ruleset whose patterns reach the default branch (~ALL, ~DEFAULT_BRANCH or a
     matching glob), whether or not is_default_branch_ruleset recognises it."""
@@ -287,7 +318,7 @@ def applies_to_default_branch(rs: dict, default_branch: str | None) -> bool:
     me = f"refs/heads/{default_branch}"
 
     def hit(pats):
-        return any(p in ("~ALL", "~DEFAULT_BRANCH") or fnmatch.fnmatchcase(me, p) for p in pats or [])
+        return any(p in ("~ALL", "~DEFAULT_BRANCH") or ref_pattern_match(me, p) for p in pats or [])
     return hit(ref.get("include")) and not hit(ref.get("exclude"))
 
 
@@ -904,11 +935,13 @@ class Aligner:
         named, can_split = None, False
         if allow:  # the aligner owns a companion with the history name outright
             named = next((r for r in detailed if r.get("name") == hname), None)
-            if named is not None and not is_own_history_ruleset(named):
+            extra = sorted({x["type"] for x in (named or {}).get("rules") or []} - set(HISTORY_RULES))
+            if named is not None and (not is_own_history_ruleset(named) or extra):
+                why = (f"carries other rule(s) {', '.join(extra)}" if is_own_history_ruleset(named)
+                       else "does not target exactly the default branch")
                 self.finding(full, "tracker-history-ruleset",
-                             f"ruleset '{named.get('name')}' exists but does not target exactly the default "
-                             "branch; not adopted as the history ruleset, so no history rule is moved for the "
-                             "allowed writers")
+                             f"ruleset '{named.get('name')}' exists but {why}; not adopted or rewritten as the "
+                             "history ruleset, so no history rule is moved for the allowed writers")
                 named = None
             else:
                 can_split = True
