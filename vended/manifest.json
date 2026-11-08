@@ -2,5 +2,6 @@
   {"repo": "rknightion/tracker-probe"},
   {"repo": "m7kni/tracker-probe"},
   {"repo": "rknightion/openai2otel"},
-  {"repo": "rknightion/transceiver-exporter"}
+  {"repo": "rknightion/transceiver-exporter"},
+  {"repo": "m7kni/m7kni-net-site"}
 ]}
