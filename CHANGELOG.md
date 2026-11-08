@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.26.6](https://github.com/rknightion/.github/compare/v1.26.5...v1.26.6) (2026-11-08)
+
+
+### Miscellaneous
+
+* **vended:** enrol m7kni-net-site ([b391a2b](https://github.com/rknightion/.github/commit/b391a2bc46d1c2bbac2f5c158cfaffc779f3ab13))
+
 ## [1.26.5](https://github.com/rknightion/.github/compare/v1.26.4...v1.26.5) (2026-11-08)
 
 
