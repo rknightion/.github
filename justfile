@@ -66,7 +66,7 @@ test:
 [group('check')]
 [no-exit-message]
 pii-check:
-    @if grep -rniE '\.ts\.net|@gmail|@[a-z0-9-]+\.(com|net|io)|ghp_|github_pat_|-----BEGIN' backlog/ | grep -vF "grep -rniE '\.ts\.net|@gmail|@[a-z0-9-]+\.(com|net|io)|ghp_|github_pat_|-----BEGIN' backlog/" >/dev/null; then echo "identifier found in backlog/ — see AGENTS.md" >&2; exit 1; fi
+    @if grep -arniE '\.ts\.net|@gmail|@[a-z0-9-]+\.(com|net|io)|ghp_|github_pat_|-----BEGIN' backlog/ | grep -vF "grep -rniE '\.ts\.net|@gmail|@[a-z0-9-]+\.(com|net|io)|ghp_|github_pat_|-----BEGIN' backlog/" >/dev/null; then echo "identifier found in backlog/ — see AGENTS.md" >&2; exit 1; fi
 
 # the full gate — exactly what ci.yml enforces
 [group('check')]
