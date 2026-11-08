@@ -453,7 +453,7 @@ test("the head file check reads the pull request tree AC_EVIDENCE_TREE names, no
   mkdirSync(join(repo, "web/src/pages"), { recursive: true });
   const git = (...args) => spawnSync("git", ["-C", repo, ...args], { encoding: "utf8" });
   git("init", "-q");
-  git("config", "user.email", "x@example.invalid");
+  git("config", "user.email", "x@example.com");
   git("config", "user.name", "x");
   git("config", "commit.gpgsign", "false");
   writeFileSync(join(repo, "internal/runs/summary_test.go"), "package runs\n");
