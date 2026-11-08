@@ -30,8 +30,10 @@ path of every added, copied or renamed-to file:
              build with an optional : or = and quote.
 
 --allow FILE (default .github/privacy/allow.txt in the repository, when present) lists literal
-strings, one per line (# starts a comment line). A finding is suppressed when its matched text lies
-inside an occurrence of an allowed string on the same line, compared case-insensitively.
+strings, one per line (# in column 1 starts a comment line). A finding is suppressed when its matched
+text lies inside one occurrence of one allowed string on the same line, with ASCII letters compared
+case-insensitively and every other character exactly; two entries never combine to cover a finding.
+A line holding a control or separator character, or a # after leading whitespace, refuses (exit 2).
 --no-repo-files ignores the repository's .github/privacy/ files; CI passes it with the base
 commit's copies so a pull request cannot loosen its own sweep.
 
@@ -179,12 +181,28 @@ def load_patterns(path, required):
 
 
 def load_allow(path):
-    """Return the lowercased literal strings of an allow file."""
+    """Return the literal strings of an allow file; a line that could hide more than it shows refuses.
+
+    Lines end at a newline only (a carriage return before it is dropped). str.splitlines() would also
+    break at \\v, \\f, \\x1c-\\x1e, \\x85, U+2028 and U+2029, letting one visible line carry a second,
+    unseen entry, so a line holding any character that is not printable, tab included, refuses with exit
+    2, as does a comment marker after leading whitespace, which is neither a clear comment nor a clear entry.
+    """
     try:
-        lines = Path(path).read_text(encoding="utf-8").splitlines()
+        lines = Path(path).read_text(encoding="utf-8").split("\n")
     except (OSError, UnicodeDecodeError) as unreadable:
         raise CannotSweep(f"the allow file {path} cannot be read ({type(unreadable).__name__})") from None
-    return [line.strip().lower() for line in lines if line.strip() and not line.startswith("#")]
+    entries = []
+    for number, line in enumerate(lines, 1):
+        line = line.removesuffix("\r")
+        if not line.strip() or line.startswith("#"):
+            continue
+        if not line.isprintable():
+            raise CannotSweep(f"line {number} of the allow file {path} holds a control or separator character")
+        if line.lstrip().startswith("#"):
+            raise CannotSweep(f"line {number} of the allow file {path} is an indented comment; start it in column 1")
+        entries.append(line.strip())
+    return entries
 
 
 def email_allowed(address):
@@ -232,9 +250,13 @@ def matches(text, rules, allow=(), strict=False):
     raw += [(m.start(), m.end(), "address") for m in QUAD.finditer(text)
             if address_reported(m.group(0), strict) and not versionish(text, m.start(), m.end())]
     if allow and raw:
-        # Match on the original text: lowercasing can change length and shift every span after it.
+        # Fail closed: a finding is suppressed only when it lies inside one occurrence of one allowed
+        # string. Spans are never merged, so entries that overlap or touch cannot jointly cover a finding.
+        # Case folds for ASCII letters only: Unicode folding reads U+017F as s and U+212A as k, so an
+        # allowed string would match text that holds a different identifier. Matching runs on the
+        # original text, never a lowercased copy whose spans can drift.
         spans = [(m.start(), m.end()) for literal in allow
-                 for m in re.finditer(re.escape(literal), text, re.IGNORECASE)]
+                 for m in re.finditer(re.escape(literal), text, re.IGNORECASE | re.ASCII)]
         raw = [hit for hit in raw if not any(s <= hit[0] and hit[1] <= e for s, e in spans)]
     return sorted((start + 1, name, text[start:end]) for start, end, name in raw)
 

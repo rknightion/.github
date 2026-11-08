@@ -95,9 +95,12 @@ The vend sync never writes these two files; the repository owns them.
   pattern does not match its own line. A line outside the subset stops the sweep with exit 2. The same
   syntax feeds a tracker identifier sweep, so one file can serve both.
 - `.github/privacy/allow.txt` lists literal strings, one per line, that are never findings, for example
-  a vendor's documented default address. A finding is suppressed when its matched text lies inside an
-  occurrence of an allowed string on the same line, compared without regard to case. Lines starting
-  with `#` are comments.
+  a vendor's documented default address. A finding is suppressed when its matched text lies inside one
+  occurrence of one allowed string on the same line, with ASCII letters compared without regard to case
+  and every other character exactly. Two entries never combine to cover a finding. Lines starting with
+  `#` in column 1 are comments. A line holding a control or separator character (tab, vertical tab, form
+  feed, U+2028 and the like) or a `#` after leading whitespace stops the sweep with exit 2, because it
+  could carry an entry the reader does not see.
 
 Because CI reads `allow.txt` from the base commit, the pull request that adds an entry still reports
 the string it allows. Land the allow entry on its own first, or have a maintainer accept that one

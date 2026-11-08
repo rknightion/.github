@@ -148,6 +148,41 @@ class SweepTest(unittest.TestCase):
         code, out, err = self.branch_sweep("--no-repo-files", "--allow", str(allow))
         self.assertEqual(code, 0, out + err)
 
+    def allow_sweep(self, content, allow_bytes):
+        if not (self.repo.path / "net.md").is_file() or (self.repo.path / "net.md").read_text() != content:
+            self.repo.write("net.md", content)
+            self.repo.commit("allow probe")
+        allow = Path(self.scratch) / "allow.txt"
+        allow.write_bytes(allow_bytes)
+        return self.branch_sweep("--no-repo-files", "--allow", str(allow))
+
+    def test_allow_entry_hidden_behind_a_line_separator_cannot_sweep(self):
+        # str.splitlines() also breaks on \v, \f, \x1c-\x1e, \x85 and U+2028/2029, so one visible line
+        # carried a second, unseen allow entry.
+        for separator in ("\v", "\f", "\x1c", "\x85", "\u2028"):
+            code, out, err = self.allow_sweep("dns " + PUBLIC_IP + "\n", ("vendor default" + separator + PUBLIC_IP + "\n").encode())
+            self.assertEqual(code, 2, (repr(separator), out, err))
+            self.assertIn("allow", err)
+
+    def test_indented_comment_in_allow_file_cannot_sweep(self):
+        code, out, err = self.allow_sweep("dns " + PUBLIC_IP + "\n", ("  # note\n" + PUBLIC_IP + "\n").encode())
+        self.assertEqual(code, 2, out + err)
+
+    def test_allow_folds_ascii_case_only(self):
+        # Unicode case folding reads U+017F (long s) as s, so the allowed address matched text holding a
+        # different address, one letter shorter, and hid it.
+        code, out, err = self.allow_sweep("contact \u017f" + EMAIL[1:] + "\n", (EMAIL + "\n").encode())
+        self.assertEqual((code, out.strip()), (1, F + "net.md:1:10: email"), err)
+        code, out, err = self.allow_sweep("contact " + EMAIL.upper() + "\n", (EMAIL + "\n").encode())
+        self.assertEqual(code, 0, out + err)
+
+    def test_overlapping_allow_entries_never_combine(self):
+        # Each finding must lie inside one occurrence of one entry; two entries that overlap or touch and
+        # together cover the finding do not suppress it.
+        half, rest = EMAIL[:12], EMAIL[8:]
+        code, out, err = self.allow_sweep("contact " + EMAIL + "\n", (half + "\n" + rest + "\n").encode())
+        self.assertEqual((code, out.strip()), (1, F + "net.md:1:9: email"), err)
+
     def test_repo_patterns_file_applied(self):
         self.repo.write(".github/privacy/patterns.txt", "# local names\nwidget-hos[t]-[0-9]+\n")
         self.repo.commit("patterns")
