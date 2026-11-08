@@ -59,6 +59,11 @@ that cannot be read is a usage error (exit 2).
 3. Run the `vend-sync` workflow by hand (`workflow_dispatch`), giving the repository as `repo`.
    It opens one pull request from the branch `vend/rknightion-github` and turns on auto-merge.
 
+The repository must allow auto-merge and have a ruleset with at least one required status check
+(every repository migrated to the tracker has both). Without a required check GitHub refuses to arm
+auto-merge on an already mergeable pull request ("clean status"), the sync reports that repository
+as failed, and the pull request waits for a maintainer to merge it.
+
 When `.vended.json` has no `CONTRIBUTING.md` entry, the sync takes over an existing
 `CONTRIBUTING.md` only when it has the repo-facts markers and everything outside the region is an
 exact copy of the template. That is how a migration adopts the file: copy the template and write
