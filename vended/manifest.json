@@ -8,5 +8,6 @@
   {"repo": "rknightion/meraki-dashboard-exporter"},
   {"repo": "rknightion/sf2loki"},
   {"repo": "rknightion/synthkit"},
-  {"repo": "rknightion/rfc6035-2otel"}
+  {"repo": "rknightion/rfc6035-2otel"},
+  {"repo": "rknightion/genai-otel-bridge"}
 ]}
