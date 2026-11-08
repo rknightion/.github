@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.28.1](https://github.com/rknightion/.github/compare/v1.28.0...v1.28.1) (2026-11-08)
+
+
+### Miscellaneous
+
+* **vended:** enrol rknightion/meraki-dashboard-ha ([dd042a9](https://github.com/rknightion/.github/commit/dd042a9a45f95b53692f6c1ecb83420c337ce61f))
+
 ## [1.28.0](https://github.com/rknightion/.github/compare/v1.27.0...v1.28.0) (2026-11-08)
 
 
