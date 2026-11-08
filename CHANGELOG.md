@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.26.12](https://github.com/rknightion/.github/compare/v1.26.11...v1.26.12) (2026-11-08)
+
+
+### Miscellaneous
+
+* **vended:** enrol rknightion/sf2loki ([f23fdfa](https://github.com/rknightion/.github/commit/f23fdfa9b77e5432ee83f0b3d30d2328add2847a))
+
 ## [1.26.11](https://github.com/rknightion/.github/compare/v1.26.10...v1.26.11) (2026-11-08)
 
 
