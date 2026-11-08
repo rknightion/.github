@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.26.3](https://github.com/rknightion/.github/compare/v1.26.2...v1.26.3) (2026-11-08)
+
+
+### Miscellaneous
+
+* **vended:** enrol openai2otel ([dd17f22](https://github.com/rknightion/.github/commit/dd17f221e4f79a4e8058a7850c2410bab94034ec))
+
 ## [1.26.2](https://github.com/rknightion/.github/compare/v1.26.1...v1.26.2) (2026-11-08)
 
 
