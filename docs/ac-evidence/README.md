@@ -15,7 +15,10 @@ fails when:
 - the body has no "Acceptance evidence" table, or the table is empty;
 - the rows do not match the issue's list in number, AC number or exact text (whitespace is normalised);
 - a row's evidence class is not `code`, `live` or `browser`, or its proof is empty;
-- a proof cites a repository path (a backticked path) that is not in the pull request head commit;
+- a proof cites a repository path (a backticked path) that is not in the pull request head commit. A
+  backticked span with spaces counts as a path too (`docs/Release Notes.md`), unless it reads as a
+  command: a word starting with `-`, or a first word with no slash while a later word has one
+  (`go test ./internal/...`). Write other non-paths without backticks;
 - the issue is in another repository (the job's token reads the caller's repository only), is a pull
   request, or has no readable AC list.
 

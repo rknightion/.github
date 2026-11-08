@@ -225,14 +225,23 @@ export function parseEvidenceTable(body) {
 // The repository paths a proof cites: code spans that look like a path with a directory, or a bare name with a
 // known file extension. A trailing :line or #Lline is dropped. A token that merely contains a slash (a media type)
 // is reported too, so write non-paths without backticks.
+//
+// A span with spaces is a path too, so a missing "docs/Release Notes.md" cannot pass unchecked, unless it reads as a
+// command: a word starting with "-" (a flag), or a first word with no slash while a later word has one
+// ("go test ./internal/...", "bash scripts/x.sh"). A spaced bare name counts when it ends in a known extension.
 export function citedPaths(proof) {
   const found = [];
   for (const [, span] of proof.matchAll(/`([^`\n]+)`/g)) {
     let token = span.replace(/(?::\d+(?:-\d+)?|#L\d+(?:-L?\d+)?)$/, "");
     if (token.startsWith("./")) token = token.slice(2);
-    if (!/^[A-Za-z0-9._@+-][A-Za-z0-9._@+/-]*$/.test(token)) continue;
+    if (!/^[A-Za-z0-9._@+-](?:[A-Za-z0-9._@+/ -]*[A-Za-z0-9._@+/-])?$/.test(token)) continue;
     if (token.includes("//") || token.endsWith("/")) continue;
     if (!token.includes("/") && !FILE_EXTENSIONS.test(token)) continue;
+    if (token.includes(" ")) {
+      const words = token.split(/ +/);
+      if (words.some((word) => word.startsWith("-"))) continue;
+      if (token.includes("/") && !words[0].includes("/")) continue;
+    }
     if (!found.includes(token)) found.push(token);
   }
   return found;

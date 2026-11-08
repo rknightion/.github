@@ -177,6 +177,23 @@ test("a proof names repo paths only in code spans that look like paths", () => {
   assert.deepEqual(citedPaths("`../secrets/x.go`"), ["../secrets/x.go"], "a path that leaves the repo is still reported so the existence check rejects it");
 });
 
+test("a cited path with spaces is checked, while a command with arguments stays out", () => {
+  assert.deepEqual(citedPaths("`docs/Release Notes.md` and `docs/Release Notes.md:3` and `./web/my page/a.tsx#L2`"), [
+    "docs/Release Notes.md", "web/my page/a.tsx",
+  ]);
+  assert.deepEqual(citedPaths("`Meeting Notes.md` and `notes/old plans`"), ["Meeting Notes.md", "notes/old plans"]);
+  assert.deepEqual(citedPaths(
+    "`go test ./internal/runs/...` `bash scripts/x_test.sh` `node --test scripts/x.test.mjs` `scripts/run.sh --fast` `just check`",
+  ), []);
+});
+
+test("a cited path with spaces that the head does not have fails", async () => {
+  const rows = row101.map((r) => r.replace("`internal/runs/summary_test.go`", "`internal/runs/summary test.go`"));
+  bad(await checkEvidence({ ...base, body: prBody("Closes #101", table(...rows)) }), /internal\/runs\/summary test\.go.*not in the pull request head/);
+  const known = async (path) => path === "internal/runs/summary test.go" || present.has(path);
+  ok(await checkEvidence({ ...base, pathExists: known, body: prBody("Closes #101", table(...rows)) }));
+});
+
 test("a complete table for the closed issue passes, and says what it checked", async () => {
   const r = await checkEvidence({ ...base, body: prBody("Closes #101", table(...row101)) });
   ok(r);
