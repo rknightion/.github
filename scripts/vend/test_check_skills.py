@@ -304,7 +304,8 @@ class TestReferences(LintCase):
 
 class TestPortableNames(LintCase):
     def test_unportable_file_names_are_findings(self) -> None:
-        for bad in ("a b.md", "CON:x.md", ".hidden", "trail.", "back\\slash.md", "x.md\n"):
+        for bad in ("a b.md", "CON:x.md", ".hidden", "trail.", "back\\slash.md", "x.md\n", "con.txt",
+                    "NUL", "lpt9.md"):
             with self.subTest(name=bad):
                 d = self.add_skill("names-skill")
                 (d / bad).write_text("x\n")

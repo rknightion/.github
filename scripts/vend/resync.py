@@ -38,6 +38,9 @@ REGULAR = ("100644", "100755")
 NAME_RE = re.compile(r"^[a-z0-9][a-z0-9-]*$")
 # One path component of a vended file: portable on every OS and filesystem git checks out to.
 COMPONENT_RE = re.compile(r"^[A-Za-z0-9_][A-Za-z0-9._-]*$")
+# Windows device names: no path component may use one as its stem, with or without an extension.
+RESERVED_STEMS = frozenset({"con", "prn", "aux", "nul", *(f"com{i}" for i in range(1, 10)),
+                            *(f"lpt{i}" for i in range(1, 10))})
 # A full (unfiltered) fetch with fsck refusing entries named with a slash, `..`, `.` or `.git`;
 # safe_rel checks every vended path again before anything is written.
 FSCK = ("-c", "fetch.fsckObjects=true", "-c", "fetch.fsck.fullPathname=error",
@@ -73,7 +76,8 @@ def safe_rel(path: str) -> str:
     """A relative POSIX path whose every component is portable: letters, digits, `.`, `_`, `-`,
     not starting with a dot, not ending with one, and no `git~1` alias."""
     parts = path.split("/")
-    if any(not COMPONENT_RE.fullmatch(p) or p.endswith(".") or p.lower() == "git~1" for p in parts):
+    if any(not COMPONENT_RE.fullmatch(p) or p.endswith(".") or p.lower() == "git~1"
+           or p.split(".", 1)[0].casefold() in RESERVED_STEMS for p in parts):
         raise Refused(f"{path!r}: not a safe repository-relative path")
     return path
 
@@ -144,8 +148,8 @@ def read_tree(repo: Path, sha: str, path: str) -> dict[str, tuple[str, bytes]]:
         folded[key] = rel
     if not files:
         raise Refused(f"{path}: empty upstream")
-    if "LICENSE" in files:
-        raise Refused(f"{path}/LICENSE: a skill-level licence would be replaced by the root one")
+    if any(rel.casefold() == "license" for rel in files):
+        raise Refused(f"{path}: a skill-level licence file would collide with the root LICENSE")
     return files
 
 
@@ -205,6 +209,8 @@ def resync(root: Path, source: str, sha: str, url: str | None, adds: dict[str, s
     sources, skills = lock.get("sources"), lock.get("skills")
     if (not isinstance(sources, dict) or not isinstance(skills, dict)
             or not all(isinstance(v, dict) for v in (*sources.values(), *skills.values()))
+            or not all(isinstance(v.get("url", ""), str) and isinstance(v.get("license_path", "LICENSE"), str)
+                       and v.get("license_path", "LICENSE") for v in sources.values())
             or not all(isinstance(e.get("source"), str) and isinstance(e.get("path"), str)
                        and isinstance(e.get("vend"), bool) and isinstance(e.get("files"), dict)
                        for e in skills.values())):

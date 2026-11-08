@@ -48,6 +48,9 @@ FORMER_SKILLS = ("audit-choices", "receiving-code-review", "verification-before-
 # block says what each means here.
 DELIBERATELY_ABSENT = frozenset({"find-overengineering", "review", "code-review"})
 LOCK_NAME = "upstream.lock.json"
+# Windows device names, which no vended path component may use as its stem.
+RESERVED_STEMS = frozenset({"con", "prn", "aux", "nul", *(f"com{i}" for i in range(1, 10)),
+                            *(f"lpt{i}" for i in range(1, 10))})
 LINK_RE = re.compile(r"\]\(\.\./([A-Za-z0-9_.-]+)/")
 # What a LICENSE must contain for each frontmatter licence.
 LICENSE_MARKERS = {
@@ -189,7 +192,8 @@ def check_skill(d: Path, names: dict[str, bool], out: list[str], terms: tuple[st
                        "case-insensitive filesystems")
         folded[key] = f
         for part in f.relative_to(d).parts:
-            if not re.fullmatch(r"[A-Za-z0-9_][A-Za-z0-9._-]*", part) or part.endswith("."):
+            if (not re.fullmatch(r"[A-Za-z0-9_][A-Za-z0-9._-]*", part) or part.endswith(".")
+                    or part.split(".", 1)[0].casefold() in RESERVED_STEMS):
                 out.append(f"{f}:0: name {part!r} is not portable (letters, digits, '.', '_', '-'; "
                            "no leading or trailing dot)")
                 break

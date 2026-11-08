@@ -15,7 +15,8 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import resync  # noqa: E402
 
-GIT_ENV = {**os.environ, "GIT_CONFIG_GLOBAL": "/dev/null", "GIT_CONFIG_NOSYSTEM": "1",
+GIT_ENV = {**{k: v for k, v in os.environ.items() if not k.startswith("GIT_")},
+           "GIT_CONFIG_GLOBAL": "/dev/null", "GIT_CONFIG_NOSYSTEM": "1",
            "GIT_AUTHOR_NAME": "t", "GIT_AUTHOR_EMAIL": "t@example.com",
            "GIT_COMMITTER_NAME": "t", "GIT_COMMITTER_EMAIL": "t@example.com"}
 
@@ -366,6 +367,28 @@ class TestResync(ResyncCase):
         self.assertEqual(rc, 0, err)
         self.assertNotIn("removed", out)
         self.assertTrue(own.exists())
+
+    def test_licence_case_variant_and_reserved_names_are_refused(self) -> None:
+        for name, needle in (("license", "collide with the root LICENSE"), ("License.md", None),
+                             ("con.txt", "not a safe"), ("NUL", "not a safe"), ("com1.md", "not a safe")):
+            with self.subTest(name=name):
+                self.write_up(f"skills/eng/one/{name}", "x\n")
+                sha2 = self.commit(f"add {name}")
+                if needle is None:
+                    self.assertEqual(self.run_resync("--sha", sha2, "--dry-run")[0], 0)
+                else:
+                    self.assertRefusedClean("--sha", sha2, needle=needle)
+                sh("git", "reset", "-q", "--hard", self.sha1, cwd=self.up)
+
+    def test_source_without_url_or_with_null_licence_path_refuses_cleanly(self) -> None:
+        for src in ({"license_path": None, "url": "x"}, {"url": 3}):
+            with self.subTest(src=src):
+                lock = self.lock()
+                lock["sources"]["ex/skills"] = src
+                (self.root / "upstream.lock.json").write_text(json.dumps(lock))
+                rc, _, err = self.run_resync("--sha", self.sha1)
+                self.assertEqual(rc, 1, err)
+                self.assertNotIn("Traceback", err)
 
     def test_names_differing_only_by_case_are_refused(self) -> None:
         self.write_up("skills/eng/one/README.md", "a\n")

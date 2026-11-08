@@ -45,9 +45,10 @@ command run locally; never trigger a workflow to test it.
    at startup, before any `if:`; removing one a skipped job needs is a `startup_failure` with no log.
 7. **No self-hosted runners in a public repository**: a fork pull request can schedule onto one and
    persist there. This is a policy finding and needs no attack path.
-8. **Every `uses:` is pinned to a full 40-character SHA with a `# vX.Y.Z` comment**, first-party and
-   cross-repository reusables included, never a tag or `@main`. Also a policy finding with no attack
-   path needed, reported even where zizmor is not enforced.
+8. **Every remote `uses:` (`owner/repo@...`) is pinned to a full 40-character SHA with a `# vX.Y.Z`
+   comment**, first-party and cross-repository reusables included, never a tag or `@main`. A local
+   `./` path cannot carry a ref and is exempt; a `docker://` image is pinned by digest. Also a policy
+   finding with no attack path needed, reported even where zizmor is not enforced.
 
 ## Report
 
