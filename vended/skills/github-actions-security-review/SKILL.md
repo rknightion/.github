@@ -27,9 +27,11 @@ command run locally; never trigger a workflow to test it.
 
 1. **Privileged triggers**, and every `# zizmor: ignore` on one (`pull_request_target`,
    `workflow_run`, `issue_comment`): no PR code runs where secrets or a write token exist;
-   `workflow_run` gates on `conclusion == 'success'`, the triggering event and head repository, and
-   uses `github.event.workflow_run.head_sha` (it matches the triggering workflow's `name:`, not its
-   file, and `github.sha` is the default-branch HEAD); a comment handler checks `author_association`.
+   `workflow_run` gates on `conclusion == 'success'`, the triggering event and head repository (it
+   matches the triggering workflow's `name:`, not its file). `github.sha` there is the default-branch
+   HEAD, right for loading trusted scripts; `github.event.workflow_run.head_sha` is the triggering
+   commit, which a fork controls, so it is read as data and never run with secrets or a write
+   token. A comment handler checks `author_association`.
 2. **Attacker values traced to their sink**: through `with:` or `env:` into a composite or local
    action's `run:`, and into an unquoted variable or `eval` in a later step.
 3. **Config and prompt poisoning**: a privileged job that reads PR-supplied instructions or config

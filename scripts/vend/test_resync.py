@@ -312,6 +312,43 @@ class TestResync(ResyncCase):
         self.assertIn("a symlink", err)
         self.assertEqual((self.root / "skills/one/SKILL.md").read_text(), "local edit\n")
 
+    def test_add_never_replaces_or_removes_a_hand_written_skill(self) -> None:
+        three = self.root / "skills/three"
+        three.mkdir(parents=True)
+        (three / "SKILL.md").write_text("ours\n")
+        self.assertRefusedClean("--sha", self.sha1, "--add", "three=skills/eng/two",
+                                needle="already exists and is not pinned")
+        own = self.root / "skills/two"
+        own.mkdir(parents=True)
+        (own / "SKILL.md").write_text("ours\n")
+        # Two already in the lock but never vended: a resync leaves the hand-written copy alone,
+        # and flipping it to vend true refuses rather than replacing it.
+        self.assertEqual(self.run_resync("--sha", self.sha1)[0], 0)
+        self.assertEqual((own / "SKILL.md").read_text(), "ours\n")
+        lock = self.lock()
+        lock["skills"]["two"]["vend"] = True
+        (self.root / "upstream.lock.json").write_text(json.dumps(lock))
+        rc, _, err = self.run_resync("--sha", self.sha1)
+        self.assertEqual(rc, 1)
+        self.assertIn("is not the pinned copy", err)
+        self.assertEqual((own / "SKILL.md").read_text(), "ours\n")
+
+    def test_malformed_lock_refuses_cleanly(self) -> None:
+        for text in ("{not json", "[]", '{"schema": 1, "sources": null, "skills": {}}',
+                     '{"schema": 1, "sources": {}, "skills": {"one": {"path": "x"}}}'):
+            with self.subTest(text=text):
+                (self.root / "upstream.lock.json").write_text(text)
+                rc, _, err = self.run_resync("--sha", self.sha1)
+                self.assertEqual(rc, 1, err)
+                self.assertIn("refused", err)
+                self.assertNotIn("Traceback", err)
+
+    def test_names_differing_only_by_case_are_refused(self) -> None:
+        self.write_up("skills/eng/one/README.md", "a\n")
+        self.write_up("skills/eng/one/readme.md", "b\n")
+        sha2 = self.commit("case pair")
+        self.assertRefusedClean("--sha", sha2, needle="differ only by case")
+
     def test_result_passes_check_skills(self) -> None:
         import check_skills
         self.run_resync("--sha", self.sha1)

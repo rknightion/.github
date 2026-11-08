@@ -135,6 +135,13 @@ def read_tree(repo: Path, sha: str, path: str) -> dict[str, tuple[str, bytes]]:
             raise Refused(f"{name!r}: outside {path} upstream")
         rel = safe_rel(name[len(path) + 1:])
         files[rel] = (mode, git_bytes("cat-file", "blob", obj, cwd=repo))
+    folded: dict[str, str] = {}
+    for rel in files:
+        key = rel.casefold()
+        if key in folded:
+            raise Refused(f"{rel!r} and {folded[key]!r}: names that differ only by case collide "
+                          "on case-insensitive filesystems")
+        folded[key] = rel
     if not files:
         raise Refused(f"{path}: empty upstream")
     if "LICENSE" in files:
@@ -155,6 +162,22 @@ def read_file(repo: Path, sha: str, path: str) -> bytes:
     return git_bytes("cat-file", "blob", obj, cwd=repo)
 
 
+def matches_lock(dest: Path, files: dict, license_sha256: str | None) -> bool:
+    """True when dest holds exactly the locked files (plus LICENSE), byte for byte."""
+    if not dest.is_dir() or dest.is_symlink() or not files:
+        return False
+    have = {f.relative_to(dest).as_posix() for f in dest.rglob("*") if f.is_file() or f.is_symlink()}
+    if have != set(files) | {"LICENSE"}:
+        return False
+    for rel, spec in files.items():
+        f = dest / rel
+        if f.is_symlink() or not isinstance(spec, dict) or \
+                hashlib.sha256(f.read_bytes()).hexdigest() != spec.get("sha256"):
+            return False
+    lic = dest / "LICENSE"
+    return not lic.is_symlink() and hashlib.sha256(lic.read_bytes()).hexdigest() == license_sha256
+
+
 def stage_skill(dest: Path, files: dict[str, tuple[str, bytes]], license_bytes: bytes) -> None:
     dest.mkdir(parents=True)
     inside = dest.resolve()
@@ -172,16 +195,33 @@ def stage_skill(dest: Path, files: dict[str, tuple[str, bytes]], license_bytes: 
 def resync(root: Path, source: str, sha: str, url: str | None, adds: dict[str, str],
            dry_run: bool) -> list[str]:
     lock_path = root / LOCK_NAME
-    lock = json.loads(lock_path.read_text(encoding="utf-8")) if lock_path.is_file() else \
-        {"schema": 1, "sources": {}, "skills": {}}
-    if lock.get("schema") != 1:
+    try:
+        lock = json.loads(lock_path.read_text(encoding="utf-8")) if lock_path.is_file() else \
+            {"schema": 1, "sources": {}, "skills": {}}
+    except json.JSONDecodeError as exc:
+        raise Refused(f"{lock_path}: not valid JSON ({exc.msg} at line {exc.lineno})") from None
+    if not isinstance(lock, dict) or lock.get("schema") != 1:
         raise Refused(f"{lock_path}: schema must be 1")
+    sources, skills = lock.get("sources"), lock.get("skills")
+    if (not isinstance(sources, dict) or not isinstance(skills, dict)
+            or not all(isinstance(v, dict) for v in (*sources.values(), *skills.values()))
+            or not all(isinstance(e.get("source"), str) and isinstance(e.get("path"), str)
+                       and isinstance(e.get("vend"), bool) and isinstance(e.get("files"), dict)
+                       for e in skills.values())):
+        raise Refused(f"{lock_path}: sources and skills must be objects; every skill needs "
+                      "source, path, vend and files")
+    # A directory is ours to replace or remove only while it still matches what the lock pinned.
+    old_license = (sources.get(source) or {}).get("license_sha256")
+    ours = {name for name, entry in skills.items()
+            if matches_lock(root / "skills" / name, entry["files"], old_license)}
     src_entry = lock["sources"].setdefault(source, {"url": f"https://github.com/{source}.git",
                                                     "license_path": "LICENSE"})
     fetch_url = url or src_entry["url"]
     for name, path in adds.items():
         if name in lock["skills"]:
             raise Refused(f"{name}: already in the lock")
+        if (root / "skills" / name).exists():
+            raise Refused(f"{name}: a skill of that name already exists and is not pinned")
         lock["skills"][safe_name(name)] = {"source": source, "path": safe_rel(path), "vend": False, "files": {}}
     report: list[str] = []
     with tempfile.TemporaryDirectory(prefix="vend-resync-") as tmp:
@@ -212,6 +252,10 @@ def resync(root: Path, source: str, sha: str, url: str | None, adds: dict[str, s
                     raise Refused(f"{dest}: a symlink, not a skill directory")
             for name in trees:
                 dest = root / "skills" / name
+                if dest.exists() and name not in ours and not lock["skills"][name]["vend"]:
+                    continue  # not a pinned copy: not ours to remove
+                if dest.exists() and name not in ours:
+                    raise Refused(f"{dest}: exists but is not the pinned copy; not replacing it")
                 if dest.exists():
                     shutil.rmtree(dest)
                 if lock["skills"][name]["vend"]:

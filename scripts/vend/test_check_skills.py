@@ -312,6 +312,16 @@ class TestPortableNames(LintCase):
                 (d / bad).unlink()
         self.assertEqual(self.lint()[0], 0)
 
+    def test_case_colliding_names_are_a_finding(self) -> None:
+        d = self.add_skill("case-skill")
+        (d / "Notes.md").write_text("a\n")
+        (d / "notes.md").write_text("b\n")
+        self.assertFinding("only by case")
+
+    def test_code_review_link_is_deliberately_absent(self) -> None:
+        self.add_skill("caller-skill", body="Run [cr](../code-review/SKILL.md).\n")
+        self.assertEqual(self.lint()[0], 0)
+
     def test_non_object_lock_parts_are_a_finding(self) -> None:
         for lock in ({"schema": 1, "skills": []}, {"schema": 1, "sources": {"s": "x"}},
                      {"schema": 1, "skills": {"a": "x"}},

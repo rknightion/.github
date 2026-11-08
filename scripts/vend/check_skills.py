@@ -46,7 +46,7 @@ FORBIDDEN_TERMS = (
 FORMER_SKILLS = ("audit-choices", "receiving-code-review", "verification-before-completion")
 # Upstream skills link these by `../<name>/`; they are deliberately not vended, and the AGENTS
 # block says what each means here.
-DELIBERATELY_ABSENT = frozenset({"find-overengineering", "review"})
+DELIBERATELY_ABSENT = frozenset({"find-overengineering", "review", "code-review"})
 LOCK_NAME = "upstream.lock.json"
 LINK_RE = re.compile(r"\]\(\.\./([A-Za-z0-9_.-]+)/")
 # What a LICENSE must contain for each frontmatter licence.
@@ -181,7 +181,13 @@ def check_skill(d: Path, names: dict[str, bool], out: list[str], terms: tuple[st
         out.append(f"{d}:0: missing SKILL.md")
     if not (d / "LICENSE").is_file():
         out.append(f"{d}:0: missing LICENSE")
+    folded: dict[str, Path] = {}
     for f in skill_entries(d):
+        key = f.relative_to(d).as_posix().casefold()
+        if key in folded:
+            out.append(f"{f}:0: differs from {folded[key].name!r} only by case; the two collide on "
+                       "case-insensitive filesystems")
+        folded[key] = f
         for part in f.relative_to(d).parts:
             if not re.fullmatch(r"[A-Za-z0-9_][A-Za-z0-9._-]*", part) or part.endswith("."):
                 out.append(f"{f}:0: name {part!r} is not portable (letters, digits, '.', '_', '-'; "
