@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.26.11](https://github.com/rknightion/.github/compare/v1.26.10...v1.26.11) (2026-11-08)
+
+
+### Miscellaneous
+
+* **vended:** enrol rknightion/meraki-dashboard-exporter in the contributor kit ([d7c428a](https://github.com/rknightion/.github/commit/d7c428a2ff376c3acb11ed22f400f9336dbace21))
+
 ## [1.26.10](https://github.com/rknightion/.github/compare/v1.26.9...v1.26.10) (2026-11-08)
 
 
