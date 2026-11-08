@@ -238,6 +238,21 @@ class SweepTest(unittest.TestCase):
         code, out, err = self.repo.sweep("--files", "notes.txt")
         self.assertEqual((code, out.strip()), (1, "notes.txt:2:9: email"), err)
 
+    def test_utf16_bom_over_utf8_bytes_is_swept_raw_too(self):
+        # A UTF-16 byte order mark in front of UTF-8 bytes of even length decodes without error into
+        # unrelated CJK text, so the decoded view alone sweeps clean; the raw bytes still carry the email.
+        for bom in (codecs.BOM_UTF16_LE, codecs.BOM_UTF16_BE):
+            content = bom + ("first\ncontact " + EMAIL + "!\n").encode()
+            self.assertEqual(len(content) % 2, 0)
+            content.decode("utf-16")  # proves the crafted bytes decode, so the BOM path is taken
+            self.repo.write("crafted.txt", content)
+            self.repo.commit("crafted " + bom.hex())
+            for result in (self.branch_sweep(), self.repo.sweep("--files", "crafted.txt")):
+                code, out, err = result
+                self.assertEqual(code, 1, out + err)
+                self.assertEqual(out.strip().splitlines(), ["crafted.txt:2:9: email"], out)
+                self.assertNotIn(EMAIL, out + err)
+
     def test_nul_heavy_without_bom_is_swept_with_nuls_stripped(self):
         self.repo.write("notes.txt", ("contact " + EMAIL + "\n").encode("utf-16-le"))
         self.repo.commit("utf-16 no bom")

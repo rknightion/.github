@@ -43,7 +43,10 @@ A finding prints path:line:column: rule, never the matched text, because the out
 logs. A finding in a file name prints path:0:0: rule (file name); that prints the path, matched text
 included, because the path is already public in the diff and the file list of the change.
 
-Content starting with a UTF-16 or UTF-32 byte order mark is decoded and swept whole. Other content
+Content starting with a UTF-16 or UTF-32 byte order mark is decoded and swept whole, and its raw
+bytes are swept too, line by line in both NUL views below, because UTF-8 bytes behind a byte order
+mark can decode without error into unrelated text; a finding both see on a line is reported once.
+Other content
 in which NUL bytes make up a fifth or more of the bytes (binary, or UTF-16 without a byte order
 mark) is swept twice, once with its NUL bytes removed (so UTF-16 text matches) and once with each
 NUL read as a line break (so a NUL still separates the bytes either side of it), and a finding both
@@ -135,7 +138,11 @@ def line_views(data, label):
                 text = data.decode(codec)
             except UnicodeDecodeError:
                 raise CannotSweep(f"{label} starts with a {codec} byte order mark but does not decode as {codec}") from None
-            return [(line,) for line in text.split("\n")]
+            # A byte order mark proves nothing: UTF-8 bytes behind one can decode cleanly into unrelated
+            # text. Line i is also swept as raw line i in both NUL views; a finding seen twice is reported once.
+            decoded, raw = text.split("\n"), data.split(b"\n")
+            return [(tuple(decoded[i:i + 1]) + (nul_views(raw[i]) if i < len(raw) else ()))
+                    for i in range(max(len(decoded), len(raw)))]
     if nul_heavy(data):
         # Binary, or UTF-16 without a byte order mark: see the module docstring for the two views.
         return [nul_views(raw) for raw in data.split(b"\n")]
