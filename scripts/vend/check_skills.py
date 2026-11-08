@@ -183,7 +183,9 @@ def run(root: Path) -> list[str]:
     out: list[str] = []
     terms = FORBIDDEN_TERMS + extra_terms()
     skills_root = root / "skills"
-    if skills_root.is_dir():
+    if not skills_root.is_dir():
+        out.append(f"{skills_root}:0: missing (the skills directory)")
+    else:
         names = skill_names(skills_root)
         for entry in sorted(skills_root.iterdir()):
             if not entry.is_dir() or entry.is_symlink():
@@ -192,7 +194,9 @@ def run(root: Path) -> list[str]:
             check_skill(entry, names, out, terms)
     for name in ("CONTRIBUTING.md", "AGENTS-block.md"):
         p = root / name
-        if p.is_file():
+        if not p.is_file():
+            out.append(f"{p}:0: missing")
+        else:
             text_rules(p, p.read_text(encoding="utf-8"), out, terms)
     return out
 

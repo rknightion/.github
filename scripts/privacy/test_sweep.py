@@ -138,6 +138,15 @@ class SweepTest(unittest.TestCase):
         code, out, err = self.branch_sweep("--no-repo-files", "--allow", str(allow))
         self.assertEqual(code, 0, out + err)
 
+    def test_allow_spans_hold_when_lowercasing_changes_length(self):
+        # "\u0130".lower() is two characters, so spans taken from lowercased text drift.
+        self.repo.write("net.md", "\u0130\u0130\u0130 dns " + PUBLIC_IP + "\n")
+        self.repo.commit("dotted capitals")
+        allow = Path(self.scratch) / "allow.txt"
+        allow.write_text(PUBLIC_IP + "\n")
+        code, out, err = self.branch_sweep("--no-repo-files", "--allow", str(allow))
+        self.assertEqual(code, 0, out + err)
+
     def test_repo_patterns_file_applied(self):
         self.repo.write(".github/privacy/patterns.txt", "# local names\nwidget-hos[t]-[0-9]+\n")
         self.repo.commit("patterns")

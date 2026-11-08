@@ -35,6 +35,8 @@ class LintCase(unittest.TestCase):
         self.root = Path(self.tmp.name) / "vended"
         self.add_skill("good-skill")
         self.add_skill("opt-skill", extra_meta="metadata:\n  vended: opt-in\n")
+        for guide in ("CONTRIBUTING.md", "AGENTS-block.md"):
+            (self.root / guide).write_text("A plain guide.\n")
 
     def tearDown(self) -> None:
         self.tmp.cleanup()
@@ -85,6 +87,19 @@ class TestClean(LintCase):
 
 
 class TestStructure(LintCase):
+    def test_missing_guide_files_are_findings(self) -> None:
+        for guide in ("CONTRIBUTING.md", "AGENTS-block.md"):
+            (self.root / guide).unlink()
+        rc, out = self.lint()
+        self.assertEqual(rc, 1, out)
+        self.assertIn("CONTRIBUTING.md:0: missing", out)
+        self.assertIn("AGENTS-block.md:0: missing", out)
+
+    def test_missing_skills_directory_is_a_finding(self) -> None:
+        import shutil
+        shutil.rmtree(self.root / "skills")
+        self.assertFinding("skills:0: missing")
+
     def test_missing_skill_md(self) -> None:
         d = self.root / "skills" / "empty-skill"
         d.mkdir(parents=True)

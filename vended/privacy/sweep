@@ -220,13 +220,9 @@ def matches(text, rules, allow=(), strict=False):
     raw += [(m.start(), m.end(), "address") for m in QUAD.finditer(text)
             if address_reported(m.group(0), strict) and not versionish(text, m.start(), m.end())]
     if allow and raw:
-        lowered = text.lower()
-        spans = []
-        for literal in allow:
-            at = lowered.find(literal)
-            while at != -1:
-                spans.append((at, at + len(literal)))
-                at = lowered.find(literal, at + 1)
+        # Match on the original text: lowercasing can change length and shift every span after it.
+        spans = [(m.start(), m.end()) for literal in allow
+                 for m in re.finditer(re.escape(literal), text, re.IGNORECASE)]
         raw = [hit for hit in raw if not any(s <= hit[0] and hit[1] <= e for s, e in spans)]
     return sorted((start + 1, name, text[start:end]) for start, end, name in raw)
 
