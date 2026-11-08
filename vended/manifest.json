@@ -14,5 +14,6 @@
   {"repo": "m7kni/gc-gitsync-m7kni", "privacy_sweep": false},
   {"repo": "rknightion/grafana-cloud-org-insights"},
   {"repo": "m7kni/factory", "privacy_sweep": false},
-  {"repo": "rknightion/meraki-dashboard-ha"}
+  {"repo": "rknightion/meraki-dashboard-ha"},
+  {"repo": "rknightion/tailscale2otel"}
 ]}
