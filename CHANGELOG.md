@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.26.8](https://github.com/rknightion/.github/compare/v1.26.7...v1.26.8) (2026-11-08)
+
+
+### Miscellaneous
+
+* **vended:** stop syncing the tracker-probe repositories ([a3a728b](https://github.com/rknightion/.github/commit/a3a728bf0abc6d1e93e4070336dd0ab5b1246774))
+
 ## [1.26.7](https://github.com/rknightion/.github/compare/v1.26.6...v1.26.7) (2026-11-08)
 
 
