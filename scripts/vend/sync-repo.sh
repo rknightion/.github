@@ -29,6 +29,17 @@ enable_auto_merge() {
   gh pr merge "$2" --repo "$1" --auto --squash --match-head-commit "$3"
 }
 
+# Stage the sync's changes in the current repository.
+stage_changes() {
+  # -f: a repository that gitignores .claude/, .vended.json or .github/privacy/ must still
+  # commit the vended skill links, the record and the sweep. The clone is fresh, so nothing
+  # else ignored is in the tree to be swept up with them.
+  git add -A
+  for vended_path in .claude/skills .agents/skills .vended.json .github/privacy; do
+    if [ -e "${vended_path}" ]; then git add -f -- "${vended_path}"; fi
+  done
+}
+
 main() {
   repo="${1:?usage: sync-repo.sh owner/name}"
   if ! [[ "${repo}" =~ ^[A-Za-z0-9-]+/[A-Za-z0-9._-]+$ ]]; then
@@ -66,11 +77,7 @@ main() {
     exit 0
   fi
 
-  # -f: a repository that gitignores .claude/ must still commit the vended skill links.
-  git add -A
-  for vended_dir in .claude/skills .agents/skills; do
-    if [ -e "${vended_dir}" ]; then git add -f -- "${vended_dir}"; fi
-  done
+  stage_changes
   git -c user.name="${BOT_NAME}" -c user.email="${BOT_EMAIL}" -c commit.gpgsign=false \
     commit --quiet -m "${title}"
 
@@ -85,7 +92,8 @@ main() {
       "${VEND_REF}" "${VEND_SHA}"
     printf 'Changed or removed paths:\n\n'
     jq -r '(.changed + .removed)[] | "- `" + . + "`"' "${work}/summary.json"
-    printf '\nA file edited in this repository is never overwritten: the sync refuses instead.\n\n'
+    printf '\nA managed file edited in this repository is not overwritten: the sync refuses instead.\n'
+    printf 'A deleted one is restored; opt out in vended/manifest.json of rknightion/.github.\n\n'
     printf 'Task: none, vended files sync from rknightion/.github %s\n' "${VEND_REF}"
   } > "${body}"
 

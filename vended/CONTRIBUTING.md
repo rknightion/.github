@@ -42,16 +42,19 @@ in particular: the tools and versions `just setup` expects to find, anything slo
 - Tick "Allow edits by maintainers" when you open a pull request from a fork, so a maintainer can
   push a small fix to your branch.
 - Say how the pull request relates to an issue, on a line of its own:
-  - `Closes #N` when it completes issue N of this repository. Add the "Acceptance evidence" table
-    with one row for each acceptance criterion of that issue, its text copied word for word, an
-    evidence class (`code`, `live` or `browser`) and the proof. A repository path in the proof goes
-    in backticks so the check can find it in your branch.
-  - `Refs #N` when it relates to an issue without completing it. An outside contributor may always
-    write `Refs #N` and leave closing the issue to a maintainer.
+  - `Refs #N` when it works on issue N, and describe in the pull request how you verified the
+    change. A maintainer adds the acceptance evidence and closes the issue.
   - `Task: none, <reason>` when there is no issue.
-- A pull request that changes `.github/workflows/` or `.github/actions/` never carries a closing
-  keyword. Write `Task: none, <reason>` (a `Refs #N` beside it is fine) and a maintainer closes the
-  issue after the merge.
+- Do not write a closing keyword (`Closes #N`, `Fixes #N` and the like) anywhere in the body, prose
+  included. Closing an issue is a maintainer's step, and it needs an acceptance evidence table the
+  repository's check reads.
+- Maintainers, and the owner's coding agents, write `Closes #N` for each issue the pull request
+  completes, with the "Acceptance evidence" table: one row for each acceptance criterion of that
+  issue, its text copied word for word, an evidence class (`code`, `live` or `browser`) and the
+  proof, with any repository path in backticks. The `commit-and-pr` skill has the format. A pull
+  request that changes `.github/workflows/` or `.github/actions/` never carries a closing keyword:
+  it says `Task: none, <reason>` (a `Refs #N` beside it is fine) and the issue is closed by hand
+  after the merge.
 
 ## Checks on a pull request from a fork
 

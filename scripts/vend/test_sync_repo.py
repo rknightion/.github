@@ -80,6 +80,26 @@ class SyncRepoTest(unittest.TestCase):
         self.assertIn("--auto", argv)
         self.assertEqual(argv[argv.index("--match-head-commit") + 1], sha)
 
+    def test_staging_force_adds_vended_paths_the_repository_ignores(self) -> None:
+        repo = Path(self.tmp.name) / "target"
+        repo.mkdir()
+        git = ["git", "-C", str(repo), "-c", "user.name=export", "-c", "user.email=export@example.com"]
+        subprocess.run([*git, "init", "-q"], check=True, timeout=60)
+        (repo / ".gitignore").write_text(".vended.json\n.github/privacy/\n.claude/\n.agents/\n")
+        vended = [".vended.json", ".github/privacy/sweep", ".github/privacy/identifier-patterns.txt",
+                  ".agents/skills/demo/SKILL.md"]
+        for rel in vended:
+            (repo / rel).parent.mkdir(parents=True, exist_ok=True)
+            (repo / rel).write_text("x\n")
+        (repo / ".claude" / "skills").mkdir(parents=True)
+        (repo / ".claude" / "skills" / "demo").symlink_to("../../.agents/skills/demo")
+        done = subprocess.run(["bash", "-c", 'source "$1"; cd "$2"; stage_changes', "bash", str(SCRIPT), str(repo)],
+                              env=self.env, capture_output=True, text=True, timeout=60)
+        self.assertEqual(done.returncode, 0, done.stderr)
+        staged = subprocess.run([*git, "diff", "--cached", "--name-only"], capture_output=True, text=True,
+                                check=True, timeout=60).stdout.split()
+        self.assertEqual(sorted(staged), sorted([".gitignore", ".claude/skills/demo", *vended]))
+
 
 if __name__ == "__main__":
     unittest.main()

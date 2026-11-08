@@ -71,10 +71,19 @@ the rest.
 
 `.vended.json` records the hash of every file the engine manages. For `CONTRIBUTING.md` the hash
 covers everything outside the repo-facts region, and for `AGENTS.md` only the managed block. When
-a managed file in the target no longer matches its recorded hash, the sync refuses, names the file
-and writes nothing, so a fix made in a repository is never silently overwritten. Upstream the fix
-here, or pass `--force` when the local change should be thrown away. A skill dropped from a
-repository's set is removed only when its files still match the record.
+a managed file in the target still exists but no longer matches its recorded hash, the sync
+refuses, names the file and writes nothing, so an edit to a managed file is never overwritten
+without `--force`. Upstream the fix here, or pass `--force` when the local change should be thrown
+away. A skill dropped from a repository's set is removed only when its files still match the
+record.
+
+Deleting is not an edit and not an opt-out. A deleted managed file is written again by the next
+sync, an `AGENTS.md` whose block (markers included) was removed gets the block inserted again, and
+a deleted `AGENTS.md` is recreated. To stop receiving a file, opt out in the repository's entry in
+`manifest.json` here: set `contributing`, `agents_block` or `privacy_sweep` to `false`, or list
+only the wanted skills in `skills`. The next sync then leaves `CONTRIBUTING.md` and `AGENTS.md`
+in place for the repository to own, and removes a dropped skill or the privacy files when they
+still match the record.
 
 The record is trusted only for paths the engine can own: files under `.agents/skills/<name>/`,
 `.github/privacy/sweep`, `.github/privacy/identifier-patterns.txt`, `CONTRIBUTING.md` and

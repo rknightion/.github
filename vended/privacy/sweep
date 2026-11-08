@@ -45,8 +45,12 @@ included, because the path is already public in the diff and the file list of th
 
 Content starting with a UTF-16 or UTF-32 byte order mark is decoded and swept whole. Other content
 in which NUL bytes make up a fifth or more of the bytes (binary, or UTF-16 without a byte order
-mark) is swept with its NUL bytes removed, so ASCII text inside it still matches. In a diff
-sweep either case sweeps the whole file at the head, with file line numbers.
+mark) is swept twice, once with its NUL bytes removed (so UTF-16 text matches) and once with each
+NUL read as a line break (so a NUL still separates the bytes either side of it), and a finding both
+views see is reported once. In a diff sweep, a file any of whose added lines holds a NUL byte is
+judged by its whole blob at the head (the index for --staged): when the blob needs decoding as
+above, the whole file is swept with file line numbers; otherwise each added line holding a NUL
+byte is swept in both views.
 
 Exit 0 clean, 1 findings, 2 cannot sweep (the reason is printed; nothing counts as clean).
 Python 3.12 or newer, standard library only.
@@ -118,18 +122,24 @@ def needs_whole_decode(data):
     return nul_heavy(data) or any(data.startswith(bom) for bom, _ in _BOMS)
 
 
-def decode_text(data, label):
-    """Decode file bytes for sweeping; NUL-heavy content is read with its NUL bytes removed."""
+def nul_views(raw):
+    """The two texts a line holding NUL bytes is swept as: NULs removed, and NULs read as line breaks."""
+    return (raw.replace(b"\0", b"").decode("utf-8", "replace"), raw.replace(b"\0", b"\n").decode("utf-8", "replace"))
+
+
+def line_views(data, label):
+    """Return the lines of file bytes for sweeping, each a tuple of the texts that line is swept as."""
     for bom, codec in _BOMS:
         if data.startswith(bom):
             try:
-                return data.decode(codec)
+                text = data.decode(codec)
             except UnicodeDecodeError:
                 raise CannotSweep(f"{label} starts with a {codec} byte order mark but does not decode as {codec}") from None
+            return [(line,) for line in text.split("\n")]
     if nul_heavy(data):
-        # Binary, or UTF-16 without a byte order mark: drop the NULs so ASCII text inside still matches.
-        return data.replace(b"\0", b"").decode("utf-8", "replace")
-    return data.decode("utf-8", "replace")
+        # Binary, or UTF-16 without a byte order mark: see the module docstring for the two views.
+        return [nul_views(raw) for raw in data.split(b"\n")]
+    return [(line,) for line in data.decode("utf-8", "replace").split("\n")]
 
 
 # Rules ---------------------------------------------------------------------------------------------
@@ -182,7 +192,7 @@ def versionish(text, start, end):
         return True
     if end + 1 < len(text) and text[end] == "." and text[end + 1].isdigit():
         return True
-    prefix = text[max(0, start - 24):start]
+    prefix = text[max(0, start - 24):start].rsplit("\n", 1)[-1]  # a NUL read as a line break ends the context
     return bool(_VERSION_OPERATOR.search(prefix) or _VERSION_WORD.search(prefix))
 
 
@@ -200,6 +210,11 @@ def address_reported(quad, strict):
 
 def findings(text, rules, allow=(), strict=False):
     """Return sorted (column, rule) for one line of text."""
+    return [(column, rule) for column, rule, _ in matches(text, rules, allow, strict)]
+
+
+def matches(text, rules, allow=(), strict=False):
+    """Return sorted (column, rule, matched text) for one line of text."""
     raw = [(m.start(), m.end(), name) for name, pattern in rules for m in pattern.finditer(text)]
     raw += [(m.start(), m.end(), "email") for m in EMAIL.finditer(text) if not email_allowed(m.group(0))]
     raw += [(m.start(), m.end(), "address") for m in QUAD.finditer(text)
@@ -213,7 +228,7 @@ def findings(text, rules, allow=(), strict=False):
                 spans.append((at, at + len(literal)))
                 at = lowered.find(literal, at + 1)
         raw = [hit for hit in raw if not any(s <= hit[0] and hit[1] <= e for s, e in spans)]
-    return sorted((start + 1, name) for start, _, name in raw)
+    return sorted((start + 1, name, text[start:end]) for start, end, name in raw)
 
 
 # Git -----------------------------------------------------------------------------------------------
@@ -294,7 +309,7 @@ def default_base():
                                   "add an upstream remote for the canonical repository or pass --base REF")
         else:
             raise CannotSweep("no upstream or origin remote; pass --base REF")
-    print(f"privacy sweep: base {base} ({why})", file=sys.stderr)
+    print(f"privacy sweep: base {printable(base)} ({printable(why)})", file=sys.stderr)
     return base
 
 
@@ -317,25 +332,28 @@ def added_names(diff_args):
 
 
 def added_lines(diff_args, blob_prefix):
-    """Yield (path, line number, text) for every line the diff adds.
+    """Yield (path, line number, texts) for every line the diff adds; texts are the views it is swept as.
 
     --text makes git print the lines of a file it would call binary (a NUL byte, or a -diff or binary
     attribute the change itself can set) instead of a "Binary files differ" line. Added lines are
-    decoded as UTF-8; when a file's added bytes start with a byte order mark or are NUL-heavy, its
-    whole blob at blob_prefix + path is read through decode_text instead, which decodes UTF-16 and
-    raises CannotSweep for content it cannot read as text.
+    decoded as UTF-8. When any added line of a file holds a NUL byte or starts with a byte order mark,
+    the decision is made on the file's whole blob at blob_prefix + path, never on the added bytes
+    alone: an edit to a UTF-16 file can add rows that are mostly NUL-free. A blob with a byte order
+    mark or NUL-heavy content is swept whole through line_views, which raises CannotSweep for content
+    it cannot read as text; otherwise each added line holding a NUL is swept in both NUL views.
     """
     per_path = {}
     for path, number, raw in _added_raw(diff_args):
         per_path.setdefault(path, []).append((number, raw))
     for path, rows in per_path.items():
-        if needs_whole_decode(b"\n".join(raw for _, raw in rows)):
+        if any(b"\0" in raw for _, raw in rows) or needs_whole_decode(b"\n".join(raw for _, raw in rows)):
             blob = git("cat-file", "blob", blob_prefix + path).stdout
-            for number, line in enumerate(decode_text(blob, path).split("\n"), 1):
-                yield path, number, line.rstrip("\r")
-        else:
-            for number, raw in rows:
-                yield path, number, raw.decode("utf-8", "replace")
+            if needs_whole_decode(blob):
+                for number, views in enumerate(line_views(blob, path), 1):
+                    yield path, number, views
+                continue
+        for number, raw in rows:
+            yield path, number, nul_views(raw) if b"\0" in raw else (raw.decode("utf-8", "replace"),)
 
 
 def _added_raw(diff_args):
@@ -381,8 +399,8 @@ def file_lines(paths):
                 data = file.read_bytes()
             except OSError as unreadable:
                 raise CannotSweep(f"{file} cannot be read ({type(unreadable).__name__})") from None
-            for number, line in enumerate(decode_text(data, str(file)).split("\n"), 1):
-                yield str(file), number, line
+            for number, views in enumerate(line_views(data, str(file)), 1):
+                yield str(file), number, views
 
 
 # Driver --------------------------------------------------------------------------------------------
@@ -394,12 +412,21 @@ def run(lines, rules, allow, strict, names=()):
         for _, rule in findings(name, rules, allow, strict):
             count += 1
             print(f"{printable(name)}:0:0: {rule} (file name)")
-    for path, number, text in lines:
+    for path, number, views in lines:
         swept += 1
         files.add(path)
-        for column, rule in findings(text, rules, allow, strict):
-            count += 1
-            print(f"{printable(path)}:{number}:{column}: {rule}")
+        earlier = []  # (rule, matched text) reported from an earlier view of this line
+        for text in views:
+            this_view = []
+            for column, rule, matched in matches(text, rules, allow, strict):
+                key = (rule, matched.lower())
+                if key in earlier:
+                    earlier.remove(key)  # the same finding seen again through another view
+                    continue
+                this_view.append(key)
+                count += 1
+                print(f"{printable(path)}:{number}:{column}: {rule}")
+            earlier += this_view
     if count:
         print(f"privacy sweep: {count} finding(s) in {swept} line(s) from {len(files)} file(s). {HINT}", file=sys.stderr)
         return 1
@@ -520,7 +547,7 @@ def main(argv=None):
             names = added_names(diff)
         return run(lines, rules, allow, args.strict_addresses, names)
     except CannotSweep as reason:
-        print(f"privacy sweep: cannot sweep: {reason}; nothing was swept", file=sys.stderr)
+        print(f"privacy sweep: cannot sweep: {printable(str(reason))}; nothing was swept", file=sys.stderr)
         return 2
     except Exception as crash:  # a crash must not exit 1 and read as findings, or 0 and read as clean
         print(f"privacy sweep: cannot sweep: it failed with {type(crash).__name__}; nothing was swept", file=sys.stderr)

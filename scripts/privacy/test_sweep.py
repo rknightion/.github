@@ -5,6 +5,7 @@
 Identifiers are assembled at run time so this file never holds one the sweep would report.
 PRIVACY_SWEEP_SCRIPT points the suite at another copy of the sweep (used to show a test red).
 """
+import codecs
 import json
 import os
 from pathlib import Path
@@ -237,6 +238,57 @@ class SweepTest(unittest.TestCase):
             self.assertIn("notes.txt:1:", out)
             self.assertIn(": email", out)
             self.assertNotIn(EMAIL, out + err)
+
+    def test_edit_to_utf16_bom_file_with_few_nul_added_bytes_is_decoded(self):
+        # The added rows are mostly CJK (no NUL bytes), so they alone are far under the NUL threshold
+        # and carry no byte order mark; only the blob says this is UTF-16.
+        self.repo.write("notes.txt", codecs.BOM_UTF16_LE + ("first line\n" * 3).encode("utf-16-le"))
+        self.repo.commit("utf-16 base")
+        base = self.repo.git("rev-parse", "HEAD").strip()
+        self.repo.write("notes.txt", codecs.BOM_UTF16_LE
+                        + ("first line\n" * 3 + "中文" * 200 + " " + EMAIL + "\n").encode("utf-16-le"))
+        self.repo.commit("append cjk and an email")
+        code, out, err = self.repo.sweep("--base", base)
+        self.assertEqual((code, out.strip()), (1, "notes.txt:4:402: email"), err)
+        self.assertNotIn(EMAIL, out + err)
+
+    def test_nul_next_to_a_letter_does_not_hide_an_address(self):
+        # Stripping NULs glues A to the address (A8.8.4.4, a version-like token); a NUL read as a
+        # line break keeps it apart. An email both views see is reported once.
+        self.repo.write("blob.dat", b"\0" * 100 + b"A\0" + PUBLIC_IP.encode() + b"\n"
+                        + b"\0" * 50 + b" " + EMAIL.encode() + b"\n")
+        self.repo.commit("probe")
+        for result in (self.branch_sweep(), self.repo.sweep("--files", "blob.dat")):
+            code, out, err = result
+            self.assertEqual(code, 1, out + err)
+            found = out.strip().splitlines()
+            self.assertEqual(len(found), 2, out)
+            self.assertTrue(found[0].startswith("blob.dat:1:") and found[0].endswith(": address"), out)
+            self.assertTrue(found[1].startswith("blob.dat:2:") and found[1].endswith(": email"), out)
+            self.assertNotIn(PUBLIC_IP, out + err)
+
+    def test_nul_heavy_rows_in_a_text_file_are_swept(self):
+        # A plain text file gains a UTF-16 line without a byte order mark: the blob is not NUL-heavy,
+        # the added row is.
+        self.repo.write("notes.txt", "plain line\n" * 200)
+        self.repo.commit("text base")
+        base = self.repo.git("rev-parse", "HEAD").strip()
+        with open(self.repo.path / "notes.txt", "ab") as handle:
+            handle.write(("contact " + EMAIL).encode("utf-16-le") + b"\n")
+        self.repo.commit("append utf-16")
+        code, out, err = self.repo.sweep("--base", base)
+        self.assertEqual(code, 1, out + err)
+        self.assertIn("notes.txt:201:", out)
+
+    def test_cannot_sweep_message_escapes_the_path(self):
+        name = "evil\n::error::injected"
+        self.repo.write(name, codecs.BOM_UTF16_LE + b"A")  # an odd byte after the mark: not UTF-16
+        self.repo.commit("undecodable")
+        for result in (self.branch_sweep(), self.repo.sweep("--files", name)):
+            code, out, err = result
+            self.assertEqual(code, 2, out + err)
+            self.assertIn("evil\\x0a::error::injected", err)
+            self.assertFalse(any(line.startswith("::") for line in err.splitlines()), err)
 
     def test_binary_without_identifiers_passes(self):
         self.repo.write("icon.bin", bytes([0, 1, 0, 2, 0, 0, 0, 255, 0, 10]) * 50)

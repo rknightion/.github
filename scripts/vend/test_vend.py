@@ -167,6 +167,17 @@ class TestApply(VendCase):
         for p in ("CONTRIBUTING.md", "AGENTS.md", ".github/privacy/sweep"):
             self.assertFalse((self.tgt / p).exists(), p)
 
+    def test_deleting_a_managed_file_or_the_block_is_not_an_opt_out(self) -> None:
+        self.assertEqual(self.run_vend()[0], 0)
+        (self.tgt / ".github/privacy/sweep").unlink()
+        (self.tgt / "CONTRIBUTING.md").unlink()
+        (self.tgt / "AGENTS.md").write_text("# demo\n\nOwn text.\n")
+        rc, summary, _ = self.run_vend()
+        self.assertEqual(rc, 0)
+        self.assertIn(".github/privacy/sweep", summary["changed"])
+        self.assertEqual((self.tgt / "CONTRIBUTING.md").read_text(), TEMPLATE)
+        self.assertIn("<!-- BEGIN vended: rknightion/.github -->", (self.tgt / "AGENTS.md").read_text())
+
     def test_missing_privacy_source_is_skipped_with_note(self) -> None:
         (self.src / "vended/privacy/sweep").unlink()
         rc, summary, err = self.run_vend()

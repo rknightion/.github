@@ -79,12 +79,22 @@ the picture, rewrite the body around the current full diff.
 
 ## Closing an issue
 
+Who closes depends on who you are:
+
+- **An outside contributor** (anyone who is not a maintainer of this repository, and the agent
+  working for them) writes `Refs #N` on a line of its own, never a closing keyword, and says in the
+  body how the change was verified. A maintainer adds the acceptance evidence and closes the issue.
+  Skip the rest of this section.
+- **A maintainer, or the owner's agent,** writes `Closes #N` with the evidence table, as below.
+
+The rest of this section is for maintainers:
+
 - A closing form is one keyword (`close`, `closes`, `closed`, `fix`, `fixes`, `fixed`, `resolve`,
   `resolves`, `resolved`, any case, optional colon) then the issue (`#N`, `<owner>/<repo>#N` or the
   issue URL) on one line outside an HTML comment. Write `Closes #N` on a line of its own for each
   issue the change completes. The issue must be in the repository the pull request targets.
-- Any such pair in the body closes the issue, prose included ("this fixes #12"). Write `Refs #N` for
-  an issue you only mention.
+- Any such pair in the body closes the issue, prose included ("this fixes #12"), so an outside
+  contributor must avoid it in prose too. Write `Refs #N` for an issue you only mention.
 - A pull request that closes an issue carries an `Acceptance evidence` table with one row per
   criterion of each closed issue, in the issue's order:
 
@@ -100,8 +110,6 @@ the picture, rewrite the body around the current full diff.
 - A pull request that closes nothing says `Task: none, <reason>` on a line of its own.
 - A pull request that changes `.github/workflows/` or `.github/actions/` carries no closing
   keyword: write `Task: none, <reason>` and a plain `Refs #N`, and a maintainer closes the issue.
-- An outside contributor may write `Refs #N` instead of a closing keyword and leave the evidence
-  table and closing to a maintainer.
 - After editing the body, re-run the acceptance evidence job if it did not re-run on its own.
 
 ## What never goes in commit or pull request text
