@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.26.7](https://github.com/rknightion/.github/compare/v1.26.6...v1.26.7) (2026-11-08)
+
+
+### Bug Fixes
+
+* **vended:** run the sync on pushes to main that change the kit, not on releases ([9004594](https://github.com/rknightion/.github/commit/90045945a58fa4f5ffde21cefd07521806ac9027))
+
 ## [1.26.6](https://github.com/rknightion/.github/compare/v1.26.5...v1.26.6) (2026-11-08)
 
 
