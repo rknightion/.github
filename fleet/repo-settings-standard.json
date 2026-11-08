@@ -296,6 +296,20 @@
     "allowed_merge_methods": [
       "squash"
     ],
+    "tracker_bypass_allow": {
+      "m7kni/gc-gitsync-m7kni": [
+        {
+          "actor_type": "Integration",
+          "actor_id": 4520356,
+          "bypass_mode": "always"
+        },
+        {
+          "actor_type": "Integration",
+          "actor_id": 3512185,
+          "bypass_mode": "always"
+        }
+      ]
+    },
     "release_tags": {
       "name": "release-tags",
       "include": [

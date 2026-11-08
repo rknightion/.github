@@ -254,10 +254,10 @@ class TrackerRulesets(unittest.TestCase):
         self.assertIs(align.pick_main_ruleset([b, g], "ci-success", "main"), b)
         self.assertIsNone(align.pick_main_ruleset([], "ci-success", "main"))
 
-    def run_rulesets(self, gh):
+    def run_rulesets(self, gh, full="rknightion/x"):
         al = align.Aligner(gh, STD, sweep=False)
         al.ci_success_reported = lambda full: self.fail("gate found in rulesets; no GraphQL needed")
-        gate = al.align_rulesets(repo("rknightion/x"), STD["profiles"]["oss"])
+        gate = al.align_rulesets(repo(full), STD["profiles"]["oss"])
         return al, gate
 
     def test_tracker_repo_loses_admin_bypass_everywhere(self):
@@ -349,6 +349,92 @@ class TrackerRulesets(unittest.TestCase):
         with self.assertRaises(align.ApiError):
             al.align_rulesets(repo("rknightion/x"), STD["profiles"]["oss"])
         self.assertEqual(gh.writes, [])
+
+
+LISTED = "m7kni/gc-gitsync-m7kni"
+BROKER = {"actor_type": "Integration", "actor_id": 4520356, "bypass_mode": "always"}
+GITSYNC = {"actor_type": "Integration", "actor_id": 3512185, "bypass_mode": "always"}
+OTHER_APP = {"actor_type": "Integration", "actor_id": 999, "bypass_mode": "always"}
+
+
+def actor_keys(actors):
+    return sorted((a["actor_type"], a["actor_id"], a["bypass_mode"]) for a in actors)
+
+
+class TrackerBypassAllow(unittest.TestCase):
+    """Per-repo machine writers that keep pushing straight to main on a tracker repo."""
+
+    def run_rulesets(self, gh, full):
+        al = align.Aligner(gh, STD, sweep=False)
+        al.ci_success_reported = lambda full: False  # gc-gitsync-m7kni has no CI: a base ruleset
+        gate = al.align_rulesets(repo(full, "private"), STD["profiles"]["private"])
+        return al, gate
+
+    def test_standard_lists_the_two_machine_writers(self):
+        allow = STD["rulesets"]["tracker_bypass_allow"]
+        self.assertEqual(actor_keys(allow[LISTED]), actor_keys([BROKER, GITSYNC]))
+        for full, actors in allow.items():
+            self.assertIn(full.split("/")[0], STD["owners"], full)
+            for a in actors:
+                self.assertFalse(align.is_standard_bypass(a, STD), full)  # never the admin bypass
+                self.assertEqual(set(a), {"actor_type", "actor_id", "bypass_mode"}, full)
+
+    def test_reconcile_adds_allowed_and_still_removes_admin(self):
+        rs = base_main(bypass=(ADMIN,))
+        want = align.reconcile_main_ruleset(rs, True, STD, tracker=True, allow=[BROKER, GITSYNC])
+        self.assertEqual(actor_keys(want["bypass_actors"]), actor_keys([BROKER, GITSYNC]))
+        again = align.reconcile_main_ruleset(want, True, STD, tracker=True, allow=[BROKER, GITSYNC])
+        self.assertEqual(align.normalise_ruleset(want), align.normalise_ruleset(again))
+
+    def test_reconcile_corrects_an_allowed_actors_mode(self):
+        rs = base_main(bypass=(dict(GITSYNC, bypass_mode="pull_request"),))
+        want = align.reconcile_main_ruleset(rs, True, STD, tracker=True, allow=[GITSYNC])
+        self.assertEqual(want["bypass_actors"], [GITSYNC])
+
+    def test_listed_tracker_repo_gets_its_writers_and_no_finding(self):
+        gh = FakeGH([base_main(bypass=(ADMIN,))], loopmd=LOOPMD)
+        al, _ = self.run_rulesets(gh, LISTED)
+        (put,) = [b for m, _p, b in gh.writes if m == "PUT"]
+        self.assertEqual(actor_keys(put["bypass_actors"]), actor_keys([BROKER, GITSYNC]))
+        self.assertFalse([f for f in al.findings if f["kind"] == "tracker-bypass"])
+
+    def test_listed_tracker_repo_is_idempotent(self):
+        gh = FakeGH([base_main(bypass=(BROKER, GITSYNC))], loopmd=LOOPMD)
+        al, _ = self.run_rulesets(gh, LISTED)
+        self.assertEqual([w for w in gh.writes if w[0] in ("PUT", "POST")], [])
+        self.assertFalse([f for f in al.findings if f["kind"] == "tracker-bypass"])
+
+    def test_listed_tracker_repo_still_reports_an_unlisted_actor(self):
+        gh = FakeGH([base_main(bypass=(ADMIN, OTHER_APP))], loopmd=LOOPMD)
+        al, _ = self.run_rulesets(gh, LISTED)
+        (put,) = [b for m, _p, b in gh.writes if m == "PUT"]
+        self.assertEqual(actor_keys(put["bypass_actors"]), actor_keys([OTHER_APP, BROKER, GITSYNC]))
+        (f,) = [f for f in al.findings if f["kind"] == "tracker-bypass"]
+        self.assertIn("Integration:999", f["detail"])
+        self.assertNotIn("4520356", f["detail"])
+        self.assertNotIn("3512185", f["detail"])
+
+    def test_listed_writers_reach_every_default_branch_ruleset(self):
+        # A push must clear every active ruleset, so a bypass on one alone would not let it through.
+        gh = FakeGH([base_main(bypass=(ADMIN,)), tracker_gate()], loopmd=LOOPMD)
+        al, _ = self.run_rulesets(gh, LISTED)
+        puts = {p.rsplit("/", 1)[1]: b for m, p, b in gh.writes if m == "PUT"}
+        for rid in ("10", "20"):
+            self.assertEqual(actor_keys(puts[rid]["bypass_actors"]), actor_keys([BROKER, GITSYNC]), rid)
+        self.assertFalse([f for f in al.findings if f["kind"] == "tracker-bypass"])
+
+    def test_allow_list_never_reaches_another_tracker_repo(self):
+        gh = FakeGH([base_main(bypass=(ADMIN, GITSYNC))], loopmd=LOOPMD)
+        al, _ = self.run_rulesets(gh, "m7kni/other")
+        (put,) = [b for m, _p, b in gh.writes if m == "PUT"]
+        self.assertEqual(put["bypass_actors"], [GITSYNC])  # left in place, not added to
+        self.assertEqual([f["kind"] for f in al.findings if f["kind"] == "tracker-bypass"], ["tracker-bypass"])
+
+    def test_listed_repo_before_cutover_keeps_todays_floor(self):  # no LOOP.md tracker: github yet
+        gh = FakeGH([base_main(bypass=())])
+        al, _ = self.run_rulesets(gh, LISTED)
+        (put,) = [b for m, _p, b in gh.writes if m == "PUT"]
+        self.assertEqual(put["bypass_actors"], [ADMIN])  # the migration window: admin bypass comes back
 
 
 class AutoMerge(unittest.TestCase):

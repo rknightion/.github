@@ -76,6 +76,27 @@ for a human to decide. The key is read the way agent-docs `loop-lint` reads them
 `key: value` lines before the first `## `, fences skipped). An unreadable `LOOP.md` stops the
 rulesets pass for that repo rather than guessing.
 
+`rulesets.tracker_bypass_allow` in the JSON is the per-repo exception to that: machine writers that
+keep pushing straight to `main` after a repo's people and agents move to pull requests. For a listed
+tracker repo the aligner ensures each listed actor (type, id and `bypass_mode`) is on **every**
+default-branch ruleset, since a push has to clear each active ruleset separately, and does not report
+it as `tracker-bypass`. It still removes the standard admin bypass, and any unlisted actor is still
+reported. The list never applies to a repo that is not listed, or to a listed repo before its
+`LOOP.md` declares `tracker: github`. An `Integration` actor's id is the GitHub App id
+(`gh api apps/<slug> --jq .id`), not its installation id. Current entries:
+
+| Repo | Actor | Why |
+|---|---|---|
+| `m7kni/gc-gitsync-m7kni` | `rknightion-token-broker` (Integration 4520356) | producer repos' dashboard publish jobs push synced dashboards |
+| `m7kni/gc-gitsync-m7kni` | `grafana-cloud-gitsync-rk` (Integration 3512185) | Grafana Git Sync commits UI saves straight to `main` |
+
+**Migration window.** Moving a repo to `tracker: github` is two steps: the migration removes the
+admin bypass (or adds a no-bypass pull-request ruleset), then `LOOP.md` declares `tracker: github`.
+In between the aligner still treats the repo as a Backlog repo, so a run may re-add the admin bypass
+to a ruleset named `main` (or the repo's only default-branch ruleset). That is expected; land the
+`LOOP.md` change promptly. After cutover the next run removes the admin bypass again and, for a
+listed repo, adds the allowed actors.
+
 Every active default-branch ruleset counts as a gate. The standard is reconciled onto one ruleset,
 chosen in this order: an active one already requiring `ci-success` (the one named `main` first),
 the active one named `main`, the first active one, else (none active) the first. The admin bypass is
@@ -158,6 +179,6 @@ Free plan: no org rulesets and no org cache settings.
 
 One JSON object on stdout: `changes` (what was changed, or would be under `--dry-run`),
 `findings` (things for a human: `needs-aggregator`, `actions-not-allowlisted`, `actions-not-pinned`,
-`org-actions-held`, `kept`), `new_findings` (findings absent from the previous full, non-dry run;
+`org-actions-held`, `tracker-bypass`, `kept`), `new_findings` (findings absent from the previous full, non-dry run;
 state in `--state-dir`),
 `cache_reclaimed` and `errors`. Exit 0 on a completed run, 2 if any API call failed.
