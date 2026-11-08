@@ -63,13 +63,13 @@ def safe_rel(path: str) -> str:
     """A relative POSIX path whose every component is portable: letters, digits, `.`, `_`, `-`,
     not starting with a dot, not ending with one, and no `git~1` alias."""
     parts = path.split("/")
-    if any(not COMPONENT_RE.match(p) or p.endswith(".") or p.lower() == "git~1" for p in parts):
+    if any(not COMPONENT_RE.fullmatch(p) or p.endswith(".") or p.lower() == "git~1" for p in parts):
         raise Refused(f"{path!r}: not a safe repository-relative path")
     return path
 
 
 def safe_name(name: str) -> str:
-    if not NAME_RE.match(name):
+    if not NAME_RE.fullmatch(name):
         raise Refused(f"{name!r}: a skill name is lower-case letters, digits and hyphens")
     return name
 

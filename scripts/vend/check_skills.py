@@ -183,7 +183,7 @@ def check_skill(d: Path, names: dict[str, bool], out: list[str], terms: tuple[st
         out.append(f"{d}:0: missing LICENSE")
     for f in skill_entries(d):
         for part in f.relative_to(d).parts:
-            if not re.match(r"^[A-Za-z0-9_][A-Za-z0-9._-]*$", part) or part.endswith("."):
+            if not re.fullmatch(r"[A-Za-z0-9_][A-Za-z0-9._-]*", part) or part.endswith("."):
                 out.append(f"{f}:0: name {part!r} is not portable (letters, digits, '.', '_', '-'; "
                            "no leading or trailing dot)")
                 break
@@ -270,7 +270,7 @@ def load_lock(root: Path, out: list[str]) -> dict:
         out.append(f"{p}:1: schema must be 1")
         return {"sources": {}, "skills": {}}
     for name, entry in sorted((lock.get("skills") or {}).items()):
-        if not re.match(r"^[a-z0-9][a-z0-9-]*$", name):
+        if not re.fullmatch(r"[a-z0-9][a-z0-9-]*", name):
             out.append(f"{p}:0: skill name {name!r} must be lower-case letters, digits and hyphens")
         if entry.get("source") not in (lock.get("sources") or {}):
             out.append(f"{p}:0: skill {name!r} names unknown source {entry.get('source')!r}")

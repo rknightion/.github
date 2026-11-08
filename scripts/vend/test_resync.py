@@ -261,7 +261,8 @@ class TestResync(ResyncCase):
         for good in ("SKILL.md", "references/rules.md", "a_b/c-d.v2.txt", "scripts/run.sh"):
             self.assertEqual(resync.safe_rel(good), good)
         for bad in ("/abs", "../x", "a/../b", ".", "..", "", "a//b", ".git", ".GIT", "git~1",
-                    ".gitmodules", "x.", "a b", "a\\b", "CON:x", "new\nline", "\u2025"):
+                    ".gitmodules", "x.", "a b", "a\\b", "CON:x", "new\nline", "\u2025", "x.md\n",
+                    "dir\n/x.md"):
             with self.subTest(path=bad), self.assertRaises(resync.Refused):
                 resync.safe_rel(bad)
 
@@ -273,8 +274,10 @@ class TestResync(ResyncCase):
         self.assertFalse((Path(self.tmp.name) / "escape").exists())
 
     def test_unsafe_lock_skill_name_is_refused(self) -> None:
-        self.assertRefusedClean("--sha", self.sha1, "--add", "../escape=skills/eng/one",
-                                needle="a skill name is lower-case")
+        for name in ("../escape", "foo\n"):
+            with self.subTest(name=name):
+                self.assertRefusedClean("--sha", self.sha1, "--add", f"{name}=skills/eng/one",
+                                        needle="a skill name is lower-case")
 
     def test_result_passes_check_skills(self) -> None:
         import check_skills
