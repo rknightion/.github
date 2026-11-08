@@ -10,5 +10,6 @@
   {"repo": "rknightion/synthkit"},
   {"repo": "rknightion/rfc6035-2otel"},
   {"repo": "rknightion/genai-otel-bridge"},
-  {"repo": "rknightion/cf2otel"}
+  {"repo": "rknightion/cf2otel"},
+  {"repo": "m7kni/gc-gitsync-m7kni", "privacy_sweep": false}
 ]}
