@@ -278,35 +278,137 @@ def is_default_branch_ruleset(rs: dict) -> bool:
     return "~DEFAULT_BRANCH" in inc or any(i in ("refs/heads/main", "refs/heads/master") for i in inc)
 
 
-def ref_pattern_match(ref: str, pattern: str) -> bool:
-    """GitHub ruleset ref patterns are fnmatch with FNM_PATHNAME: `*` and `?` never cross `/`,
-    `**` does. Python's fnmatch lets `*` cross `/`, so translate instead."""
-    out, i = [], 0
-    while i < len(pattern):
-        c = pattern[i]
-        if pattern.startswith("**", i):
-            out.append(".*")
-            i += 2
+def _fnm_bracket(p: str, i: int, c: str) -> int | None:
+    """Ruby dir.c bracket(): the index after the class if `c` matches it, else None. A malformed
+    class (empty, reversed range, unterminated) simply does not match."""
+    n = len(p)
+    if i >= n:
+        return None
+    neg = p[i] in "!^"
+    if neg:
+        i += 1
+    ok = False
+    while True:
+        if i >= n:
+            return None
+        if p[i] == "]":
+            break
+        t1 = i + 1 if p[i] == "\\" else i
+        if t1 >= n:
+            return None
+        i = t1 + 1
+        if i >= n:
+            return None
+        if p[i] == "-" and not (i + 1 < n and p[i + 1] == "]"):
+            t2 = i + 1
+            if t2 < n and p[t2] == "\\":
+                t2 += 1
+            if t2 >= n:
+                return None
+            i = t2 + 1
+            if ok:
+                continue
+            if c in (p[t1], p[t2]) or ord(p[t1]) <= ord(c) <= ord(p[t2]):
+                ok = True
             continue
-        if c == "*":
-            out.append("[^/]*")
-        elif c == "?":
-            out.append("[^/]")
-        elif c == "[":
-            j = pattern.find("]", i + 2 if pattern[i + 1:i + 2] in ("!", "^") else i + 1)
-            if j == -1:
-                out.append(re.escape(c))
-            else:
-                body = pattern[i + 1:j]
-                if body[:1] in ("!", "^"):
-                    body = "^" + body[1:]
-                out.append("[" + body.replace("\\", "\\\\") + "]")
-                i = j + 1
+        if not ok and p[t1] == c:
+            ok = True
+    return None if ok == neg else i + 1
+
+
+def _fnm_segment(p: str, pi: int, s: str, si: int) -> tuple[bool, int, int]:
+    """Ruby dir.c fnmatch_helper() with FNM_PATHNAME: match one path segment."""
+    def pend(i):
+        return i >= len(p) or p[i] == "/"
+
+    def send(i):
+        return i >= len(s) or s[i] == "/"
+
+    def unesc(i):
+        return i + 1 if i < len(p) and p[i] == "\\" else i
+
+    def at(i):
+        return p[i] if i < len(p) else ""
+    if si < len(s) and s[si] == "." and at(unesc(pi)) != ".":  # leading period
+        return False, pi, si
+    ptmp = stmp = None
+    while True:
+        ch = at(pi)
+        matched = False
+        if ch == "*":
+            while at(pi) == "*":
+                pi += 1
+            if pend(unesc(pi)):
+                return True, unesc(pi), si
+            if send(si):
+                return False, pi, si
+            ptmp, stmp = pi, si
+            continue
+        if ch == "?":
+            if send(si):
+                return False, pi, si
+            pi, si = pi + 1, si + 1
+            continue
+        if ch == "[":
+            if send(si):
+                return False, pi, si
+            t = _fnm_bracket(p, pi + 1, s[si])
+            if t is not None:
+                pi, si = t, si + 1
                 continue
         else:
-            out.append(re.escape(c))
-        i += 1
-    return re.fullmatch("".join(out), ref) is not None
+            pi = unesc(pi)
+            if send(si):
+                return pend(pi), pi, si
+            if not pend(pi) and p[pi] == s[si]:
+                pi, si = pi + 1, si + 1
+                matched = True
+        if matched:
+            continue
+        if ptmp is None:  # failed: try the next position for the last '*'
+            return False, pi, si
+        stmp += 1
+        pi, si = ptmp, stmp
+
+
+def ref_pattern_match(ref: str, pattern) -> bool:
+    """Ruby File.fnmatch(pattern, ref, File::FNM_PATHNAME), which GitHub uses for ruleset ref
+    patterns: `*`, `?` and classes never cross `/`; `**/` matches zero or more whole segments, and
+    `**` anywhere else is a plain `*`; a leading `.` needs an explicit `.`. A malformed pattern
+    matches nothing and never raises, so live ruleset data cannot abort a run."""
+    if not isinstance(pattern, str) or not isinstance(ref, str):
+        return False
+    try:
+        p, s = pattern, ref
+        pi = si = 0
+        ptmp = stmp = None
+        while True:
+            if p.startswith("**/", pi):
+                while p.startswith("**/", pi):
+                    pi += 3
+                    while pi < len(p) and p[pi] == "/":
+                        pi += 1
+                ptmp, stmp = pi, si
+            ok, npi, nsi = _fnm_segment(p, pi, s, si)
+            if ok:
+                pi, si = npi, nsi
+                while si < len(s) and s[si] != "/":
+                    si += 1
+                if pi < len(p) and si < len(s):
+                    pi, si = pi + 1, si + 1
+                    continue
+                if pi >= len(p) and si >= len(s):
+                    return True
+            if ptmp is not None and not (stmp < len(s) and s[stmp] == "."):
+                while stmp < len(s) and s[stmp] != "/":
+                    stmp += 1
+                if stmp < len(s):
+                    stmp += 1
+                    pi, si = ptmp, stmp
+                    continue
+            return False
+    except Exception:  # defensive: an unforeseen pattern shape is a non-match, never a crash
+        return False
 
 
 def applies_to_default_branch(rs: dict, default_branch: str | None) -> bool:
@@ -406,7 +508,7 @@ def history_covered(rs: dict, default_branch: str | None) -> bool:
         return False
     inc = ((rs.get("conditions") or {}).get("ref_name") or {}).get("include") or []
     ok = {"~DEFAULT_BRANCH"} | ({f"refs/heads/{default_branch}"} if default_branch else set())
-    return bool(inc) and set(inc) <= ok
+    return bool(inc) and all(isinstance(i, str) and i in ok for i in inc)
 
 
 def is_own_history_ruleset(rs: dict) -> bool:
@@ -426,7 +528,7 @@ def allow_plan(rs: dict, default_branch: str | None, can_split: bool) -> str:
                writers added;
     'conflict' it can block a push and carries history rules the companion cannot take over:
                writers not added (that would exempt them from the history rules), reported."""
-    types = {r["type"] for r in rs.get("rules") or []}
+    types = rule_types(rs)
     if not types - set(HISTORY_RULES):
         return "skip"
     if not types & set(HISTORY_RULES):
@@ -434,8 +536,13 @@ def allow_plan(rs: dict, default_branch: str | None, can_split: bool) -> str:
     return "split" if can_split and history_covered(rs, default_branch) else "conflict"
 
 
+def rule_types(rs: dict | None) -> set:
+    """Rule types of a ruleset as read from the API, tolerating odd shapes."""
+    return {r.get("type") for r in (rs or {}).get("rules") or [] if isinstance(r, dict)}
+
+
 def is_pure_history(rs: dict) -> bool:
-    types = {r["type"] for r in rs.get("rules") or []}
+    types = rule_types(rs)
     return bool(types) and types <= set(HISTORY_RULES)
 
 
@@ -935,7 +1042,7 @@ class Aligner:
         named, can_split = None, False
         if allow:  # the aligner owns a companion with the history name outright
             named = next((r for r in detailed if r.get("name") == hname), None)
-            extra = sorted({x["type"] for x in (named or {}).get("rules") or []} - set(HISTORY_RULES))
+            extra = sorted(str(t) for t in rule_types(named) - set(HISTORY_RULES))
             if named is not None and (not is_own_history_ruleset(named) or extra):
                 why = (f"carries other rule(s) {', '.join(extra)}" if is_own_history_ruleset(named)
                        else "does not target exactly the default branch")
@@ -981,7 +1088,7 @@ class Aligner:
         want = reconcile_main_ruleset(
             main, add_ci, self.std, tracker, add_bypass=owned,
             allow=allow if plan in ("split", "add") else [], split=plan == "split",
-            drop=allow if plan == "skip" and set(HISTORY_RULES) & {r["type"] for r in floor["rules"]} else [],
+            drop=allow if plan == "skip" and set(HISTORY_RULES) & rule_types(floor) else [],
             keep_live=allow if plan == "conflict" else [])
         if main is None:
             self.gh.write("POST", f"/repos/{full}/rulesets", want)
@@ -1019,11 +1126,6 @@ class Aligner:
             self.gh.write("POST", f"/repos/{full}/rulesets", want)
             self.change(full, "rulesets", f"created '{want['name']}' (deletion and force-push blocked, no bypass)")
         elif normalise_ruleset(want) != normalise_ruleset(existing):
-            extra = sorted({r["type"] for r in existing.get("rules") or []} - set(HISTORY_RULES))
-            if extra:
-                self.finding(full, "tracker-history-ruleset",
-                             f"history ruleset '{want['name']}' carried other rule(s) {', '.join(extra)}; removed, "
-                             "since it must not block an ordinary push. Put them on another ruleset if needed")
             self.gh.write("PUT", f"/repos/{full}/rulesets/{existing['id']}", want)
             dropped = sorted(f"{a.get('actor_type')}:{a.get('actor_id')}" for a in existing.get("bypass_actors") or [])
             self.change(full, "rulesets", f"updated '{want['name']}' as the history ruleset (deletion and force-push "
@@ -1046,7 +1148,7 @@ class Aligner:
             if r.get("enforcement") != "active" or is_default_branch_ruleset(r) \
                     or not applies_to_default_branch(r, default_branch):
                 continue
-            if {x["type"] for x in r.get("rules") or []} - set(HISTORY_RULES):
+            if rule_types(r) - set(HISTORY_RULES):
                 self.finding(full, "tracker-bypass-allow-unreached",
                              f"ruleset '{r.get('name')}' reaches the default branch through a wider pattern and "
                              "can block a push; the aligner does not manage it, so the allowed writers are not on "
@@ -1074,10 +1176,11 @@ class Aligner:
                         or any(same_actor(a, w) for w in allow)]
             else:
                 keep = plan_actors(stripped, allow, plan,
-                                   bool({x["type"] for x in r.get("rules") or []} & set(HISTORY_RULES)))
+                                   bool(rule_types(r) & set(HISTORY_RULES)))
             left |= {key(a) for a in keep}
             rules = r.get("rules") or []
-            rules_keep = [x for x in rules if x["type"] not in HISTORY_RULES] if plan == "split" else rules
+            rules_keep = [x for x in rules if not isinstance(x, dict) or x.get("type") not in HISTORY_RULES] \
+                if plan == "split" else rules
             if normalise_ruleset({"bypass_actors": keep}) != normalise_ruleset({"bypass_actors": actors}) \
                     or len(rules_keep) != len(rules):
                 body = ruleset_body(r)

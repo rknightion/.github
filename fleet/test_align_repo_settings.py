@@ -403,6 +403,7 @@ class TrackerBypassAllow(unittest.TestCase):
         self.assertFalse(align.history_covered(rs(["~DEFAULT_BRANCH", "refs/heads/release/*"]), "main"))
         self.assertFalse(align.history_covered(rs(["~ALL"]), "main"))
         self.assertFalse(align.history_covered(rs([]), "main"))
+        self.assertFalse(align.history_covered(rs(["~DEFAULT_BRANCH", ["odd"]]), "main"))  # never raises
         self.assertFalse(align.history_covered({"target": "tag", "conditions": rs(["~DEFAULT_BRANCH"])["conditions"]}, "main"))
 
     def split_main(self):
@@ -662,14 +663,48 @@ class TrackerBypassAllow(unittest.TestCase):
         hit = align.applies_to_default_branch
         self.assertTrue(hit(rs(["refs/heads/*"]), "main"))
         self.assertTrue(hit(rs(["refs/heads/ma?n"]), "main"))
-        self.assertTrue(hit(rs(["refs/**"]), "main"))
+        self.assertFalse(hit(rs(["refs/**"]), "main"))     # ** crosses '/' only as a whole '**/' segment
+        self.assertTrue(hit(rs(["refs/**/main"]), "main"))
         self.assertTrue(hit(rs(["~ALL"]), "main"))
         self.assertFalse(hit(rs(["refs/*"]), "main"))                  # * never crosses '/'
         self.assertFalse(hit(rs(["refs/heads/*"]), "release/1"))
-        self.assertTrue(hit(rs(["refs/heads/**"]), "release/1"))
+        self.assertFalse(hit(rs(["refs/heads/**"]), "release/1"))
+        self.assertTrue(hit(rs(["refs/heads/**/*"]), "release/1"))
+        self.assertFalse(hit(rs(["refs/heads/[z-a]", 5, None]), "main"))  # malformed: no match, no raise
         self.assertFalse(hit(rs(["refs/heads/*"], ["refs/heads/main"]), "main"))
         self.assertFalse(hit(rs(["refs/heads/*"], ["~DEFAULT_BRANCH"]), "main"))
         self.assertFalse(hit({"target": "tag", "conditions": rs(["~ALL"])["conditions"]}, "main"))
+
+    def test_ref_pattern_match_is_ruby_fnmatch_pathname(self):
+        # Ruby File.fnmatch(pattern, ref, File::FNM_PATHNAME), as GitHub evaluates ruleset ref patterns.
+        ref = "refs/heads/main"
+        cases = {
+            "refs/**": False, "**": False, "refs/heads/**/main": True, "refs/**/main": True,
+            "**/main": True, "refs/**/*": True, "refs/heads/m***": True, "refs/heads/ma?n": True,
+            "refs/*": False, "refs/heads/*": True, "refs/heads/m*": True, "*": False,
+            "refs/heads/[z-a]": False, "refs/heads/[]ain": False, "refs/heads/[!]ain": True,
+            "refs/heads/[]": False, "refs/heads/m[[]in": False, "refs/heads/m[a-c]in": True,
+            "refs/heads/m[/]in": False, "refs/heads/ma\\in": True, "refs/heads/m[\\]]in": False,
+            "refs/heads/[a-z]*": True, "refs/heads/[": False, "refs/heads/m[a": False,
+            "refs/heads/[!a-z]ain": False, "refs/heads/[^n]ain": True, "": False,
+        }
+        for pat, want in cases.items():
+            self.assertIs(align.ref_pattern_match(ref, pat), want, pat)
+        self.assertIs(align.ref_pattern_match("refs/heads/release/1", "refs/heads/**"), False)
+        self.assertIs(align.ref_pattern_match("refs/heads/release/1", "refs/heads/**/1"), True)
+        self.assertIs(align.ref_pattern_match("refs/heads/.hidden", "refs/heads/*"), False)  # leading period
+        self.assertIs(align.ref_pattern_match("refs/heads/.hidden", "refs/heads/.*"), True)
+        for bad in (5, None, ["x"]):
+            self.assertIs(align.ref_pattern_match(ref, bad), False)
+
+    def test_malformed_patterns_never_abort_the_rulesets_pass(self):
+        weird = tracker_gate(50)
+        weird["name"] = "weird"
+        weird["conditions"]["ref_name"]["include"] = ["refs/heads/[z-a]", "refs/heads/[]ain", "[]", "[[]", 7]
+        weird["rules"].append({"parameters": None})  # a rule without a type
+        gh = FakeGH([self.split_main(), weird, history_ruleset()], loopmd=LOOPMD)
+        al, _ = self.run_rulesets(gh, LISTED)
+        self.assertNotIn("50", self.puts_by_id(gh))
 
     def test_blocking_ruleset_beyond_the_default_branch_set_is_reported(self):
         for include in (["~ALL"], ["refs/heads/*"]):

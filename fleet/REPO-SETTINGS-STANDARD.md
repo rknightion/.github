@@ -90,7 +90,8 @@ actor: it is ensured where listed actors are ensured, and left exactly as found 
 - **History rules only** (`deletion`, `non_fast_forward`) or no rules: it never blocks a
   fast-forward push, so no writer needs to bypass it and none is added. One with history rules
   keeps them, and a listed actor found on it is removed, since it would be exempt from them; one
-  with no rules is left as it is. A repo with no CI, whose `main`
+  with no rules keeps any other listed actor already on it. Either kind loses the admin bypass, a
+  flagged one included, since nothing there needs bypassing. A repo with no CI, whose `main`
   is just the base floor, ends up here: `main` binds everyone and nothing else is needed.
 - **Other rules, no history rules** (a pull-request or check ruleset): each listed actor (type, id
   and `bypass_mode`) is ensured on it.
@@ -116,13 +117,18 @@ its own name rather than duplicated; else it creates `main-history`. Only a rule
 change line names them. A `main-history` that targets anything else, or carries any other rule (a
 review requirement, a check), is never adopted or rewritten as the companion, is reported as
 `tracker-history-ruleset`, and then nothing is split; if it still targets the default branch it is
-sorted like any other ruleset above (so it keeps its rules, and loses only an unflagged admin bypass).
+sorted like any other ruleset above. Its rules are never moved or removed, but its bypass list is
+handled by those cases: an unflagged admin bypass is removed, and if it can block a push and has no
+history rules (a review requirement alone, say) the listed writers are added to it.
 
-A ruleset that reaches the default branch only through a wider pattern (`~ALL`, `refs/heads/*`,
-matched as GitHub does, where `*` never crosses `/` and `**` does) is
+A ruleset that reaches the default branch only through a wider pattern (`~ALL`, `refs/heads/*`) is
 outside the aligner's default-branch set and is never changed. On a listed tracker repo, an active one
 that can block a push is reported as `tracker-bypass-allow-unreached`: the listed writers are not on
-it, so their pushes may be refused until a human adds them or narrows it.
+it, so their pushes may be refused until a human adds them or narrows it. Patterns are matched as
+GitHub does, with Ruby's `File.fnmatch` and `FNM_PATHNAME`: `*`, `?` and `[...]` never cross `/`;
+`**/` matches zero or more whole segments, while `**` anywhere else is a plain `*` (so `refs/**` does
+not reach `refs/heads/main`, but `refs/**/main` does); a segment starting with `.` needs an explicit
+`.`. A malformed pattern matches nothing.
 
 Every entry needs exactly `actor_type` (`Integration`, `RepositoryRole` or `Team`), an integer
 `actor_id` and `bypass_mode` (`always` or `pull_request`); `rulesets.history_name` is always
@@ -153,8 +159,8 @@ In between the aligner still treats the repo as a Backlog repo, so a run may re-
 to a ruleset named `main` (or the repo's only default-branch ruleset). That is expected; land the
 `LOOP.md` change promptly. After cutover the next run removes the admin bypass again and, for a listed
 repo, adds the allowed actors. On a repo in `tracker_bypass_allow_admin` the admin bypass is instead
-kept or added on rulesets the listed actors go on, kept as found on a conflict ruleset, and removed
-only from history-only rulesets.
+kept or added on rulesets the listed actors go on and kept as found on a conflict ruleset; it is
+removed from history-only rulesets and from rulesets with no rules at all.
 
 Every active default-branch ruleset counts as a gate. The standard is reconciled onto one ruleset,
 chosen in this order: an active one already requiring `ci-success` (the one named `main` first),
