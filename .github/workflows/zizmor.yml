@@ -12,6 +12,18 @@ on:
         description: Fail pull_request runs on findings instead of only uploading SARIF.
         type: boolean
         default: false
+      runs-on:
+        description: "Runner label. Self-hosted callers must also set harden to false."
+        required: false
+        type: string
+        default: "ubuntu-latest"
+      harden:
+        description: >-
+          Run step-security/harden-runner. MUST be false on a self-hosted runner:
+          it is Enterprise-tier there and needs an agent on the runner host.
+        required: false
+        type: boolean
+        default: true
 
 permissions: {}
 
@@ -25,7 +37,7 @@ concurrency:
 jobs:
   zizmor:
     name: Run zizmor
-    runs-on: ubuntu-latest
+    runs-on: ${{ inputs.runs-on }}
     timeout-minutes: 15
     permissions:
       security-events: write
@@ -33,6 +45,7 @@ jobs:
       actions: read
     steps:
       - name: Harden the runner (audit egress)
+        if: ${{ inputs.harden }}
         uses: step-security/harden-runner@46b06cea07f9e64621fdf066ba77ac6915163d43 # v2.22.3
         with:
           egress-policy: audit
