@@ -1,5 +1,30 @@
 # Changelog
 
+## [1.29.0](https://github.com/rknightion/.github/compare/v1.28.1...v1.29.0) (2026-11-08)
+
+
+### Features
+
+* **vended:** pin dzhng skills upstream-native with a lock, resync and checker rules ([02b97f1](https://github.com/rknightion/.github/commit/02b97f1575a14d7ef58c3874061ff3ec2cc7530f))
+
+
+### Bug Fixes
+
+* **vend:** check every swap destination before touching any; nested lock shapes are findings ([057c1c8](https://github.com/rknightion/.github/commit/057c1c8680dbbdebf57a72108da1bca8cd4c890d))
+* **vend:** every resync refusal happens before any directory is touched ([ba51f16](https://github.com/rknightion/.github/commit/ba51f1661eb66e36ca72333dbd4a35b7c6d9e76b))
+* **vend:** https or local sources only, no recipe interpolation, and Kodus findings ([2a333d6](https://github.com/rknightion/.github/commit/2a333d6107883763c576f0d09be7dcbf65575db3))
+* **vend:** name rules match the whole name, so a trailing newline is refused ([40f3812](https://github.com/rknightion/.github/commit/40f3812a669d247a6b867201d3f11f4d6607dcec))
+* **vend:** never replace a skill the lock did not pin; refuse case collisions and malformed locks ([1c998b8](https://github.com/rknightion/.github/commit/1c998b816a4d9ba59b2b4d189d989a936c8d6b92))
+* **vend:** portable names only, full fetch, and direct tests of the write guards ([936e482](https://github.com/rknightion/.github/commit/936e482dde5f0c5ba2eb82f5777dd1c6354740c0))
+* **vend:** refuse licence case variants and Windows device names; validate the lock source ([d677491](https://github.com/rknightion/.github/commit/d677491c39e6bcfcfb8e9b798369b59971b33187))
+* **vend:** resync reads upstream from git objects and refuses symlinks ([555166d](https://github.com/rknightion/.github/commit/555166d42cb64370095f5d879dc04b8cc71f0c86))
+* **vend:** resync refuses hostile upstream entry names and lock skill names ([4cb24c3](https://github.com/rknightion/.github/commit/4cb24c375e6f2fcd380413cace668f952af09fa8))
+
+
+### Miscellaneous
+
+* **vended:** enrol m7kni/synthkit-hosted in the contributor kit ([9dd9553](https://github.com/rknightion/.github/commit/9dd9553258eb1dbf54e1795b37d8b8a805937307))
+
 ## [1.28.1](https://github.com/rknightion/.github/compare/v1.28.0...v1.28.1) (2026-11-08)
 
 
