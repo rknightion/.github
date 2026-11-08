@@ -87,8 +87,9 @@ has to clear each active one separately), and removes the standard admin bypass 
 tracker repo:
 
 - **History rules only** (`deletion`, `non_fast_forward`) or no rules: it never blocks a
-  fast-forward push, so no writer needs to bypass it. It keeps its history rules, and a listed
-  actor found on it is removed, since it would be exempt from them. A repo with no CI, whose `main`
+  fast-forward push, so no writer needs to bypass it and none is added. One with history rules
+  keeps them, and a listed actor found on it is removed, since it would be exempt from them; one
+  with no rules is left as it is. A repo with no CI, whose `main`
   is just the base floor, ends up here: `main` binds everyone and nothing else is needed.
 - **Other rules, no history rules** (a pull-request or check ruleset): each listed actor (type, id
   and `bypass_mode`) is ensured on it.
@@ -97,8 +98,9 @@ tracker repo:
   `non_fast_forward` move to the companion history ruleset and the listed actors are ensured.
 - **Other rules and history rules, also on other refs:** the listed actors are **not** added and
   it is reported as `tracker-bypass-allow-conflict` for a human to split. A listed actor already on
-  it is left in place (the aligner never removes a bypass from a ruleset that can block a push) and
-  named in that finding. The standard's own target ruleset is judged with its history floor, so on
+  it (the admin role too, where flagged) is left exactly as found, `bypass_mode` included, since the
+  aligner never widens or removes a bypass on a ruleset that can block a push, and is named in that
+  finding. The standard's own target ruleset is judged with its history floor, so on
   a wider target this is the conflict case.
 
 The companion history ruleset exists only when something is split, and is written **before** any
@@ -109,12 +111,19 @@ admin, not the writers). The aligner uses, in order: a ruleset named by `ruleset
 and keeps it in shape whenever it exists); else an existing history-only ruleset on exactly
 `~DEFAULT_BRANCH` under any other name, such as a hand-made `main-integrity`, which is adopted under
 its own name rather than duplicated; else it creates `main-history`. Adopting one removes its bypass
-actors, and the change line names them. A `main-history` that targets anything else is never adopted
+actors, and the change line names them. Any other rule found on it is removed too and reported as
+`tracker-history-ruleset`, since the companion must never block an ordinary push. A `main-history` that targets anything else is never adopted
 or rewritten as the companion, is reported as `tracker-history-ruleset`, and then nothing is split;
 if it still targets the default branch it is sorted like any other ruleset above.
 
+A ruleset that reaches the default branch only through a wider pattern (`~ALL`, `refs/heads/*`) is
+outside the aligner's default-branch set and is never changed. On a listed tracker repo, an active one
+that can block a push is reported as `tracker-bypass-allow-unreached`: the listed writers are not on
+it, so their pushes may be refused until a human adds them or narrows it.
+
 Every entry needs exactly `actor_type` (`Integration`, `RepositoryRole` or `Team`), an integer
-`actor_id` and `bypass_mode` (`always` or `pull_request`). The standard admin bypass
+`actor_id` and `bypass_mode` (`always` or `pull_request`); `rulesets.history_name` is always
+required. The standard admin bypass
 (`RepositoryRole` 5) is refused unless the repo is also named in
 `rulesets.tracker_bypass_allow_admin`. GitHub rulesets have no per-user bypass, so this is the only
 way to keep the owner's own direct pushes on a tracker repo; it lets every repo admin push. A repo
@@ -225,6 +234,7 @@ Free plan: no org rulesets and no org cache settings.
 
 One JSON object on stdout: `changes` (what was changed, or would be under `--dry-run`),
 `findings` (things for a human: `needs-aggregator`, `actions-not-allowlisted`, `actions-not-pinned`,
-`org-actions-held`, `tracker-bypass`, `tracker-bypass-allow-conflict`, `tracker-history-ruleset`, `kept`), `new_findings` (findings absent from the previous full, non-dry run;
+`org-actions-held`, `tracker-bypass`, `tracker-bypass-allow-conflict`, `tracker-bypass-allow-unreached`,
+`tracker-history-ruleset`, `kept`), `new_findings` (findings absent from the previous full, non-dry run;
 state in `--state-dir`),
 `cache_reclaimed` and `errors`. Exit 0 on a completed run, 2 if any API call failed.

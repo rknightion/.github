@@ -614,12 +614,46 @@ class TrackerBypassAllow(unittest.TestCase):
         hist = history_ruleset(bypass=(ADMIN, GITSYNC), enforcement="disabled")
         hist["rules"].append({"type": "pull_request", "parameters": {}})  # would block the writers
         gh = FakeGH([main, hist], loopmd=LOOPMD)
-        self.run_rulesets(gh, LISTED)
+        al, _ = self.run_rulesets(gh, LISTED)
         (put,) = [(p, b) for m, p, b in gh.writes if m == "PUT"]
         self.assertTrue(put[0].endswith("/40"))
         self.assertEqual(put[1]["bypass_actors"], [])
         self.assertEqual(put[1]["enforcement"], "active")
         self.assertEqual(rule_types(put[1]), HISTORY_RULES)
+        (f,) = [f for f in al.findings if f["kind"] == "tracker-history-ruleset"]  # never silent
+        self.assertIn("pull_request", f["detail"])
+
+    def test_conflict_on_the_main_target_keeps_live_entries_verbatim(self):
+        live = dict(GITSYNC, bypass_mode="pull_request")
+        gate = tracker_gate(bypass=(live,))
+        gate["conditions"]["ref_name"]["include"].append("refs/heads/release/*")
+        gh = FakeGH([gate, history_ruleset()], loopmd=LOOPMD)
+        self.run_rulesets(gh, LISTED)
+        put = self.puts_by_id(gh)["20"]
+        self.assertEqual(put["bypass_actors"], [live])  # not widened to "always", nothing added
+
+    def test_conflict_on_another_ruleset_keeps_live_entries_verbatim(self):
+        live = dict(GITSYNC, bypass_mode="pull_request")
+        gate = tracker_gate(bypass=(live,))
+        gate["conditions"]["ref_name"]["include"].append("refs/heads/release/*")
+        gate["rules"].append({"type": "deletion"})
+        gh = FakeGH([self.split_main(), gate, history_ruleset()], loopmd=LOOPMD)
+        self.run_rulesets(gh, LISTED)
+        self.assertNotIn("20", self.puts_by_id(gh))
+
+    def test_blocking_ruleset_beyond_the_default_branch_set_is_reported(self):
+        for include in (["~ALL"], ["refs/heads/*"]):
+            wide = tracker_gate(50)
+            wide["name"] = "everything"
+            wide["conditions"]["ref_name"]["include"] = include
+            gh = FakeGH([self.split_main(), wide, history_ruleset()], loopmd=LOOPMD)
+            al, _ = self.run_rulesets(gh, LISTED)
+            self.assertNotIn("50", self.puts_by_id(gh), include)
+            (f,) = [f for f in al.findings if f["kind"] == "tracker-bypass-allow-unreached"]
+            self.assertIn("everything", f["detail"])
+            gh = FakeGH([self.split_main(), wide], loopmd=LOOPMD)  # an unlisted repo: unchanged, silent
+            al, _ = self.run_rulesets(gh, "m7kni/other")
+            self.assertFalse([f for f in al.findings if f["kind"] == "tracker-bypass-allow-unreached"])
 
     def test_listed_tracker_repo_still_reports_an_unlisted_actor(self):
         gh = FakeGH([base_main(bypass=(ADMIN, OTHER_APP))], loopmd=LOOPMD)
@@ -731,6 +765,37 @@ class FactoryAndAwsinfra(unittest.TestCase):
         self.assertFalse([w for w in gh.writes if w[0] == "POST"])  # nothing to split, no companion
         self.assertEqual(self.kinds(al), [])
 
+    def test_awsinfra_conflicts_keep_the_admin_on_both_paths(self):
+        wide_main = tracker_gate(10, bypass=(ADMIN,))
+        wide_main["name"] = "main"
+        wide_main["conditions"]["ref_name"]["include"].append("refs/heads/release/*")
+        gh = FakeGH([wide_main], loopmd=LOOPMD)
+        self.run_rulesets(gh, AWSINFRA)
+        self.assertEqual(self.puts_by_id(gh)["10"]["bypass_actors"], [ADMIN])
+        split = tracker_gate(10, bypass=(ADMIN, RENOVATE, BROKER))
+        split["name"] = "main"
+        wide = tracker_gate(20, bypass=(ADMIN,))
+        wide["conditions"]["ref_name"]["include"].append("refs/heads/release/*")
+        wide["rules"].append({"type": "deletion"})
+        gh = FakeGH([split, wide], loopmd=LOOPMD)
+        self.run_rulesets(gh, AWSINFRA)
+        self.assertNotIn("20", self.puts_by_id(gh))  # the live admin entry stays, as on main
+
+    def test_change_text_never_claims_a_kept_admin_was_removed(self):
+        main = tracker_gate(10, bypass=(ADMIN,))
+        main["name"] = "main"
+        main["rules"] += [{"type": "deletion"}]
+        other = tracker_gate(20, bypass=(ADMIN,))
+        other["rules"] += [{"type": "non_fast_forward"}]
+        gh = FakeGH([main, other], loopmd=LOOPMD)
+        al, _ = self.run_rulesets(gh, AWSINFRA)
+        for c in al.changes:
+            if "'main'" in c["detail"] or "'pr only'" in c["detail"]:
+                self.assertNotIn("no admin bypass", c["detail"])
+                self.assertNotIn("removed admin bypass", c["detail"])
+        for b in self.puts_by_id(gh).values():
+            self.assertIn(ADMIN, b["bypass_actors"])
+
     def test_admin_allowed_only_on_the_flagged_repo(self):
         gh = FakeGH([base_main(bypass=(ADMIN,)), tracker_gate()], loopmd=LOOPMD)
         self.run_rulesets(gh, LISTED)
@@ -773,6 +838,20 @@ class StandardValidation(unittest.TestCase):
         std["rulesets"]["tracker_bypass_allow"] = None  # absent or null: no allow-list
         std["rulesets"]["tracker_bypass_allow_admin"] = None
         align.validate_standard(std)
+
+    def test_history_name_is_always_required(self):
+        std = self.std_with([BROKER])
+        std["rulesets"]["tracker_bypass_allow"] = None
+        del std["rulesets"]["history_name"]
+        with self.assertRaises(ValueError):
+            align.validate_standard(std)
+
+    def test_non_list_actors_under_a_flagged_repo_is_a_value_error(self):
+        for actors in (5, "x", {"a": 1}):
+            std = self.std_with(actors)
+            std["rulesets"]["tracker_bypass_allow_admin"] = [LISTED]
+            with self.assertRaises(ValueError, msg=repr(actors)):
+                align.validate_standard(std)
 
     def test_admin_needs_the_per_repo_flag(self):
         std = self.std_with([ADMIN, BROKER])
