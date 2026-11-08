@@ -49,19 +49,24 @@ INLINE_CODE_RE = re.compile(r"(`+)(.+?)\1")
 
 
 def prose_lines(text: str):
-    """Yield (line number, line with fenced and inline code removed)."""
+    """Yield (line number, line with fenced and inline code removed).
+
+    A fence opens on a run of three or more backticks or tildes, info string allowed. It closes only on
+    a run of the same character at least as long with nothing but whitespace after it, as CommonMark
+    says; "```bash title" inside a block is content, not a closer.
+    """
     fence = None
     for no, line in enumerate(text.splitlines(), 1):
-        m = FENCE_RE.match(line)
-        if m:
-            mark = m.group(1)
-            if fence is None:
-                fence = mark[0] * len(mark)
-            elif line.strip().startswith(fence):
-                fence = None
-            continue
         if fence is None:
+            m = FENCE_RE.match(line)
+            if m:
+                fence = m.group(1)
+                continue
             yield no, INLINE_CODE_RE.sub(" ", line)
+            continue
+        closer = re.fullmatch(r"\s*(`{3,}|~{3,})\s*", line)
+        if closer and closer.group(1)[0] == fence[0] and len(closer.group(1)) >= len(fence):
+            fence = None
 
 
 def extra_terms() -> tuple[str, ...]:

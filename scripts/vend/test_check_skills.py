@@ -204,6 +204,21 @@ class TestTextRules(LintCase):
         self.add_skill("fence-skill", body="```\nx -- y\n```\n\nafter -- fence\n")
         self.assertFinding("double hyphen outside code")
 
+    def test_fence_line_with_trailing_text_does_not_close_a_fence(self) -> None:
+        # A closing fence carries nothing but whitespace after its marks. "```bash title" inside a block is
+        # content; read as a closer, it flipped every later fence and hid the prose after the block.
+        self.add_skill("info-skill", body="```\nexample\n```bash title\nstill code -- here\n```\n\nafter -- fence\n")
+        out = check_skills.run(self.root)
+        self.assertEqual([f for f in out if "double hyphen" in f], [f"{self.root / 'skills' / 'info-skill' / 'SKILL.md'}:19: double hyphen outside code; rewrite the sentence"], out)
+
+    def test_shorter_or_other_fence_does_not_close(self) -> None:
+        lines = list(check_skills.prose_lines("````md\n```\nin -- code\n````\nout\n~~~\n```\nx\n~~~\nlast\n"))
+        self.assertEqual(lines, [(5, "out"), (10, "last")])
+
+    def test_opener_with_info_string_opens_and_bare_fence_closes(self) -> None:
+        lines = list(check_skills.prose_lines("```bash title=x\na -- b\n```  \nprose\n"))
+        self.assertEqual(lines, [(4, "prose")])
+
     def test_dash_in_references_file(self) -> None:
         d = self.add_skill("ref-skill")
         (d / "references").mkdir()
