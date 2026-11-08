@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.27.0](https://github.com/rknightion/.github/compare/v1.26.12...v1.27.0) (2026-11-08)
+
+
+### Features
+
+* **zizmor:** enforce input fails pull requests on findings ([e14fdac](https://github.com/rknightion/.github/commit/e14fdac18ee81ab178113aac6da31361acd863ab))
+
 ## [1.26.12](https://github.com/rknightion/.github/compare/v1.26.11...v1.26.12) (2026-11-08)
 
 
