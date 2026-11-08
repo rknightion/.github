@@ -97,8 +97,9 @@ jobs:
 ```
 
 Triggering on `edited` re-runs the check when the pull request body changes, which is the usual path;
-without it a body edit needs a manual re-run. Fork pull requests fail: a fork's head commit is not in the
-caller repository.
+without it a body edit needs a manual re-run. A pull request from a fork runs the same check: the caller
+repository serves the fork's head commit through `refs/pull/N/head`, so the checkout by SHA and the
+cited-path checks both work, and the job needs no secret.
 
 The caller's permissions block must grant `contents: read`, `issues: read` and `pull-requests: read`. A
 called workflow is capped by its caller and validated at startup, so a missing one is a `startup_failure`
