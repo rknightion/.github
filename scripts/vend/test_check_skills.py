@@ -310,6 +310,8 @@ class TestPortableNames(LintCase):
                 d = self.add_skill("names-skill")
                 (d / bad).write_text("x\n")
                 self.assertFinding("is not portable")
+                if bad.split(".", 1)[0].lower() in ("con", "nul", "lpt9"):
+                    self.assertFinding("Windows device name")
                 (d / bad).unlink()
         self.assertEqual(self.lint()[0], 0)
 
