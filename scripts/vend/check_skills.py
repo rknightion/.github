@@ -180,6 +180,8 @@ def check_skill(d: Path, names: dict[str, bool], out: list[str], terms: tuple[st
                 pinned: tuple[dict, dict] | None = None) -> None:
     """Lint one skill dir. `pinned` is (lock entry, lock source) for a pinned upstream copy."""
     skill_md = d / "SKILL.md"
+    if d.name.split(".", 1)[0].casefold() in RESERVED_STEMS:
+        out.append(f"{d}:0: skill dir name {d.name!r} may not be a Windows device name")
     if not skill_md.is_file() or skill_md.is_symlink():
         out.append(f"{d}:0: missing SKILL.md")
     if not (d / "LICENSE").is_file():
@@ -192,8 +194,11 @@ def check_skill(d: Path, names: dict[str, bool], out: list[str], terms: tuple[st
                        "case-insensitive filesystems")
         folded[key] = f
         for part in f.relative_to(d).parts:
-            if (not re.fullmatch(r"[A-Za-z0-9_][A-Za-z0-9._-]*", part) or part.endswith(".")
-                    or part.split(".", 1)[0].casefold() in RESERVED_STEMS):
+            if part.split(".", 1)[0].casefold() in RESERVED_STEMS:
+                out.append(f"{f}:0: name {part!r} is not portable: it uses a Windows device name "
+                           "(CON, PRN, AUX, NUL, COM1-9, LPT1-9)")
+                break
+            if not re.fullmatch(r"[A-Za-z0-9_][A-Za-z0-9._-]*", part) or part.endswith("."):
                 out.append(f"{f}:0: name {part!r} is not portable (letters, digits, '.', '_', '-'; "
                            "no leading or trailing dot)")
                 break
@@ -290,6 +295,8 @@ def load_lock(root: Path, out: list[str]) -> dict:
     for name, entry in sorted((lock.get("skills") or {}).items()):
         if not re.fullmatch(r"[a-z0-9][a-z0-9-]*", name):
             out.append(f"{p}:0: skill name {name!r} must be lower-case letters, digits and hyphens")
+        elif name in RESERVED_STEMS:
+            out.append(f"{p}:0: skill name {name!r} may not be a Windows device name")
         if entry.get("source") not in (lock.get("sources") or {}):
             out.append(f"{p}:0: skill {name!r} names unknown source {entry.get('source')!r}")
     return lock

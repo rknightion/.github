@@ -76,8 +76,9 @@ def safe_rel(path: str) -> str:
     """A relative POSIX path whose every component is portable: letters, digits, `.`, `_`, `-`,
     not starting with a dot, not ending with one, and no `git~1` alias."""
     parts = path.split("/")
-    if any(not COMPONENT_RE.fullmatch(p) or p.endswith(".") or p.lower() == "git~1"
-           or p.split(".", 1)[0].casefold() in RESERVED_STEMS for p in parts):
+    if any(p.split(".", 1)[0].casefold() in RESERVED_STEMS for p in parts):
+        raise Refused(f"{path!r}: a component uses a Windows device name (CON, PRN, AUX, NUL, COM1-9, LPT1-9)")
+    if any(not COMPONENT_RE.fullmatch(p) or p.endswith(".") or p.lower() == "git~1" for p in parts):
         raise Refused(f"{path!r}: not a safe repository-relative path")
     return path
 
@@ -85,6 +86,8 @@ def safe_rel(path: str) -> str:
 def safe_name(name: str) -> str:
     if not NAME_RE.fullmatch(name):
         raise Refused(f"{name!r}: a skill name is lower-case letters, digits and hyphens")
+    if name in RESERVED_STEMS:  # it becomes a directory name
+        raise Refused(f"{name!r}: a skill name may not be a Windows device name (CON, PRN, AUX, NUL, COM1-9, LPT1-9)")
     return name
 
 
@@ -139,17 +142,21 @@ def read_tree(repo: Path, sha: str, path: str) -> dict[str, tuple[str, bytes]]:
             raise Refused(f"{name!r}: outside {path} upstream")
         rel = safe_rel(name[len(path) + 1:])
         files[rel] = (mode, git_bytes("cat-file", "blob", obj, cwd=repo))
+    # stage_skill adds LICENSE to every skill, so no file or directory there may take that name.
+    if any(rel.split("/", 1)[0].casefold() == "license" for rel in files):
+        raise Refused(f"{path}: a skill-level licence file would collide with the root LICENSE")
+    # Every directory on the way counts too: Ref/a.md and ref/b.md merge on a case-insensitive disk.
     folded: dict[str, str] = {}
     for rel in files:
-        key = rel.casefold()
-        if key in folded:
-            raise Refused(f"{rel!r} and {folded[key]!r}: names that differ only by case collide "
-                          "on case-insensitive filesystems")
-        folded[key] = rel
+        parts = rel.split("/")
+        for i in range(1, len(parts) + 1):
+            prefix = "/".join(parts[:i])
+            other = folded.setdefault(prefix.casefold(), prefix)
+            if other != prefix:
+                raise Refused(f"{prefix!r} and {other!r}: names that differ only by case collide "
+                              "on case-insensitive filesystems")
     if not files:
         raise Refused(f"{path}: empty upstream")
-    if any(rel.casefold() == "license" for rel in files):
-        raise Refused(f"{path}: a skill-level licence file would collide with the root LICENSE")
     return files
 
 
@@ -222,7 +229,9 @@ def resync(root: Path, source: str, sha: str, url: str | None, adds: dict[str, s
             if matches_lock(root / "skills" / name, entry["files"], old_license)}
     src_entry = lock["sources"].setdefault(source, {"url": f"https://github.com/{source}.git",
                                                     "license_path": "LICENSE"})
-    fetch_url = url or src_entry["url"]
+    fetch_url = url or src_entry.get("url")
+    if not fetch_url:
+        raise Refused(f"{source}: the lock source has no url; pass --url")
     for name, path in adds.items():
         if name in lock["skills"]:
             raise Refused(f"{name}: already in the lock")

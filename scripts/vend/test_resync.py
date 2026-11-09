@@ -59,6 +59,15 @@ class ResyncCase(unittest.TestCase):
         sh("git", "commit", "-q", "-m", msg, cwd=self.up)
         return sh("git", "rev-parse", "HEAD", cwd=self.up).strip()
 
+    def commit_via_index(self, files: dict[str, str], msg: str) -> str:
+        """Commit exact paths through the index, so case-only twins survive a case-insensitive disk."""
+        for rel, text in files.items():
+            blob = subprocess.run(["git", "hash-object", "-w", "--stdin"], cwd=self.up, env=GIT_ENV,
+                                  input=text.encode(), check=True, capture_output=True).stdout.decode().strip()
+            sh("git", "update-index", "--add", "--cacheinfo", f"100644,{blob},{rel}", cwd=self.up)
+        sh("git", "commit", "-q", "-m", msg, cwd=self.up)
+        return sh("git", "rev-parse", "HEAD", cwd=self.up).strip()
+
     def run_resync(self, *extra: str) -> tuple[int, str, str]:
         out, err = io.StringIO(), io.StringIO()
         with contextlib.redirect_stdout(out), contextlib.redirect_stderr(err):
@@ -370,7 +379,10 @@ class TestResync(ResyncCase):
 
     def test_licence_case_variant_and_reserved_names_are_refused(self) -> None:
         for name, needle in (("license", "collide with the root LICENSE"), ("License.md", None),
-                             ("con.txt", "not a safe"), ("NUL", "not a safe"), ("com1.md", "not a safe")):
+                             ("license/x.md", "collide with the root LICENSE"),
+                             ("LICENSE/x.md", "collide with the root LICENSE"),
+                             ("con.txt", "Windows device name"), ("NUL", "Windows device name"),
+                             ("com1.md", "Windows device name")):
             with self.subTest(name=name):
                 self.write_up(f"skills/eng/one/{name}", "x\n")
                 sha2 = self.commit(f"add {name}")
@@ -381,20 +393,30 @@ class TestResync(ResyncCase):
                 sh("git", "reset", "-q", "--hard", self.sha1, cwd=self.up)
 
     def test_source_without_url_or_with_null_licence_path_refuses_cleanly(self) -> None:
-        for src in ({"license_path": None, "url": "x"}, {"url": 3}):
+        for src, needle in (({"license_path": None, "url": str(self.up)}, "must be objects"),
+                            ({"url": 3}, "must be objects"),
+                            ({"license_path": "LICENSE"}, "has no url")):
             with self.subTest(src=src):
                 lock = self.lock()
                 lock["sources"]["ex/skills"] = src
                 (self.root / "upstream.lock.json").write_text(json.dumps(lock))
                 rc, _, err = self.run_resync("--sha", self.sha1)
                 self.assertEqual(rc, 1, err)
+                self.assertIn(needle, err)
                 self.assertNotIn("Traceback", err)
 
     def test_names_differing_only_by_case_are_refused(self) -> None:
-        self.write_up("skills/eng/one/README.md", "a\n")
-        self.write_up("skills/eng/one/readme.md", "b\n")
-        sha2 = self.commit("case pair")
+        sha2 = self.commit_via_index({"skills/eng/one/README.md": "a\n",
+                                      "skills/eng/one/readme.md": "b\n"}, "case pair")
         self.assertRefusedClean("--sha", sha2, needle="differ only by case")
+
+    def test_directories_differing_only_by_case_are_refused(self) -> None:
+        sha2 = self.commit_via_index({"skills/eng/one/Ref/a.md": "a\n",
+                                      "skills/eng/one/ref/b.md": "b\n"}, "directory case pair")
+        self.assertRefusedClean("--sha", sha2, needle="differ only by case")
+
+    def test_device_name_skill_name_is_refused(self) -> None:
+        self.assertRefusedClean("--sha", self.sha1, "--add", "con=skills/eng/one", needle="Windows device name")
 
     def test_result_passes_check_skills(self) -> None:
         import check_skills
