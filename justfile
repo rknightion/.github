@@ -64,13 +64,6 @@ test:
     python3 -m unittest discover -s scripts/privacy -p 'test_*.py'
     python3 vended/privacy/sweep --self-test
 
-# fail if backlog/ carries an identifier (AGENTS.md rule)
-# Ignore only the task's literal documented scanner command, not any real match.
-[group('check')]
-[no-exit-message]
-pii-check:
-    @if grep -arniE '\.ts\.net|@gmail|@[a-z0-9-]+\.(com|net|io)|ghp_|github_pat_|-----BEGIN' backlog/ | grep -vF "grep -rniE '\.ts\.net|@gmail|@[a-z0-9-]+\.(com|net|io)|ghp_|github_pat_|-----BEGIN' backlog/" >/dev/null; then echo "identifier found in backlog/ — see AGENTS.md" >&2; exit 1; fi
-
 # lint the vended skills, contributor guide and AGENTS block
 [group('check')]
 [no-exit-message]
@@ -92,7 +85,7 @@ privacy-sweep *args:
 
 # the full gate — exactly what ci.yml enforces
 [group('check')]
-check: fmt-check lint test pii-check check-vended
+check: fmt-check lint test check-vended
 
 # GitHub issues and the rknightion Project; maintainers only (needs the tracker tools and credentials)
 [group('tracker')]

@@ -15,7 +15,7 @@ just check      # the full gate — exactly what ci.yml enforces
 ## Cloud agent environments
 
 Codex and Claude Code cloud tasks use one manual setup script so they can work with
-this repository's Backlog.md tracker and run the same local validation gates as
+this repository's GitHub issue tracker and run the same local validation gates as
 contributors:
 
 > [!IMPORTANT]
@@ -30,14 +30,14 @@ bash scripts/cloud-environment-setup.sh
   [Codex environment settings](https://chatgpt.com/codex/settings/environments).
 * **Claude Code:** enter the same command in the **Setup script** field of the cloud
   environment selector at [claude.ai/code](https://claude.ai/code). Network access
-  should be set to **Trusted** by default. The setup requires npm, PyPI, and
+  should be set to **Trusted** by default. The setup requires PyPI and
   proxy.golang.org; document an exception only when an additional domain is needed.
   Keep the setup under Claude's five-minute limit.
 
-The script installs pinned versions of `backlog`, `actionlint`, and `zizmor` under
+The script installs pinned versions of `actionlint` and `zizmor` under
 `~/.local/bin`, adds that directory to `PATH` through `~/.bashrc` for the later agent
 phase, verifies each tool, and can be safely run again when rebuilding an environment.
-It retrieves packages only through npm, PyPI, and the Go module proxy.
+It retrieves packages only through PyPI and the Go module proxy.
 
 ## Reusable workflows (`.github/workflows/`)
 

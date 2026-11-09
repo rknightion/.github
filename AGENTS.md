@@ -34,7 +34,7 @@ just check
 ```
 
 `fmt-check` + `lint` (actionlint, zizmor, shellcheck) + `test` (the next-rc-tag shell suite) +
-`pii-check` (the `backlog/` identifier sweep below). `just setup` installs the pinned actionlint and
+`check-vended`. `just setup` installs the pinned actionlint and
 zizmor into `.tools/` first; it is idempotent.
 
 `ci.yml` runs the same `just check` through `.github/workflows/just-check.yml`, and additionally
