@@ -29,5 +29,6 @@
   {"repo": "m7kni/brewmdm-vendor-signing", "privacy_sweep": false},
   {"repo": "m7kni/rob-knight-com-site", "privacy_sweep": false},
   {"repo": "m7kni/agentic-journal-v2", "privacy_sweep": false},
-  {"repo": "m7kni/dmarc-reporties", "privacy_sweep": false}
+  {"repo": "m7kni/dmarc-reporties", "privacy_sweep": false},
+  {"repo": "m7kni/m7kni-com-site", "privacy_sweep": false}
 ]}
