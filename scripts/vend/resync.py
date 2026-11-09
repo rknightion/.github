@@ -63,8 +63,14 @@ class Refused(Exception):
     """Resync cannot go ahead; nothing was written."""
 
 
+# No background work: git runs `maintenance run --auto` detached after a fetch, and a detached
+# process still writing into the scratch repo's objects/ races the temporary directory's removal
+# (ENOTEMPTY) when the run refuses early.
+NO_MAINTENANCE = ("-c", "maintenance.auto=false", "-c", "gc.auto=0", "-c", "gc.autoDetach=false")
+
+
 def git_bytes(*args: str, cwd: Path) -> bytes:
-    return subprocess.run(["git", "-c", "core.hooksPath=/dev/null", *args], cwd=cwd,
+    return subprocess.run(["git", "-c", "core.hooksPath=/dev/null", *NO_MAINTENANCE, *args], cwd=cwd,
                           env={**GIT_ENV, "HOME": str(cwd)}, check=True, capture_output=True).stdout
 
 
@@ -316,7 +322,7 @@ def main(argv: list[str] | None = None) -> int:
         return 1
     except subprocess.CalledProcessError as exc:
         err = exc.stderr.decode("utf-8", "replace").strip() if isinstance(exc.stderr, bytes) else exc.stderr
-        print(f"refused: git {' '.join(exc.cmd[3:])} failed: {err}", file=sys.stderr)
+        print(f"refused: git {' '.join(exc.cmd[3 + len(NO_MAINTENANCE):])} failed: {err}", file=sys.stderr)
         return 1
     except OSError as exc:
         print(f"failed while writing: {exc}; restore {root} from git (checkout, and remove any new "

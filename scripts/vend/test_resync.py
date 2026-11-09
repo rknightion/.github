@@ -11,6 +11,7 @@ import sys
 import tempfile
 import unittest
 from pathlib import Path
+from unittest import mock
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import resync  # noqa: E402
@@ -172,6 +173,14 @@ class TestResync(ResyncCase):
         self.assertEqual((self.root / "upstream.lock.json").read_bytes(), before)
         self.assertFalse((self.root / "skills/one").exists())
 
+    def test_a_git_failure_names_the_git_command_not_the_fixed_flags(self) -> None:
+        missing = Path(self.tmp.name) / "no-such-source"
+        rc, _, err = self.run_resync("--sha", self.sha1, "--url", str(missing))
+        self.assertEqual(rc, 1, err)
+        self.assertIn("refused: git ", err)
+        self.assertNotIn("maintenance.auto", err)
+        self.assertNotIn("hooksPath", err)
+
     def test_symlinked_license_is_refused(self) -> None:
         secret = Path(self.tmp.name) / "host-secret"
         secret.write_text("PRIVATE KEY\n")
@@ -221,6 +230,22 @@ class TestResync(ResyncCase):
         side = self.commit("side")
         sh("git", "checkout", "-q", "main", cwd=self.up)
         self.assertRefusedClean("--sha", side, needle="not on the default branch")
+
+    def test_fetch_starts_no_background_maintenance(self) -> None:
+        """A detached `git maintenance run --auto` outlives the run and races the removal of the
+        scratch repo (ENOTEMPTY), so no git call of the tool may spawn one."""
+        trace = Path(self.tmp.name) / "trace.log"
+        # Thresholds forced to 1 so a spawned maintenance run has real work to do.
+        forced = {"GIT_TRACE": str(trace), "GIT_CONFIG_COUNT": "3",
+                  "GIT_CONFIG_KEY_0": "gc.auto", "GIT_CONFIG_VALUE_0": "1",
+                  "GIT_CONFIG_KEY_1": "gc.autoPackLimit", "GIT_CONFIG_VALUE_1": "1",
+                  "GIT_CONFIG_KEY_2": "fetch.unpackLimit", "GIT_CONFIG_VALUE_2": "1"}
+        with mock.patch.dict(resync.GIT_ENV, forced):
+            rc, _, err = self.run_resync("--sha", self.sha1)
+        self.assertEqual(rc, 0, err)
+        spawned = [ln for ln in trace.read_text().splitlines()
+                   if "run_command" in ln and ("maintenance" in ln or " gc " in ln or ln.endswith(" gc"))]
+        self.assertEqual(spawned, [])
 
     def hostile_commit(self, bad_name: bytes) -> str:
         """A commit on main whose skill tree holds an entry git itself would never write."""
