@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.29.3](https://github.com/rknightion/.github/compare/v1.29.2...v1.29.3) (2026-11-09)
+
+
+### Miscellaneous
+
+* **vended:** enrol m7kni/brewmdm-environments ([f201ecc](https://github.com/rknightion/.github/commit/f201eccb24cf4034eee80fe6912529ae70d92b70))
+
 ## [1.29.2](https://github.com/rknightion/.github/compare/v1.29.1...v1.29.2) (2026-11-09)
 
 
