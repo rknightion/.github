@@ -322,7 +322,7 @@ def main(argv: list[str] | None = None) -> int:
         return 1
     except subprocess.CalledProcessError as exc:
         err = exc.stderr.decode("utf-8", "replace").strip() if isinstance(exc.stderr, bytes) else exc.stderr
-        print(f"refused: git {' '.join(exc.cmd[3:])} failed: {err}", file=sys.stderr)
+        print(f"refused: git {' '.join(exc.cmd[3 + len(NO_MAINTENANCE):])} failed: {err}", file=sys.stderr)
         return 1
     except OSError as exc:
         print(f"failed while writing: {exc}; restore {root} from git (checkout, and remove any new "

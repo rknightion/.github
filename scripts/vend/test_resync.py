@@ -173,6 +173,14 @@ class TestResync(ResyncCase):
         self.assertEqual((self.root / "upstream.lock.json").read_bytes(), before)
         self.assertFalse((self.root / "skills/one").exists())
 
+    def test_a_git_failure_names_the_git_command_not_the_fixed_flags(self) -> None:
+        missing = Path(self.tmp.name) / "no-such-source"
+        rc, _, err = self.run_resync("--sha", self.sha1, "--url", str(missing))
+        self.assertEqual(rc, 1, err)
+        self.assertIn("refused: git ", err)
+        self.assertNotIn("maintenance.auto", err)
+        self.assertNotIn("hooksPath", err)
+
     def test_symlinked_license_is_refused(self) -> None:
         secret = Path(self.tmp.name) / "host-secret"
         secret.write_text("PRIVATE KEY\n")
