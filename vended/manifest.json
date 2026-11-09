@@ -30,5 +30,17 @@
   {"repo": "m7kni/rob-knight-com-site", "privacy_sweep": false},
   {"repo": "m7kni/agentic-journal-v2", "privacy_sweep": false},
   {"repo": "m7kni/dmarc-reporties", "privacy_sweep": false},
-  {"repo": "m7kni/m7kni-com-site", "privacy_sweep": false}
+  {"repo": "m7kni/m7kni-com-site", "privacy_sweep": false},
+  {"repo": "rknightion/grafana-cloud-vending-machine"},
+  {"repo": "rknightion/grafana-cloud-agento11y-demo"},
+  {"repo": "rknightion/autopi-ha"},
+  {"repo": "rknightion/bumblebee-catalog"},
+  {"repo": "rknightion/bumblebee-intune"},
+  {"repo": "rknightion/grafana-cloud-reference-examples"},
+  {"repo": "rknightion/intune-assignments-manager"},
+  {"repo": "rknightion/openbao-plugin-secrets-github"},
+  {"repo": "rknightion/polylens2otel"},
+  {"repo": "rknightion/sagemcom-f3896-py"},
+  {"repo": "rknightion/mq-exporter-dist"},
+  {"repo": "rknightion/synthkit-terraform", "privacy_sweep": false}
 ]}
