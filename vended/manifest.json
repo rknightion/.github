@@ -20,5 +20,6 @@
   {"repo": "m7kni/synthkit-hosted", "privacy_sweep": false},
   {"repo": "BroTEK-Solutions/ha-addons"},
   {"repo": "m7kni/rkps-awsinfra", "privacy_sweep": false},
-  {"repo": "m7kni/brewmdm-linux-agent", "privacy_sweep": false}
+  {"repo": "m7kni/brewmdm-linux-agent", "privacy_sweep": false},
+  {"repo": "m7kni/brewmdm-website", "privacy_sweep": false}
 ]}
