@@ -22,5 +22,6 @@
   {"repo": "m7kni/rkps-awsinfra", "privacy_sweep": false},
   {"repo": "m7kni/brewmdm-linux-agent", "privacy_sweep": false},
   {"repo": "m7kni/brewmdm-website", "privacy_sweep": false},
-  {"repo": "m7kni/brewmdm-environments", "privacy_sweep": false}
+  {"repo": "m7kni/brewmdm-environments", "privacy_sweep": false},
+  {"repo": "m7kni/brewmdm-control-plane", "privacy_sweep": false}
 ]}
