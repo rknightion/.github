@@ -3,3 +3,7 @@ rules:
     config:
       policies:
         "*": hash-pin
+  # ci.yml and others deliberately call this repo's own reusables by ./ path so a
+  # pull request tests its own version; the dedicated syntax would change that.
+  self-repository:
+    disable: true

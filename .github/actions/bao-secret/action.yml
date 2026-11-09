@@ -101,7 +101,8 @@ runs:
         BAO_ADDR: ${{ inputs.bao-addr }}
         JOIN_TAILNET: ${{ inputs.join-tailnet }}
         RESOLVE_VIA: ${{ inputs.resolve-via }}
-      run: |
+      # BAO_RESOLVE is the documented export; host and ip are regex-checked below before the write
+      run: | # zizmor: ignore[github-env]
         set -euo pipefail
         host=${BAO_ADDR#https://}
         if [ "$JOIN_TAILNET" = "true" ]; then
@@ -121,6 +122,11 @@ runs:
           echo "no address pinning; relying on ambient DNS for ${host}"
           exit 0
         fi
+        # Both parts feed GITHUB_ENV, which parses one assignment per line: refuse
+        # anything but a bare hostname and an IP literal, so no newline or extra
+        # NAME=value pair can ride in on bao-addr, resolve-via or a lookup result.
+        [[ "$host" =~ ^[A-Za-z0-9.-]+$ ]] || { echo "::error::bao-addr is not a plain https://host address"; exit 1; }
+        [[ "$ip" =~ ^[0-9A-Fa-f:.]+$ ]] || { echo "::error::resolved address is not an IP literal"; exit 1; }
         echo "BAO_RESOLVE=--resolve ${host}:443:${ip}" >> "$GITHUB_ENV"
         echo "pinned ${host} -> ${ip}"
 
@@ -132,7 +138,8 @@ runs:
         BAO_ROLE: ${{ inputs.role }}
         KV_MOUNT: ${{ inputs.mount }}
         KV_PATH: ${{ inputs.path }}
-      run: |
+      # writes only KEY<<delimiter blocks the generator built from keys validated as [A-Z_][A-Z0-9_]*, excluding GITHUB_/RUNNER_/ACTIONS_/NODE_OPTIONS, with a random delimiter
+      run: | # zizmor: ignore[github-env]
         set -euo pipefail
         umask 077
         tmp=$(mktemp -d); trap 'rm -rf "$tmp"' EXIT

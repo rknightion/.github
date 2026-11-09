@@ -16,7 +16,8 @@ ERROR_MARKER = "sensitive_error_fixture_marker"
 
 def reader_script():
     section = ACTION.read_text().split("    - name: Read the secret\n", 1)[1]
-    block = section.split("      run: |\n", 1)[1]
+    # The run: header may carry a trailing zizmor ignore comment, so split on the key alone.
+    block = section.split("      run: |", 1)[1].split("\n", 1)[1]
     lines = []
     for line in block.splitlines():
         if line.strip() and not line.startswith("        "):
