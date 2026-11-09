@@ -18,5 +18,6 @@
   {"repo": "rknightion/tailscale2otel"},
   {"repo": "rknightion/opnsense2otel"},
   {"repo": "m7kni/synthkit-hosted", "privacy_sweep": false},
-  {"repo": "BroTEK-Solutions/ha-addons"}
+  {"repo": "BroTEK-Solutions/ha-addons"},
+  {"repo": "m7kni/rkps-awsinfra", "privacy_sweep": false}
 ]}
