@@ -43,7 +43,7 @@ jobs:
       languages: '[{"language":"actions","build-mode":"none"}]'
 
   # This repo's own task surface. `just check` is the complete local gate
-  # (fmt-check + lint + test + pii-check); this job is what makes it enforced
+  # (fmt-check + lint + test + check-vended); this job is what makes it enforced
   # rather than aspirational. setup: true installs the pinned actionlint and
   # zizmor into .tools/ on the runner.
   just:
