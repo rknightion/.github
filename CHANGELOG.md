@@ -1,5 +1,24 @@
 # Changelog
 
+## [1.30.0](https://github.com/rknightion/.github/compare/v1.29.3...v1.30.0) (2026-11-09)
+
+
+### Features
+
+* **vended:** enrol m7kni/brewmdm-protocol ([f4732d6](https://github.com/rknightion/.github/commit/f4732d6fa8d8b961059f041d00760fb5ee4f8b55))
+
+
+### Build & CI
+
+* **actions:** clear zizmor findings in the composite actions ([2b9df70](https://github.com/rknightion/.github/commit/2b9df700539c402dac7e1b76f2a54f9e0a5ede54))
+* **actions:** review fixes for the zizmor clean-up ([db10d2d](https://github.com/rknightion/.github/commit/db10d2d05b646aa909d1fa5b4a904be72286c032))
+* wire the tracker move (ac-evidence, privacy-sweep, backlog-freeze, enforced zizmor) ([9f588b4](https://github.com/rknightion/.github/commit/9f588b42634ace59e0f9290a7af35d369f8eee3e))
+
+
+### Miscellaneous
+
+* **tracker:** track work in GitHub issues ([#200](https://github.com/rknightion/.github/issues/200)) ([b0a257d](https://github.com/rknightion/.github/commit/b0a257d5ef09ed33801b37eebdd2c9b9204d99cf))
+
 ## [1.29.3](https://github.com/rknightion/.github/compare/v1.29.2...v1.29.3) (2026-11-09)
 
 
