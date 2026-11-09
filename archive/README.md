@@ -2,11 +2,11 @@
 
 `github-issues-2026-08-14.json` is a complete capture of this repository's GitHub issue tracker as
 it stood on **2026-08-14**, taken immediately before the closed issues were deleted. It exists
-because the closed-work index doc in `backlog/docs/` is only a row per issue — the bodies,
+because the closed-work index doc in `.github/tracker/history/` is only a row per issue: the bodies,
 acceptance criteria and completion comments live here and nowhere else.
 
-The repository moved to a [Backlog.md](https://backlog.md) tracker in `backlog/`. Open work is now
-tasks; this file is the record of the closed work.
+The repository later moved to a Backlog.md board and then back to GitHub issues; this file is the
+record of the closed work from before the board.
 
 ## What it contains
 

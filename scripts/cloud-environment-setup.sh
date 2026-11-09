@@ -4,7 +4,6 @@
 
 set -euo pipefail
 
-readonly BACKLOG_VERSION="1.50.1"
 readonly ACTIONLINT_VERSION="1.7.12"
 readonly ZIZMOR_VERSION="1.29.0"
 readonly LOCAL_BIN="${HOME}/.local/bin"
@@ -22,16 +21,6 @@ require() {
 
 version_is() {
   "$1" --version 2>/dev/null | head -n 1 | grep -Eq "(^|[^0-9.])$2([^0-9.]|$)"
-}
-
-install_backlog() {
-  if [ -x "${LOCAL_BIN}/backlog" ] && version_is "${LOCAL_BIN}/backlog" "${BACKLOG_VERSION}"; then
-    log "Backlog.md ${BACKLOG_VERSION} is already installed"
-    return
-  fi
-
-  log "installing Backlog.md ${BACKLOG_VERSION}"
-  npm install --global --prefix "${HOME}/.local" "backlog.md@${BACKLOG_VERSION}"
 }
 
 install_actionlint() {
@@ -70,20 +59,16 @@ persist_path() {
 main() {
   require go
   require grep
-  require npm
   require python3
 
   mkdir -p "${LOCAL_BIN}"
-  install_backlog
   install_actionlint
   install_zizmor
   persist_path
 
-  version_is "${LOCAL_BIN}/backlog" "${BACKLOG_VERSION}"
   version_is "${LOCAL_BIN}/actionlint" "${ACTIONLINT_VERSION}"
   version_is "${LOCAL_BIN}/zizmor" "${ZIZMOR_VERSION}"
-  "${LOCAL_BIN}/backlog" instructions overview >/dev/null
-  log "ready: Backlog.md, actionlint, and zizmor are available"
+  log "ready: actionlint and zizmor are available"
 }
 
 main "$@"
