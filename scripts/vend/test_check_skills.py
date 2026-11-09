@@ -315,6 +315,15 @@ class TestPortableNames(LintCase):
                 (d / bad).unlink()
         self.assertEqual(self.lint()[0], 0)
 
+    def test_device_name_skill_dir_and_lock_name_are_findings(self) -> None:
+        self.add_skill("con")
+        self.assertFinding("Windows device name")
+        (self.root / "upstream.lock.json").write_text(json.dumps({"schema": 1, "sources": {}, "skills": {
+            "nul": {"source": "s", "path": "p", "vend": False, "files": {}}}}))
+        rc, out = self.lint()
+        self.assertIn("'nul'", out)
+        self.assertIn("Windows device name", out)
+
     def test_case_colliding_names_are_a_finding(self) -> None:
         d = self.add_skill("case-skill")
         (d / "Notes.md").write_text("a\n")

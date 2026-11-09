@@ -86,6 +86,8 @@ def safe_rel(path: str) -> str:
 def safe_name(name: str) -> str:
     if not NAME_RE.fullmatch(name):
         raise Refused(f"{name!r}: a skill name is lower-case letters, digits and hyphens")
+    if name in RESERVED_STEMS:  # it becomes a directory name
+        raise Refused(f"{name!r}: a skill name may not be a Windows device name (CON, PRN, AUX, NUL, COM1-9, LPT1-9)")
     return name
 
 
