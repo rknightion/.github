@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.29.1](https://github.com/rknightion/.github/compare/v1.29.0...v1.29.1) (2026-11-09)
+
+
+### Miscellaneous
+
+* **vended:** enrol BroTEK-Solutions/ha-addons ([9581f83](https://github.com/rknightion/.github/commit/9581f8308216eab722f84b74a21350ea8e4bee24))
+* **vended:** enrol m7kni/rkps-awsinfra ([ca12846](https://github.com/rknightion/.github/commit/ca12846b94e2a666e91db896742f1386e2eeb3fe))
+
 ## [1.29.0](https://github.com/rknightion/.github/compare/v1.28.1...v1.29.0) (2026-11-08)
 
 
