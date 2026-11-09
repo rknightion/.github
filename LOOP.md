@@ -6,6 +6,23 @@ release-on-push: yes
 deploy-on-push: no
 receiver: https://loopwatch.m7kni.com
 grafana-stack: none
+tracker: github
+landing: pr
+
+Issues are public: no hostname, address or email in any issue, pull request or doc. Run `just` with
+stdin from `/dev/null`.
+
+The tracker working model is `~/repos/agent-docs/docs/github-tracker.md` (maintainers only).
+
+## Queue
+
+- The queue is `just tracker queue`: open issues at Project Status Ready on the rknightion Project.
+- A charter selects work by labels and Project fields. Never queue `needs-owner` or `needs-triage`,
+  the Dependency Dashboard (#3) or the bot-owned Release train status issue (#52).
+- Only the root writes issues and the Project, through `just tracker`. A lane returns the status and
+  the AC ticks it wants.
+- A queue row names the issue as `#N`. A legacy board id (`GHC-0001`) resolves with `just issue <ID>`;
+  `.github/tracker/id-map.json` is the map.
 
 ## Credentials
 - Reusable actions `bao-secret` and `broker-token` authenticate against the OpenBao broker, a live
@@ -32,13 +49,12 @@ grafana-stack: none
   pushed to main does not reliably auto-close.
 - Repo settings and rulesets leave no git trace: record before and after values in the task and verify
   by re-reading the API.
-- `zizmor` runs with `--no-exit-codes` on purpose. Never restore a mutable cross-repository
-  `config-file: ...@main` reference for CodeQL.
+- Never restore a mutable cross-repository `config-file: ...@main` reference for CodeQL.
 - Renovate: this repo's `renovate.json` is an override only; the fleet default lives in a separate
   config repository.
 - A fleet-wide sweep over `~/repos/*` misses this repo, because `*` does not match a leading dot.
-- Bare `backlog task edit --notes` / `--plan` replace the whole section; use `--append-notes` /
-  `--append-plan`. `backlog/` carries no identifiers: no hosts, emails, handles or account ids.
+- Closed pre-tracker GitHub issues are in `archive/` and the retired board's docs in
+  `.github/tracker/history/`; a legacy id such as `GHC-0001` resolves with `just issue`.
 
 ## Mutexes
 - The fleet: one lane at a time runs a cross-repo sweep or rollout.

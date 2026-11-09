@@ -42,9 +42,8 @@ dogfoods the `actionlint`, `zizmor` and `codeql` reusables against this repo so 
 tested at all. `ci-success` is the single required status check. CodeQL's query policy is embedded in
 the pinned reusable; do not restore a mutable cross-repository `config-file: ...@main` reference.
 
-zizmor runs with `--no-exit-codes` because CI's zizmor job is non-gating — findings go to the
-Security tab as SARIF. Removing that flag turns the gate red on findings this repo has already
-accepted.
+zizmor fails a pull request on any finding: the `ci.yml` call passes `enforce: true`. The local `just lint`
+recipe still passes `--no-exit-codes`; treat its output as findings to fix, not as a pass.
 
 A Linux binary is not executed on macOS and a composite action's behaviour on a consumer's runner is
 not observable from here — so when a change executes in CI, name the run that will prove it.
@@ -73,92 +72,28 @@ This repo's task surface is a `justfile`. Discover it, don't guess it:
 - `scripts/cloud-environment-setup.sh` has deliberately **no** recipe. It is the cloud-environment
   setup phase's entry point and local agents must not run it.
 
-## Task tracking
+## Tracking work
 
-Work is tracked in `backlog/` with [Backlog.md](https://backlog.md). `backlog task list --plain` is
-the queue; `backlog doc list --plain` lists the durable documents.
+Work is tracked in this repository's GitHub issues; they are the only queue. Do not add a checklist
+file beside them. The `backlog/` board is retired and frozen: a pull request may delete or move files
+there, never add or change one (`ci.yml` job `backlog-freeze`).
 
-Read `~/repos/agent-docs/sources/loop/contract.md` before designing a wave, and the **Wave operating
-model** doc for this project's own rules, recurring defects and escape hatch. The **Closed GitHub
-issues index (pre-tracker)** doc covers everything closed before 2026-08-14; the issues themselves
-were archived to `archive/` and deleted from GitHub.
-
-Four rules, each one an upstream footgun that is silent and unrepairable rather than a preference.
-The first two are enforced by a `PreToolUse` guard that lives in the agent config globally rather than
-in this repo, because documenting them was not enough. A contributor working without that guard gets
-no enforcement, so read these as rules, not as something a tool will catch for you.
-
-**Never use `--notes` or `--plan` bare.** They *silently replace* the whole section, destroying
-another session's writes with no warning and exit 0. Use `--append-notes` and `--append-plan`. This
-is an open upstream bug, not a misunderstanding.
-
-The guard judges an actual `backlog` invocation, not a mention, so a `git commit -m` or a `grep`
-whose text merely contains one of the flags passes. It also covers `--final-summary`, and carries a
-backstop for indirection (`F=--notes; backlog task edit X $F hi`). An earlier repo-local version
-matched literal command text and blocked those mentions; if you hit that, you are running a stale
-guard.
-
-**Never hand-edit task, draft, doc, decision or milestone markdown.** Section boundaries are
-HTML-comment markers; break one and the section is silently dropped at exit 0 — the data stays in the
-file but is invisible to the CLI until the next write destroys it for real. There is no repair
-command (`backlog doctor` only fixes duplicate task IDs). Use the CLI. `backlog/config.yml` is the
-one exception and is edited by hand, because list-valued keys cannot be set through `backlog config
-set`.
-
-**Finalize in one call**, so an interrupted agent cannot leave finished work looking unfinished:
-
-```bash
-backlog task edit ghc-0007 --check-ac 1 --check-ac 2 -s Done
-```
-
-**Never let two agents edit the same task.** The v1.50.x concurrency fix covers the edit funnel but
-not reorder, draft saves, the TUI path, `doc update` or decision updates.
-
-Statuses are `To Do`, `In Progress`, `Parked`, `Done`. `Parked` is for work that was attempted and
-blocked — it carries a concrete resume boundary, which is the most valuable thing a long run
-produces and is lost if flattened into `To Do`.
-
-## `backlog/` is committed, so it must never carry identifiers
-
-No email addresses, handles, usernames, account IDs, device or host names, addresses, coordinates, or
-credential values in tasks, docs or decisions. Write the shape, not the instance. Aggregate counts,
-timings and structural findings are fine — this repo's own history is full of useful ones. It is easy
-to break by accident precisely because a tracker feels private. Sweep before committing:
-
-```bash
-grep -rniE '\.ts\.net|@gmail|@[a-z0-9-]+\.(com|net|io)|ghp_|github_pat_|-----BEGIN' backlog/ && echo "PII FOUND"
-```
-
-The pattern deliberately names no real host or account — spelling one out here would put it in this
-public repo's permanent history, which is the thing being prevented. It matches the *classes*
-instead. Sweep for specific infrastructure names from a local list that is not committed.
-
-The same rule is why `archive/github-issues-2026-08-14.json` was swept before it was committed;
-`archive/README.md` carries the method and the evidence. That sweep ran over the **decoded** string
-fields rather than the serialized JSON, because an escaped newline in `json.dumps` output leaves a
-literal `n` against the following word and breaks a `\b` boundary — the convenient method certifies a
-file clean while it still leaks.
-
-<!-- BACKLOG.MD GUIDELINES START -->
-<!-- backlog.md-instructions-version: 1.50.1 -->
-<CRITICAL_INSTRUCTION>
-
-## Backlog.md Workflow
-
-This project uses Backlog.md for task and project management.
-
-**For every user request in this project, run `backlog instructions overview` before answering or taking action.**
-
-Use the overview to decide whether to search, read, create, or update Backlog tasks.
-
-Before task lifecycle actions, read the matching detailed guide:
-- `backlog instructions task-creation` before creating or splitting tasks
-- `backlog instructions task-execution` before planning, changing status or assignee, adding a plan or implementation notes, or implementing task work
-- `backlog instructions task-finalization` before checking acceptance criteria, writing final summaries, or moving tasks to terminal statuses
-
-Use `backlog <command> --help` before running unfamiliar commands. Help shows options, fields, and examples.
-
-Do not edit Backlog task, draft, document, decision, or milestone markdown files directly. Use the `backlog` CLI so metadata, relationships, and history stay consistent.
-
-</CRITICAL_INSTRUCTION>
-<!-- BACKLOG.MD GUIDELINES END -->
+- A pull request body says how it relates to an issue, on a line of its own: `Closes #N` with an
+  `Acceptance evidence` table (header exactly `| Issue | AC | AC text | Evidence class | Proof |`, one
+  row for each acceptance criterion of that issue), `Refs #N` when it only relates to one, or
+  `Task: none, <reason>`. There is no pull request template here on purpose: in this repository it
+  would become the default for every `rknightion` repository.
+- A pull request that changes `.github/workflows/` or `.github/actions/` carries no closing keyword:
+  write `Task: none, <reason>`, with `Refs #N` beside it if you like.
+- Contributors never need the project board or the tracker tooling; a maintainer handles both.
+  Only the root or the interactive main thread writes issues and the Project, through `just tracker`.
+- Issues and pull requests are public, so they carry no real identifiers: no email addresses,
+  handles, account ids, host or device names, addresses or coordinates. Write the shape, not the
+  instance. The `privacy-sweep` check scans the lines a pull request adds; the sweep names no real
+  host or account, because spelling one out here would put it in this public repo's history.
+- Older commits, docs and tests cite legacy board ids such as `GHC-0001`. `just issue <ID>` prints the
+  issue each one became; `.github/tracker/id-map.json` is the map.
+- The Dependency Dashboard (#3) and the Release train status issue (#52) are bot-owned: never queue,
+  edit or close them.
+- Read `~/repos/agent-docs/docs/github-tracker.md` before tracking, queueing, closing or landing work
+  here. Closed pre-tracker history is under `.github/tracker/history/`.
