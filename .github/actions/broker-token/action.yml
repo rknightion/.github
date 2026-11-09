@@ -144,6 +144,7 @@ runs:
         # Both parts feed GITHUB_ENV, which parses one assignment per line: refuse
         # anything but a bare hostname and an IP literal, so no newline or extra
         # NAME=value pair can ride in on bao-addr, resolve-via or a lookup result.
+        LC_ALL=C  # ASCII-only character classes in the checks below
         [[ "$host" =~ ^[A-Za-z0-9.-]+$ ]] || { echo "::error::bao-addr is not a plain https://host address"; exit 1; }
         [[ "$ip" =~ ^[0-9A-Fa-f:.]+$ ]] || { echo "::error::resolved address is not an IP literal"; exit 1; }
         echo "BAO_RESOLVE=--resolve ${host}:443:${ip}" >> "$GITHUB_ENV"

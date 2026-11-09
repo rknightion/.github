@@ -28,8 +28,19 @@ inputs:
 runs:
   using: composite
   steps:
+    # Enforce the "pin exactly" contract: a range, "latest" or an empty value
+    # would let extractions/setup-just float to whatever release is newest.
+    - name: Check the just version is an exact pin
+      shell: bash
+      env:
+        JUST_VERSION: ${{ inputs.just-version }}
+      run: |
+        [[ "$JUST_VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] || {
+          echo "::error::just-version must be an exact X.Y.Z version, got '${JUST_VERSION}'"
+          exit 1
+        }
     - uses: extractions/setup-just@53165ef7e734c5c07cb06b3c8e7b647c5aa16db3 # v4.0.0
       with:
-        # The version is the caller's input, which defaults to an exact pin and is documented as exact; it is workflow-author config, never event data.
+        # zizmor flags the input expression itself; the step above refuses anything but an exact X.Y.Z.
         just-version: ${{ inputs.just-version }} # zizmor: ignore[unpinned-tools]
         github-token: ${{ inputs.github-token }}
