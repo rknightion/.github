@@ -25,6 +25,7 @@
   {"repo": "m7kni/brewmdm-environments", "privacy_sweep": false},
   {"repo": "m7kni/brewmdm-control-plane", "privacy_sweep": false},
   {"repo": "m7kni/brewmdm-macos-agent", "privacy_sweep": false},
+  {"repo": "m7kni/brewmdm-protocol", "privacy_sweep": false},
   {"repo": "m7kni/.github", "privacy_sweep": false},
   {"repo": "m7kni/brewmdm-vendor-signing", "privacy_sweep": false},
   {"repo": "m7kni/rob-knight-com-site", "privacy_sweep": false},
