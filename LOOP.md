@@ -4,7 +4,6 @@ gate: just check
 ci-required: ci-success
 release-on-push: yes
 deploy-on-push: no
-receiver: https://loopwatch.m7kni.com
 grafana-stack: none
 tracker: github
 landing: pr
