@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.29.2](https://github.com/rknightion/.github/compare/v1.29.1...v1.29.2) (2026-11-09)
+
+
+### Miscellaneous
+
+* **vended:** enrol m7kni/brewmdm-linux-agent ([58475f5](https://github.com/rknightion/.github/commit/58475f56ba4feeda34a36fd3bc408b64b941de84))
+
 ## [1.29.1](https://github.com/rknightion/.github/compare/v1.29.0...v1.29.1) (2026-11-09)
 
 
