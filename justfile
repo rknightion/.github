@@ -94,6 +94,21 @@ privacy-sweep *args:
 [group('check')]
 check: fmt-check lint test pii-check check-vended
 
+# GitHub issues and the rknightion Project; maintainers only (needs the tracker tools and credentials)
+[group('tracker')]
+[positional-arguments]
+tracker *args:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    export TRACKER_REPO=rknightion/.github TRACKER_PROJECT_OWNER=rknightion TRACKER_PROJECT=7
+    export TRACKER_ISSUE_IDENTITY=app TRACKER_PROJECT_IDENTITY=user
+    exec tracker-with-token "$@"
+
+# print the issue a legacy board id (GHC-0001) became
+[group('tracker')]
+issue id:
+    TRACKER_REPO=rknightion/.github tracker legacy {{ quote(id) }}
+
 # list every fleet caller of this repo's reusables (network + gh auth)
 [group('dev')]
 callers:
