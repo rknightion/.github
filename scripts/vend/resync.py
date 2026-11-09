@@ -140,6 +140,9 @@ def read_tree(repo: Path, sha: str, path: str) -> dict[str, tuple[str, bytes]]:
             raise Refused(f"{name!r}: outside {path} upstream")
         rel = safe_rel(name[len(path) + 1:])
         files[rel] = (mode, git_bytes("cat-file", "blob", obj, cwd=repo))
+    # stage_skill adds LICENSE to every skill, so no file or directory there may take that name.
+    if any(rel.split("/", 1)[0].casefold() == "license" for rel in files):
+        raise Refused(f"{path}: a skill-level licence file would collide with the root LICENSE")
     # Every directory on the way counts too: Ref/a.md and ref/b.md merge on a case-insensitive disk.
     folded: dict[str, str] = {}
     for rel in files:
@@ -152,8 +155,6 @@ def read_tree(repo: Path, sha: str, path: str) -> dict[str, tuple[str, bytes]]:
                               "on case-insensitive filesystems")
     if not files:
         raise Refused(f"{path}: empty upstream")
-    if any(rel.casefold() == "license" for rel in files):
-        raise Refused(f"{path}: a skill-level licence file would collide with the root LICENSE")
     return files
 
 

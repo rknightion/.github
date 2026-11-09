@@ -370,6 +370,8 @@ class TestResync(ResyncCase):
 
     def test_licence_case_variant_and_reserved_names_are_refused(self) -> None:
         for name, needle in (("license", "collide with the root LICENSE"), ("License.md", None),
+                             ("license/x.md", "collide with the root LICENSE"),
+                             ("LICENSE/x.md", "collide with the root LICENSE"),
                              ("con.txt", "Windows device name"), ("NUL", "Windows device name"),
                              ("com1.md", "Windows device name")):
             with self.subTest(name=name):
