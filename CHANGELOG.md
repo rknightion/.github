@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.30.2](https://github.com/rknightion/.github/compare/v1.30.1...v1.30.2) (2026-11-09)
+
+
+### Miscellaneous
+
+* **tracker:** move the board docs to history and delete the frozen backlog ([#207](https://github.com/rknightion/.github/issues/207)) ([546dd21](https://github.com/rknightion/.github/commit/546dd219787c07048a01eb7dec06b05fc2dd9674))
+
 ## [1.30.1](https://github.com/rknightion/.github/compare/v1.30.0...v1.30.1) (2026-11-09)
 
 
