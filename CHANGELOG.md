@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.30.3](https://github.com/rknightion/.github/compare/v1.30.2...v1.30.3) (2026-11-09)
+
+
+### Miscellaneous
+
+* **loop:** drop the retired loop receiver key ([#209](https://github.com/rknightion/.github/issues/209)) ([07e0dbf](https://github.com/rknightion/.github/commit/07e0dbf0e44effdc917a560bc0bc7f1684a96c02))
+
 ## [1.30.2](https://github.com/rknightion/.github/compare/v1.30.1...v1.30.2) (2026-11-09)
 
 
