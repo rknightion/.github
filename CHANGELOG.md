@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.30.1](https://github.com/rknightion/.github/compare/v1.30.0...v1.30.1) (2026-11-09)
+
+
+### Bug Fixes
+
+* **vend:** stop git background maintenance racing the resync scratch cleanup ([#205](https://github.com/rknightion/.github/issues/205)) ([510c404](https://github.com/rknightion/.github/commit/510c404a4c0c0418c647c2fae65a815a8ac35e8a))
+
 ## [1.30.0](https://github.com/rknightion/.github/compare/v1.29.3...v1.30.0) (2026-11-09)
 
 
