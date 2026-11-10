@@ -19,7 +19,10 @@ import resync  # noqa: E402
 GIT_ENV = {**{k: v for k, v in os.environ.items() if not k.startswith("GIT_")},
            "GIT_CONFIG_GLOBAL": "/dev/null", "GIT_CONFIG_NOSYSTEM": "1",
            "GIT_AUTHOR_NAME": "t", "GIT_AUTHOR_EMAIL": "t@example.com",
-           "GIT_COMMITTER_NAME": "t", "GIT_COMMITTER_EMAIL": "t@example.com"}
+           "GIT_COMMITTER_NAME": "t", "GIT_COMMITTER_EMAIL": "t@example.com",
+           # The fixture's own commits must not leave a detached maintenance run in the scratch dir.
+           "GIT_CONFIG_COUNT": "2", "GIT_CONFIG_KEY_0": "maintenance.auto", "GIT_CONFIG_VALUE_0": "false",
+           "GIT_CONFIG_KEY_1": "gc.auto", "GIT_CONFIG_VALUE_1": "0"}
 
 
 def sh(*args: str, cwd: Path) -> str:
@@ -177,7 +180,7 @@ class TestResync(ResyncCase):
         missing = Path(self.tmp.name) / "no-such-source"
         rc, _, err = self.run_resync("--sha", self.sha1, "--url", str(missing))
         self.assertEqual(rc, 1, err)
-        self.assertIn("refused: git ", err)
+        self.assertIn("refused: git -c fetch.fsckObjects=true ", err)
         self.assertNotIn("maintenance.auto", err)
         self.assertNotIn("hooksPath", err)
 
