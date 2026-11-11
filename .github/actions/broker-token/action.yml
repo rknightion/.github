@@ -134,7 +134,12 @@ runs:
           # name. tailscaled's peer list does not depend on DNS.
           ip=$(tailscale ip -4 openbao)
         elif [ -n "$RESOLVE_VIA" ]; then
-          ip=$(getent hosts "$RESOLVE_VIA" | head -1 | awk '{print $1}')
+          # getent exits 2 when the host is absent. Keep that failure from
+          # set -e so the guard below can name the unresolved host, while
+          # clearing any partial output keeps this path fail-closed.
+          if ! ip=$(getent hosts "$RESOLVE_VIA" | head -1 | awk '{print $1}'); then
+            ip=
+          fi
           [ -n "$ip" ] || { echo "::error::could not resolve ${RESOLVE_VIA}"; exit 1; }
         else
           echo "BAO_RESOLVE=" >> "$GITHUB_ENV"
@@ -147,6 +152,8 @@ runs:
         LC_ALL=C  # ASCII-only character classes in the checks below
         [[ "$host" =~ ^[A-Za-z0-9.-]+$ ]] || { echo "::error::bao-addr is not a plain https://host address"; exit 1; }
         [[ "$ip" =~ ^[0-9A-Fa-f:.]+$ ]] || { echo "::error::resolved address is not an IP literal"; exit 1; }
+        # curl wants an IPv6 address in brackets; an IPv4 address is written as is.
+        case $ip in *:*) ip="[${ip}]" ;; esac
         echo "BAO_RESOLVE=--resolve ${host}:443:${ip}" >> "$GITHUB_ENV"
         echo "pinned ${host} -> ${ip}"
 
@@ -159,6 +166,9 @@ runs:
         BAO_ROLE: ${{ inputs.role || inputs.permission-set }}
       run: |
         set -euo pipefail
+        # BAO_RESOLVE is expanded unquoted below so it splits into two words. A
+        # bracketed IPv6 pin is also a glob pattern: no pathname expansion here.
+        set -f
         tmp=$(mktemp -d); trap 'rm -rf "$tmp"' EXIT
 
         # `curl --fail-with-body` would be the obvious way to surface an error

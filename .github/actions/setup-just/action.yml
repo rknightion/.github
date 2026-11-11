@@ -36,7 +36,15 @@ runs:
         JUST_VERSION: ${{ inputs.just-version }}
       run: |
         [[ "$JUST_VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] || {
-          echo "::error::just-version must be an exact X.Y.Z version, got '${JUST_VERSION}'"
+          # The value is caller-supplied and runs through a line-based command
+          # parser: encode it as the runner does for command data so a newline
+          # or carriage return cannot start a second workflow command.
+          # Patterns are held in variables so the expansion also behaves on macOS bash 3.2.
+          pct='%'; cr=$'\r'; nl=$'\n'
+          shown=${JUST_VERSION//"$pct"/%25}
+          shown=${shown//"$cr"/%0D}
+          shown=${shown//"$nl"/%0A}
+          echo "::error::just-version must be an exact X.Y.Z version, got '${shown}'"
           exit 1
         }
     - uses: extractions/setup-just@53165ef7e734c5c07cb06b3c8e7b647c5aa16db3 # v4.0.0

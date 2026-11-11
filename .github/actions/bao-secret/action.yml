@@ -128,6 +128,8 @@ runs:
         LC_ALL=C  # ASCII-only character classes in the checks below
         [[ "$host" =~ ^[A-Za-z0-9.-]+$ ]] || { echo "::error::bao-addr is not a plain https://host address"; exit 1; }
         [[ "$ip" =~ ^[0-9A-Fa-f:.]+$ ]] || { echo "::error::resolved address is not an IP literal"; exit 1; }
+        # curl wants an IPv6 address in brackets; an IPv4 address is written as is.
+        case $ip in *:*) ip="[${ip}]" ;; esac
         echo "BAO_RESOLVE=--resolve ${host}:443:${ip}" >> "$GITHUB_ENV"
         echo "pinned ${host} -> ${ip}"
 
@@ -142,6 +144,9 @@ runs:
       # writes only KEY<<delimiter blocks the generator built from keys validated as [A-Z_][A-Z0-9_]*, excluding GITHUB_/RUNNER_/ACTIONS_/NODE_OPTIONS, with a random delimiter
       run: | # zizmor: ignore[github-env]
         set -euo pipefail
+        # BAO_RESOLVE is expanded unquoted below so it splits into two words. A
+        # bracketed IPv6 pin is also a glob pattern: no pathname expansion here.
+        set -f
         umask 077
         tmp=$(mktemp -d); trap 'rm -rf "$tmp"' EXIT
         export BAO_SUMMARY="$tmp/summary"
