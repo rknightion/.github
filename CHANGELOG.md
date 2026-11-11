@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.30.5](https://github.com/rknightion/.github/compare/v1.30.4...v1.30.5) (2026-11-11)
+
+
+### Bug Fixes
+
+* **vend:** keep vended text from pointing at files a consumer does not have ([#218](https://github.com/rknightion/.github/issues/218)) ([da0e056](https://github.com/rknightion/.github/commit/da0e056c29e0fbae1dff837ffaa922fe998ce92b)), closes [#214](https://github.com/rknightion/.github/issues/214)
+
 ## [1.30.4](https://github.com/rknightion/.github/compare/v1.30.3...v1.30.4) (2026-11-11)
 
 
