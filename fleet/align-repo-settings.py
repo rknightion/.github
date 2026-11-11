@@ -629,7 +629,11 @@ def reconcile_main_ruleset(existing: dict | None, gated: bool, std: dict, tracke
             "required_review_thread_resolution": False}})
     for r in body["rules"]:
         if r["type"] == "pull_request":
-            r.setdefault("parameters", {})["allowed_merge_methods"] = list(rcfg["allowed_merge_methods"])
+            params = r.setdefault("parameters", {})
+            params["allowed_merge_methods"] = list(rcfg["allowed_merge_methods"])
+            # Copilot's pull requests merge on the same terms as anyone else's.
+            params["require_extra_approval_for_unattributed_changes"] = bool(
+                rcfg.get("require_extra_approval_for_unattributed_changes", False))
     if gated:
         rsc = next((r for r in body["rules"] if r["type"] == "required_status_checks"), None)
         if rsc is None:

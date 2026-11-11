@@ -60,6 +60,13 @@ requires a PR (0 approvals, squash only) and the `ci-success` check (GitHub Acti
 non-strict; the check is bound to the GitHub Actions app, so no other app or commit status can
 satisfy it). Otherwise it is **base**, and the repo is reported as `needs-aggregator`.
 
+Every `pull_request` rule the aligner reconciles sets `require_extra_approval_for_unattributed_changes`
+to `false`, so a pull request the Copilot cloud agent opens without a human author merges on the
+same terms as anyone else's (0 approvals, `ci-success`). GitHub's default is `true`, which adds one
+required approval to those pull requests only. The Copilot setting "Require approval for workflow
+runs" is separate, has no API and stays on: CI on Copilot's pushes still waits for a person to
+approve the run. Fork pull request approvals are unchanged (see Actions).
+
 Gating on a check that never reports blocks every merge permanently, which is why `ci-success` is
 only added once it has been seen. A repo moves from base to gated on its own once its aggregator
 lands.
