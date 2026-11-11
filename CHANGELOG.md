@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.30.4](https://github.com/rknightion/.github/compare/v1.30.3...v1.30.4) (2026-11-11)
+
+
+### Bug Fixes
+
+* **actions:** name the unresolved host, bracket IPv6 pins, escape the rejected just version ([#216](https://github.com/rknightion/.github/issues/216)) ([328d556](https://github.com/rknightion/.github/commit/328d55634ff13c1e7a3427c08e022dcc7bd2e373))
+
 ## [1.30.3](https://github.com/rknightion/.github/compare/v1.30.2...v1.30.3) (2026-11-09)
 
 
