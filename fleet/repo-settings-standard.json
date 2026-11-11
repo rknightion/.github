@@ -136,7 +136,7 @@
         },
         "workflow": {
           "default_workflow_permissions": "read",
-          "can_approve_pull_request_reviews": false
+          "can_approve_pull_request_reviews": true
         },
         "cache": {
           "max_cache_size_gb": 10,
@@ -187,7 +187,7 @@
         },
         "workflow": {
           "default_workflow_permissions": "read",
-          "can_approve_pull_request_reviews": false
+          "can_approve_pull_request_reviews": true
         },
         "cache": {
           "max_cache_size_gb": 10,
@@ -234,7 +234,7 @@
         },
         "workflow": {
           "default_workflow_permissions": "read",
-          "can_approve_pull_request_reviews": false
+          "can_approve_pull_request_reviews": true
         },
         "cache": {
           "max_cache_size_gb": 10,
@@ -272,7 +272,7 @@
         },
         "workflow": {
           "default_workflow_permissions": "read",
-          "can_approve_pull_request_reviews": false
+          "can_approve_pull_request_reviews": true
         },
         "cache": {
           "max_cache_size_gb": 10,
