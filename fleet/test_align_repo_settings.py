@@ -1007,6 +1007,15 @@ class ArtifactRetention(unittest.TestCase):
         align.Aligner(gh, STD, sweep=False).align_org_caps("m7kni", {"artifact_retention_days": 7})
         self.assertEqual(gh.writes, [("PUT", "/orgs/m7kni/actions/permissions/artifact-and-log-retention", {"days": 7})])
 
+    def test_org_workflow_permissions_are_set_before_the_repos(self):
+        # A repo cannot allow what its org forbids: the repo PUT is a 409 until the org allows it.
+        gh = FakeGH()
+        gh.call = lambda method, path: (200, {"default_workflow_permissions": "read",
+                                             "can_approve_pull_request_reviews": False}, None)
+        align.Aligner(gh, STD, sweep=False).align_org_caps("m7kni", {"actions": True})
+        self.assertEqual(gh.writes, [("PUT", "/orgs/m7kni/actions/permissions/workflow",
+                                      STD["profiles"]["private"]["actions"]["workflow"])])
+
 
 class CacheSweep(unittest.TestCase):
     now = dt.datetime(2026, 9, 27, 12, tzinfo=dt.timezone.utc)

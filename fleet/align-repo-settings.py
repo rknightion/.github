@@ -1284,6 +1284,10 @@ class Aligner:
         if cfg.get("artifact_retention_days"):
             self._put_if_diff(org, "actions/permissions/artifact-and-log-retention",
                               {"days": cfg["artifact_retention_days"]}, base="/orgs")
+        if cfg.get("actions"):
+            # A repo cannot allow what its org forbids (409), so the org's workflow permissions go first.
+            wf = self.std["profiles"]["private"]["actions"]["workflow"]
+            self._put_if_diff(org, "actions/permissions/workflow", wf, base="/orgs")
 
     def align_org(self, org: str, cfg: dict, blocked: list[str] | None = None):
         allow = self.std["actions_allowlist"]
@@ -1303,9 +1307,6 @@ class Aligner:
                     or sorted(cur.get("patterns_allowed") or []) != sorted(allow["patterns_allowed"])):
                 self.gh.write("PUT", f"/orgs/{org}/actions/permissions/selected-actions", allow)
                 self.change(org, "actions", "org selected-actions allowlist")
-        if cfg.get("actions"):
-            wf = self.std["profiles"]["private"]["actions"]["workflow"]
-            self._put_if_diff(org, "actions/permissions/workflow", wf, base="/orgs")
         if cfg.get("fork_pr_contributor_approval"):
             self._put_if_diff(org, "actions/permissions/fork-pr-contributor-approval",
                               {"approval_policy": cfg["fork_pr_contributor_approval"]}, base="/orgs")
