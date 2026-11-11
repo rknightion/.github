@@ -10,7 +10,9 @@ for the dash and term rules. Prints `path:line: message` per finding. Exit 0 cle
 Skills are read only by agents, so the dash rules apply only to the two human-read files. A skill
 named in `<root>/upstream.lock.json` with `"vend": true` is a pinned upstream copy: it must match
 the lock byte for byte (plus the source's LICENSE) and skips the provenance, licence-frontmatter and
-name-mention rules, which upstream text cannot meet. Every skill's `../<name>/` links must resolve.
+name-mention rules, which upstream text cannot meet. Every skill's `../<name>/` links must resolve,
+as the skill reads after the edits in vend.SKILL_REWRITES. No vended text may link a file a default
+consumer lacks, and the two contributor files may not name a conditional file (refs.py).
 
 VENDED_EXTRA_TERMS_FILE, when set, names a file of further forbidden terms, one per line (# starts
 a comment line), so a maintainer can check names that must not be spelled out in this public repo.
@@ -27,7 +29,11 @@ import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from vend import is_opt_in, parse_frontmatter, split_frontmatter  # noqa: E402
+from refs import TOLERATED_ABSENT_SKILLS, dead_references, path_set, prose_lines  # noqa: E402
+from vend import (  # noqa: E402
+    AGENTS_PATH, CONTRIBUTING_PATH, PRIVACY_DEST, PRIVACY_FILES, SKILL_REWRITES, SKILLS_DIR, RewriteError,
+    apply_rewrites, is_opt_in, outside_region, parse_frontmatter, split_frontmatter,
+)
 
 LICENSES = {"MIT", "Apache-2.0"}
 FORBIDDEN_TERMS = (
@@ -45,8 +51,9 @@ FORBIDDEN_TERMS = (
 # Names a skill may still cite by mistake after a rename or a drop.
 FORMER_SKILLS = ("audit-choices", "receiving-code-review", "verification-before-completion")
 # Upstream skills link these by `../<name>/`; they are deliberately not vended, and the AGENTS
-# block says what each means here.
-DELIBERATELY_ABSENT = frozenset({"find-overengineering", "review", "code-review"})
+# block says what each means here. (`find-overengineering` is not one: vend.SKILL_REWRITES drops
+# its link.)
+DELIBERATELY_ABSENT = TOLERATED_ABSENT_SKILLS
 LOCK_NAME = "upstream.lock.json"
 # Windows device names, which no vended path component may use as its stem.
 RESERVED_STEMS = frozenset({"con", "prn", "aux", "nul", *(f"com{i}" for i in range(1, 10)),
@@ -59,29 +66,6 @@ LICENSE_MARKERS = {
 }
 EXTRA_TERMS_ENV = "VENDED_EXTRA_TERMS_FILE"
 DASHES = {"–": "en dash", "—": "em dash"}
-FENCE_RE = re.compile(r"^\s*(`{3,}|~{3,})")
-INLINE_CODE_RE = re.compile(r"(`+)(.+?)\1")
-
-
-def prose_lines(text: str):
-    """Yield (line number, line with fenced and inline code removed).
-
-    A fence opens on a run of three or more backticks or tildes, info string allowed. It closes only on
-    a run of the same character at least as long with nothing but whitespace after it, as CommonMark
-    says; "```bash title" inside a block is content, not a closer.
-    """
-    fence = None
-    for no, line in enumerate(text.splitlines(), 1):
-        if fence is None:
-            m = FENCE_RE.match(line)
-            if m:
-                fence = m.group(1)
-                continue
-            yield no, INLINE_CODE_RE.sub(" ", line)
-            continue
-        closer = re.fullmatch(r"\s*(`{3,}|~{3,})\s*", line)
-        if closer and closer.group(1)[0] == fence[0] and len(closer.group(1)) >= len(fence):
-            fence = None
 
 
 def extra_terms() -> tuple[str, ...]:
@@ -177,8 +161,11 @@ def pinned_rules(d: Path, entry: dict, source: dict, out: list[str]) -> None:
 
 
 def check_skill(d: Path, names: dict[str, bool], out: list[str], terms: tuple[str, ...] = FORBIDDEN_TERMS,
-                pinned: tuple[dict, dict] | None = None) -> None:
-    """Lint one skill dir. `pinned` is (lock entry, lock source) for a pinned upstream copy."""
+                pinned: tuple[dict, dict] | None = None, consumer=None) -> None:
+    """Lint one skill dir. `pinned` is (lock entry, lock source) for a pinned upstream copy.
+
+    `consumer` says whether a repository-relative path exists in a repository that receives the kit.
+    """
     skill_md = d / "SKILL.md"
     if d.name.split(".", 1)[0].casefold() in RESERVED_STEMS:
         out.append(f"{d}:0: skill dir name {d.name!r} may not be a Windows device name")
@@ -214,9 +201,18 @@ def check_skill(d: Path, names: dict[str, bool], out: list[str], terms: tuple[st
             continue
         text_rules(f, text, out, terms, dashes=False)
         if f.name != "LICENSE":
+            rel = f.relative_to(d).as_posix()
+            try:
+                text = apply_rewrites(d.name, rel, text)  # what a consumer receives
+            except RewriteError as exc:
+                out.append(f"{f}:0: {exc}")
             link_rules(f, text, d.name, names, out)
             if pinned is None:
                 ref_rules(f, text, d.name, names, out)
+            if consumer is not None:
+                for no, message in dead_references(f"{SKILLS_DIR}/{d.name}/{rel}", text, consumer,
+                                                   skill_links=False):
+                    out.append(f"{f}:{no}: {message}")
     if pinned is not None:
         pinned_rules(d, pinned[0], pinned[1], out)
     if not skill_md.is_file() or skill_md.is_symlink():
@@ -302,6 +298,18 @@ def load_lock(root: Path, out: list[str]) -> dict:
     return lock
 
 
+def consumer_paths(root: Path, skills_root: Path):
+    """`exists` for a consumer that receives every skill and the privacy files and has no other
+    conditional file, release-please-config.json above all."""
+    files = {AGENTS_PATH, CONTRIBUTING_PATH, *(f"{PRIVACY_DEST}/{n}" for n in PRIVACY_FILES)}
+    for d in skills_root.iterdir():
+        if d.is_dir() and not d.is_symlink():
+            files.add(f"{SKILLS_DIR}/{d.name}")
+            files.update(f"{SKILLS_DIR}/{d.name}/{f.relative_to(d).as_posix()}"
+                         for f in skill_entries(d) if f.is_file() and not f.is_symlink())
+    return path_set(files)
+
+
 def run(root: Path) -> list[str]:
     out: list[str] = []
     terms = FORBIDDEN_TERMS + extra_terms()
@@ -313,6 +321,7 @@ def run(root: Path) -> list[str]:
         out.append(f"{skills_root}:0: missing (the skills directory)")
     else:
         names = skill_names(skills_root)
+        consumer = consumer_paths(root, skills_root)
         for entry in sorted(skills_root.iterdir()):
             if not entry.is_dir() or entry.is_symlink():
                 out.append(f"{entry}:0: not a skill directory")
@@ -322,7 +331,7 @@ def run(root: Path) -> list[str]:
                 out.append(f"{entry}:0: {LOCK_NAME} marks {entry.name!r} vend false; it must not be here")
                 continue
             pinned = (spec, sources.get(spec.get("source"), {})) if spec is not None else None
-            check_skill(entry, names, out, terms, pinned)
+            check_skill(entry, names, out, terms, pinned, consumer)
         for name, spec in sorted(locked.items()):
             if spec.get("vend") and not (skills_root / name).is_dir():
                 out.append(f"{skills_root / name}:0: missing; {LOCK_NAME} vends it")
@@ -331,7 +340,15 @@ def run(root: Path) -> list[str]:
         if not p.is_file():
             out.append(f"{p}:0: missing")
         else:
-            text_rules(p, p.read_text(encoding="utf-8"), out, terms)
+            text = p.read_text(encoding="utf-8")
+            text_rules(p, text, out, terms)
+            if skills_root.is_dir():
+                if name == "CONTRIBUTING.md":
+                    as_path, text = CONTRIBUTING_PATH, outside_region(text.replace("\r\n", "\n"))
+                else:
+                    as_path = AGENTS_PATH
+                for no, message in dead_references(as_path, text, consumer, conditional=True):
+                    out.append(f"{p}:{no}: {message}")
     return out
 
 

@@ -9,7 +9,7 @@ and `.github/workflows/vend-sync.yml` runs it on every push to `main` that chang
 
 | Source | Lands at | How |
 | --- | --- | --- |
-| `skills/<name>/` | `.agents/skills/<name>/` | Copied byte for byte, file modes included. |
+| `skills/<name>/` | `.agents/skills/<name>/` | Copied byte for byte, file modes included, except the few edits in `SKILL_REWRITES` (see Skills). |
 | (none) | `.claude/skills/<name>` | A relative symlink to `../../.agents/skills/<name>`, because Claude Code reads only `.claude/skills/`. |
 | `CONTRIBUTING.md` | `CONTRIBUTING.md` | The template, with the repository's own text kept between `<!-- vended:repo-facts:begin -->` and `<!-- vended:repo-facts:end -->`. |
 | `AGENTS-block.md` | `AGENTS.md` | Only the text between `<!-- BEGIN vended: rknightion/.github -->` and `<!-- END vended: rknightion/.github -->` is managed. Without the markers the block goes after the first H1 and its first paragraph, or at the top when there is no H1. A missing `AGENTS.md` is created with the repository name as its H1. |
@@ -31,7 +31,11 @@ There are two kinds of skill under `skills/`:
   recorded in `upstream.lock.json`, with that repository's `LICENSE` beside them. Today they all
   come from [dzhng/skills](https://github.com/dzhng/skills). Never edit one: change the pin with
   `just vend-resync <sha>` (which runs `scripts/vend/resync.py` and then the checker) and review the
-  upstream diff in the pull request. The lock also pins upstream skills marked `"vend": false`;
+  upstream diff in the pull request. Where upstream text points at something a consumer never
+  receives (today the `find-overengineering` link in `refactor-clean`), the source stays unchanged
+  and `SKILL_REWRITES` in `scripts/vend/vend.py` adjusts the copy written into a consumer. Each edit
+  names the exact text and it must occur exactly once, so a resync that moves it fails `check-vended`
+  and a sync instead of leaving a dead link. The lock also pins upstream skills marked `"vend": false`;
   those are not vended to repositories, but the owner's agent homes install the same pin.
 - **Our own skills** carry a `Source:` line, a "Changes from the source" note and a `LICENSE`
   matching their frontmatter `license:`. `repo-conventions` holds everything the pinned skills get
@@ -54,9 +58,19 @@ in `skills`. No skill in the default set may cite or link an opt-in skill.
 - Our own skills need frontmatter, a licence of MIT or Apache-2.0 whose text is in `LICENSE`, the
   `Source:` line and the "Changes" note, and may not name a skill that is not vended.
 - Every skill: no `allowed-tools`, no symlink, UTF-8 only, no banned term, and every
-  `](../<name>/...)` link must reach a vended skill. Upstream links to `review` and
-  `find-overengineering` are allowed on purpose; the `AGENTS.md` block says what they mean here. A
-  repository that takes only some skills can still receive a link to one it lacks.
+  `](../<name>/...)` link, read as a consumer receives the skill, must reach a vended skill.
+  Upstream links to `review` and `code-review` are allowed on purpose; the `AGENTS.md` block says
+  what they mean here.
+- Dead references, in every skill and in the two contributor files: a relative markdown link must
+  resolve to a file a consumer has (a link into another skill is left to the rule above), and
+  `CONTRIBUTING.md` and the `AGENTS.md` block may not name `release-please-config.json`, which many
+  consumers lack, in prose or in inline code (as a whole word). Relative links include
+  `[text](<path with spaces>)` and `[label]: path` definitions. Links inside code and any name inside
+  a fenced block are examples and are not checked. The sync runs the
+  same check against the repository it is syncing and refuses, writing nothing, when vended text
+  links a file it will not have (a directory whose vended files are all being removed counts as gone); there the conditional file counts as present when the repository
+  has it. A repository that takes only some skills (`skills` in its entry) is therefore refused when
+  a chosen skill links one it left out.
 - `CONTRIBUTING.md` and `AGENTS-block.md` are read by people, so they also may not use an em dash,
   en dash or double hyphen. Skills are read only by agents and are exempt.
 

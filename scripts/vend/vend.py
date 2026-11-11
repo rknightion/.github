@@ -25,6 +25,9 @@ import tempfile
 from dataclasses import dataclass, field
 from pathlib import Path, PurePosixPath
 
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+import refs  # noqa: E402
+
 SOURCE_NAME = "rknightion/.github"
 RECORD_PATH = ".vended.json"
 SKILLS_DIR = ".agents/skills"
@@ -50,6 +53,50 @@ MANIFEST_KEYS = {"repo", "skills", "contributing", "agents_block", "privacy_swee
 
 class UsageError(Exception):
     """Bad input: exit 2."""
+
+
+# Pinned upstream skills are copied unchanged into vended/skills/ (the lock and `check-vended`
+# insist). A few carry text that points at something these repositories never receive; the copy
+# written into a consumer is adjusted instead, here, and the source stays byte for byte upstream.
+# Keyed by (skill, path inside the skill); each edit is (exact text, replacement) and the text must
+# occur exactly once, so a resync that moves it fails loudly instead of leaving a dead link.
+SKILL_REWRITES: dict[tuple[str, str], tuple[tuple[str, str], ...]] = {
+    # `find-overengineering` is deliberately not vended: these projects have users.
+    ("refactor-clean", "SKILL.md"): (
+        (
+            " To roll back protective code and migrations\n"
+            "  that cost more than they protect, use\n"
+            "  [find-overengineering](../find-overengineering/SKILL.md).",
+            "",
+        ),
+    ),
+}
+
+
+class RewriteError(Exception):
+    """A SKILL_REWRITES edit that does not match its file exactly once."""
+
+
+def apply_rewrites(name: str, relf: str, text: str) -> str:
+    """`text` of skill file `name`/`relf` as a consumer receives it."""
+    for old, new in SKILL_REWRITES.get((name, relf), ()):
+        if text.count(old) != 1:
+            raise RewriteError(
+                f"SKILL_REWRITES edit does not match {name}/{relf} exactly once "
+                f"({text.count(old)} matches); update the edit in scripts/vend/vend.py: {old[:60]!r}"
+            )
+        text = text.replace(old, new)
+    return text
+
+
+def render_skill_file(name: str, relf: str, data: bytes) -> bytes:
+    """The bytes written into a consumer for one skill file."""
+    if (name, relf) not in SKILL_REWRITES:
+        return data
+    try:
+        return apply_rewrites(name, relf, data.decode("utf-8")).encode("utf-8")
+    except (RewriteError, UnicodeDecodeError) as exc:
+        raise UsageError(str(exc)) from exc
 
 
 # ---------------------------------------------------------------------------------------------
@@ -200,6 +247,14 @@ def contributing_parts(text: str) -> tuple[str, str, str] | None:
     inner_start = b + len(FACTS_BEGIN)
     inner_end = e - len(FACTS_END)
     return text[:inner_start], text[inner_start:inner_end], text[inner_end:]
+
+
+def outside_region(lf_text: str) -> str:
+    """CONTRIBUTING text with the repo-facts region blanked, line numbers kept: the vended part."""
+    parts = contributing_parts(lf_text)
+    if parts is None:
+        return lf_text
+    return parts[0] + "\n" * parts[1].count("\n") + parts[2]
 
 
 def contributing_managed_hash(lf_text: str) -> str | None:
@@ -598,22 +653,30 @@ def build_plan(source: Path, target: Path, repo: str, force: bool) -> Plan:
         except UnsafePath as exc:
             plan.refuse(rel, str(exc))
 
+    vended_text: dict[str, str] = {}  # rel -> text a consumer will read, for the dead-reference check
     for name in chosen:
         for relf, src in skill_files(source / "vended" / "skills" / name):
             rel = f"{SKILLS_DIR}/{name}/{relf}"
             mode = stat.S_IMODE(src.stat().st_mode)
-            guarded(plan_whole_file, rel, target, rel, src.read_bytes(), mode, recorded, force, plan)
+            data = render_skill_file(name, relf, src.read_bytes())
+            guarded(plan_whole_file, rel, target, rel, data, mode, recorded, force, plan)
+            try:
+                vended_text[rel] = data.decode("utf-8")
+            except UnicodeDecodeError:
+                pass
         plan_link(target, name, plan)
 
     if entry.get("contributing", True):
         tmpl = (source / "vended" / "CONTRIBUTING.md").read_text(encoding="utf-8")
         guarded(plan_contributing, CONTRIBUTING_PATH, target, to_lf(tmpl), recorded, force, plan)
+        vended_text[CONTRIBUTING_PATH] = outside_region(to_lf(tmpl))
     elif CONTRIBUTING_PATH in recorded:
         plan.notes.append(f"{CONTRIBUTING_PATH}: no longer vended; left in place")
 
     if entry.get("agents_block", True):
         body = (source / "vended" / "AGENTS-block.md").read_text(encoding="utf-8")
         guarded(plan_agents, AGENTS_PATH, target, repo, body, recorded, force, plan)
+        vended_text[AGENTS_PATH] = to_lf(body)
     elif AGENTS_PATH in recorded:
         plan.notes.append(f"{AGENTS_PATH}: block no longer vended; left in place")
 
@@ -652,7 +715,43 @@ def build_plan(source: Path, target: Path, repo: str, force: bool) -> Plan:
         plan.deletes.append(rel)
     for name in sorted(dropped_skills):
         plan_unlink(target, name, plan)
+    check_references(target, vended_text, plan)
     return plan
+
+
+def check_references(target: Path, vended_text: dict[str, str], plan: Plan) -> None:
+    """Refuse when vended text links a path, or names a conditional file, the repository will not have."""
+    future = set(plan.record_files) | set(plan.writes) | set(plan.links)
+    gone = set(plan.deletes) | set(plan.unlinks)
+    planned = refs.path_set(future)
+
+    def going(rel: str) -> bool:
+        """True when the path, a parent of it, or every file under it is being removed."""
+        parts = PurePosixPath(rel).parts
+        if any("/".join(parts[:i]) in gone for i in range(1, len(parts) + 1)):
+            return True
+        p = target / rel
+        if p.is_dir() and not p.is_symlink():
+            files = [f.relative_to(target).as_posix() for f in p.rglob("*") if f.is_file() or f.is_symlink()]
+            return bool(files) and all(f in gone for f in files)
+        return False
+
+    def exists(rel: str) -> bool:
+        if planned(rel):
+            return True
+        if going(rel):
+            return False
+        p = target / rel
+        return p.exists() or p.is_symlink()
+
+    for rel, text in sorted(vended_text.items()):
+        contributor = rel in (CONTRIBUTING_PATH, AGENTS_PATH)
+        for no, message in refs.dead_references(rel, text, exists, conditional=contributor):
+            # A contributor file's line counts in the vended text, not in the consumer's file, which
+            # has its own text around the managed part.
+            where = {CONTRIBUTING_PATH: "of the vended template", AGENTS_PATH: "of the vended block"}.get(rel)
+            place = f"line {no} {where}" if where else f"line {no}"
+            plan.refuse(rel, f"{place}: {message.replace('a consumer', 'this repository')}")
 
 
 # ---------------------------------------------------------------------------------------------
