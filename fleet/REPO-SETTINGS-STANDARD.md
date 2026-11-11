@@ -180,7 +180,11 @@ under immutability.
 
 ## Actions
 
-- Default `GITHUB_TOKEN` is read-only and cannot approve PRs.
+- Default `GITHUB_TOKEN` is read-only. "Allow GitHub Actions to create and approve pull requests"
+  is on, so a workflow that asks for `pull-requests: write` can open a pull request with its own
+  token (drift and enrichment bots open draft PRs this way). Approval grants nothing: the
+  pull-request ruleset requires 0 approving reviews, so a bot approval cannot stand in for a
+  person. A pull request opened with `GITHUB_TOKEN` does not start CI on its own.
 - Every action must be pinned to a full commit SHA (`sha_pinning_required`). Reusable workflows are
   exempt by GitHub's design. **Enforcement reaches actions nested inside composite actions**
   (verified 2026-09-26: autopi-ha's Bandit job failed on python-bandit-scan's own `@v3`/`@main`
