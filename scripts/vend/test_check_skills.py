@@ -10,6 +10,7 @@ import os
 import sys
 import tempfile
 import unittest
+import unittest.mock
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
@@ -362,13 +363,82 @@ class TestLinks(LintCase):
         self.assertFinding("links 'write-spec', which is not a vended skill")
 
     def test_deliberately_absent_link_passes(self) -> None:
-        self.add_skill("caller-skill", body="Run [review](../review/SKILL.md) and "
-                       "[find-overengineering](../find-overengineering/SKILL.md).\n")
+        self.add_skill("caller-skill", body="Run [review](../review/SKILL.md).\n")
         self.assertEqual(self.lint()[0], 0)
+
+    def test_find_overengineering_link_is_a_dead_link(self) -> None:
+        self.add_skill("caller-skill", body="Run [fo](../find-overengineering/SKILL.md).\n")
+        self.assertFinding("links 'find-overengineering', which is not a vended skill")
 
     def test_default_links_opt_in(self) -> None:
         self.add_skill("caller-skill", body="See [sql](../opt-skill/SKILL.md).\n")
         self.assertFinding("default-set skill links opt-in skill 'opt-skill'")
+
+
+class TestDeadReferences(LintCase):
+    """AC3: the lint fails when vended text links a path the consumer will not have."""
+
+    def test_guide_link_to_a_missing_path_is_a_finding(self) -> None:
+        (self.root / "CONTRIBUTING.md").write_text("See [the docs](docs/guide.md).\n")
+        self.assertFinding("CONTRIBUTING.md:1: links 'docs/guide.md', which does not exist in a consumer")
+
+    def test_guide_link_to_a_file_a_consumer_has_passes(self) -> None:
+        (self.root / "CONTRIBUTING.md").write_text(
+            "See [agents](AGENTS.md) and [a skill](.agents/skills/good-skill/SKILL.md).\n")
+        self.assertEqual(self.lint(), (0, ""))
+
+    def test_agents_block_is_read_as_agents_md(self) -> None:
+        (self.root / "AGENTS-block.md").write_text("See [x](nowhere.md).\n")
+        self.assertFinding("AGENTS-block.md:1: links 'nowhere.md'")
+
+    def test_conditional_file_in_a_guide_is_a_finding(self) -> None:
+        for guide in ("CONTRIBUTING.md", "AGENTS-block.md"):
+            with self.subTest(guide=guide):
+                (self.root / guide).write_text("Use a type from `release-please-config.json`.\n")
+                self.assertFinding("names 'release-please-config.json', which a consumer may not have")
+                (self.root / guide).write_text("A plain guide.\n")
+
+    def test_conditional_file_bare_in_prose_is_a_finding_but_not_in_a_fence(self) -> None:
+        (self.root / "AGENTS-block.md").write_text("Use a type from release-please-config.json.\n")
+        self.assertFinding("AGENTS-block.md:1: names 'release-please-config.json'")
+        (self.root / "AGENTS-block.md").write_text("```\ncat release-please-config.json\n```\n")
+        self.assertEqual(self.lint(), (0, ""))
+        (self.root / "AGENTS-block.md").write_text("See x-release-please-config.json.bak.\n")
+        self.assertEqual(self.lint(), (0, ""))
+
+    def test_reference_definitions_and_angle_destinations_are_checked(self) -> None:
+        (self.root / "CONTRIBUTING.md").write_text("See [x][d].\n\n[d]: docs/missing.md\n")
+        self.assertFinding("CONTRIBUTING.md:3: links 'docs/missing.md'")
+        (self.root / "CONTRIBUTING.md").write_text("See [d](<docs/a b.md>).\n")
+        self.assertFinding("links 'docs/a b.md'")
+        (self.root / "CONTRIBUTING.md").write_text("See [d](<AGENTS.md>) and [x][d].\n\n[d]: AGENTS.md\n")
+        self.assertEqual(self.lint(), (0, ""))
+
+    def test_conditional_file_inside_the_repo_facts_region_is_not_checked(self) -> None:
+        (self.root / "CONTRIBUTING.md").write_text(
+            "# C\n\n<!-- vended:repo-facts:begin -->\nSee `release-please-config.json` and "
+            "[x](nowhere.md).\n<!-- vended:repo-facts:end -->\n")
+        self.assertEqual(self.lint(), (0, ""))
+
+    def test_skill_link_to_a_missing_file_in_the_skill_is_a_finding(self) -> None:
+        self.add_skill("caller-skill", body="See [notes](references/notes.md).\n")
+        self.assertFinding("caller-skill/SKILL.md:")
+        self.assertFinding("links 'references/notes.md', which does not exist in a consumer")
+
+    def test_skill_link_to_its_own_file_passes(self) -> None:
+        d = self.add_skill("caller-skill", body="See [notes](references/notes.md).\n")
+        (d / "references").mkdir()
+        (d / "references" / "notes.md").write_text("n\n")
+        self.assertEqual(self.lint()[0], 0)
+
+    def test_skill_link_out_of_the_repository_is_a_finding(self) -> None:
+        self.add_skill("caller-skill", body="See [x](../../../../etc/hosts).\n")
+        self.assertFinding("links '../../../../etc/hosts'")
+
+    def test_links_in_code_and_urls_are_not_paths(self) -> None:
+        self.add_skill("caller-skill", body="[w](https://example.com/x) `[a](nope.md)`\n\n"
+                       "```\n[a](nope.md)\n```\n")
+        self.assertEqual(self.lint()[0], 0)
 
 
 def sha(data: bytes) -> str:
@@ -462,6 +532,24 @@ class TestPinned(LintCase):
         self.lock["skills"]["up-skill"]["files"]["SKILL.md"]["sha256"] = sha(text.encode())
         self.write_lock()
         self.assertFinding("links 'write-spec', which is not a vended skill")
+
+    def pin(self, text: str) -> None:
+        (self.up / "SKILL.md").write_text(text)
+        self.lock["skills"]["up-skill"]["files"]["SKILL.md"]["sha256"] = sha(text.encode())
+        self.write_lock()
+
+    def test_pinned_link_to_an_unvended_skill_is_dropped_by_a_rewrite(self) -> None:
+        link = "[fo](../find-overengineering/SKILL.md)"
+        self.pin(UPSTREAM_SKILL + f"Done. Roll back with {link}.\n")
+        self.assertFinding("links 'find-overengineering', which is not a vended skill")
+        with unittest.mock.patch.dict(check_skills.SKILL_REWRITES,
+                                      {("up-skill", "SKILL.md"): ((f" Roll back with {link}.", ""),)}):
+            self.assertEqual(self.lint()[0], 0)
+
+    def test_a_rewrite_that_no_longer_matches_is_a_finding(self) -> None:
+        with unittest.mock.patch.dict(check_skills.SKILL_REWRITES,
+                                      {("up-skill", "SKILL.md"): (("not in the file", ""),)}):
+            self.assertFinding("up-skill/SKILL.md:0: SKILL_REWRITES edit does not match")
 
     def test_name_mentions_not_checked_in_pinned(self) -> None:
         text = UPSTREAM_SKILL + "Upstream prose naming audit-choices.\n"
