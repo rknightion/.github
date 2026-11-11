@@ -297,6 +297,7 @@
     "allowed_merge_methods": [
       "squash"
     ],
+    "require_extra_approval_for_unattributed_changes": false,
     "tracker_bypass_allow": {
       "m7kni/gc-gitsync-m7kni": [
         {

@@ -125,6 +125,15 @@ class Rulesets(unittest.TestCase):
         pr = next(r for r in want["rules"] if r["type"] == "pull_request")["parameters"]
         self.assertEqual(pr["allowed_merge_methods"], ["squash"])
 
+    def test_unattributed_copilot_changes_need_no_extra_approval(self):
+        existing = self.existing_portina_iac()
+        pr_rule = next(r for r in existing["rules"] if r["type"] == "pull_request")
+        pr_rule["parameters"]["require_extra_approval_for_unattributed_changes"] = True
+        for start in (existing, None):
+            want = align.reconcile_main_ruleset(start, True, STD)
+            pr = next(r for r in want["rules"] if r["type"] == "pull_request")["parameters"]
+            self.assertIs(pr["require_extra_approval_for_unattributed_changes"], False)
+
     def test_reconcile_is_idempotent(self):
         once = align.reconcile_main_ruleset(self.existing_portina_iac(), True, STD)
         twice = align.reconcile_main_ruleset(once, True, STD)
@@ -215,8 +224,9 @@ def tracker_gate(rid=20, bypass=()):
     return {"id": rid, "name": "pr only", "target": "branch", "enforcement": "active",
             "conditions": {"ref_name": {"include": ["~DEFAULT_BRANCH"], "exclude": []}},
             "bypass_actors": [dict(a) for a in bypass],
-            "rules": [{"type": "pull_request", "parameters": {"allowed_merge_methods": ["squash"],
-                                                              "required_approving_review_count": 0}},
+            "rules": [{"type": "pull_request", "parameters": {
+                          "allowed_merge_methods": ["squash"], "required_approving_review_count": 0,
+                          "require_extra_approval_for_unattributed_changes": False}},
                       {"type": "required_status_checks", "parameters": {
                           "strict_required_status_checks_policy": False,
                           "required_status_checks": [{"context": "ci-success", "integration_id": 15368}]}}]}
