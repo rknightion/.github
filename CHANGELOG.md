@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.30.6](https://github.com/rknightion/.github/compare/v1.30.5...v1.30.6) (2026-11-16)
+
+
+### Bug Fixes
+
+* **broker-token:** bound requests and retry pre-send failures ([#222](https://github.com/rknightion/.github/issues/222)) ([afbcaaa](https://github.com/rknightion/.github/commit/afbcaaa3db04dcf410a9e45e92db5cc130792034))
+
 ## [1.30.5](https://github.com/rknightion/.github/compare/v1.30.4...v1.30.5) (2026-11-11)
 
 
