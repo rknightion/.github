@@ -179,13 +179,36 @@ runs:
         # Capturing the status code with -w is portable to every curl.
         req() { # req <outfile> <what> <curl args...>
           local out=$1 what=$2; shift 2
-          local code
-          code=$(curl -sS -o "$out" -w '%{http_code}' "$@")
-          if [ "$code" -ge 400 ]; then
-            echo "::error::${what} returned HTTP ${code}"
-            cat "$out" >&2 || true
-            return 1
-          fi
+          local result code sent rc attempt
+          # Three attempts at most. Retry only failures before an HTTP request
+          # was sent: replaying a timed-out POST could mint a second token.
+          for attempt in 1 2 3; do
+            rc=0
+            result=$(curl -sS --connect-timeout 10 --max-time 30 \
+              -o "$out" -w '%{http_code} %{size_request}' "$@") || rc=$?
+            read -r code sent <<< "$result"
+            if [ "$rc" -eq 0 ]; then
+              case "$code" in
+                2??) return 0 ;;
+                *)
+                  # Error bodies can contain credentials or workflow commands.
+                  echo "::error::${what} returned HTTP ${code}; response body withheld"
+                  return 1
+                  ;;
+              esac
+            fi
+            case "$rc:$sent" in
+              6:0|7:0|28:0)
+                if [ "$attempt" -lt 3 ]; then
+                  echo "::warning::${what} failed before sending a request (curl ${rc}, attempt ${attempt}/3); retrying in 2s"
+                  sleep 2
+                  continue
+                fi
+                ;;
+            esac
+            echo "::error::${what} failed (curl ${rc}, attempt ${attempt}/3); check broker reachability for OpenBao requests"
+            return "$rc"
+          done
         }
 
         # ::add-mask:: is LINE-BASED: given a multi-line value it registers only
