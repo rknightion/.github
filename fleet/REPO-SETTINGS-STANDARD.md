@@ -33,9 +33,13 @@ visibility and plan, so a new repo is picked up with no edit here.
 
 ## General settings
 
-- Squash merge only, commit message = PR title with a blank body. release-please parses one
-  conventional commit per PR, and Renovate's PR bodies (upstream release notes that can contain
-  `BREAKING CHANGE`) never land in commit bodies to trigger false major bumps.
+- Merge, squash and rebase are available in every profile. Use a merge commit to preserve a
+  reviewed series and its commit SHAs; rebase preserves separate commits with rewritten SHAs.
+  Existing linear-history requirements still prevent merge commits.
+- Squash retains commit message = PR title with a blank body. The shared release-PR auto-merge
+  workflow defaults to squash; dependency automation should explicitly select squash so release notes containing
+  `BREAKING CHANGE` do not enter commit bodies and trigger false major bumps. For merge or
+  rebase, review the individual commit messages as release input and use a concise merge message.
 - `delete_branch_on_merge` and `allow_update_branch` on.
 - Repository Projects, downloads and sponsorships off. Work is tracked on each owner's own
   Project (or a repo's Backlog.md board until it migrates); the repo-level Projects tab is not used.
@@ -56,7 +60,7 @@ No repo uses legacy branch protection, and none should.
 **`main`** targets the default branch, admin bypass `always` (so Rob can still push straight to
 main on a repo still on Backlog.md), deletion and force-push blocked. It is **gated** when `ci-success` has reported recently
 (default branch or a recent PR head) or the ruleset already requires other checks: then it also
-requires a PR (0 approvals, squash only) and the `ci-success` check (GitHub Actions app,
+requires a PR (0 approvals, merge, squash or rebase) and the `ci-success` check (GitHub Actions app,
 non-strict; the check is bound to the GitHub Actions app, so no other app or commit status can
 satisfy it). Otherwise it is **base**, and the repo is reported as `needs-aggregator`.
 

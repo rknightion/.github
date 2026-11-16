@@ -107,7 +107,7 @@ class Rulesets(unittest.TestCase):
                 "bypass_actors": [{"actor_type": "RepositoryRole", "actor_id": 5, "bypass_mode": "always"},
                                   {"actor_type": "Integration", "actor_id": 3512185, "bypass_mode": "always"}],
                 "rules": [{"type": "deletion"}, {"type": "non_fast_forward"}, {"type": "required_linear_history"},
-                          {"type": "pull_request", "parameters": {"allowed_merge_methods": ["merge", "squash", "rebase"],
+                          {"type": "pull_request", "parameters": {"allowed_merge_methods": ["squash"],
                                                                   "required_approving_review_count": 0}},
                           {"type": "required_status_checks", "parameters": {
                               "strict_required_status_checks_policy": True,
@@ -123,7 +123,7 @@ class Rulesets(unittest.TestCase):
         self.assertTrue(rsc["strict_required_status_checks_policy"])
         self.assertEqual({c["context"] for c in rsc["required_status_checks"]}, {"iac-success", "ci-success"})
         pr = next(r for r in want["rules"] if r["type"] == "pull_request")["parameters"]
-        self.assertEqual(pr["allowed_merge_methods"], ["squash"])
+        self.assertEqual(pr["allowed_merge_methods"], ["merge", "squash", "rebase"])
 
     def test_unattributed_copilot_changes_need_no_extra_approval(self):
         existing = self.existing_portina_iac()
@@ -225,7 +225,7 @@ def tracker_gate(rid=20, bypass=()):
             "conditions": {"ref_name": {"include": ["~DEFAULT_BRANCH"], "exclude": []}},
             "bypass_actors": [dict(a) for a in bypass],
             "rules": [{"type": "pull_request", "parameters": {
-                          "allowed_merge_methods": ["squash"], "required_approving_review_count": 0,
+                          "allowed_merge_methods": ["merge", "squash", "rebase"], "required_approving_review_count": 0,
                           "require_extra_approval_for_unattributed_changes": False}},
                       {"type": "required_status_checks", "parameters": {
                           "strict_required_status_checks_policy": False,
