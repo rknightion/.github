@@ -1,0 +1,18 @@
+name: Metadata preview
+on:
+  pull_request:
+    types: [opened, edited, reopened, synchronize, ready_for_review]
+permissions: {}
+jobs:
+  metadata:
+    permissions:
+      contents: read
+      issues: read
+      pull-requests: read
+    uses: rknightion/.github/.github/workflows/pr-metadata.yml@4963b799c2556be870823663b3b8a64ac1af00c5
+    with:
+      runs-on: ubuntu-latest
+      harden: true
+      check-acceptance: true
+      enforce-all-prs: true
+      skip-docs-only-lint: true
