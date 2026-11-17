@@ -1,0 +1,8 @@
+name: Temporary lint fixture
+on: workflow_dispatch
+permissions: {}
+jobs:
+  proof:
+    runs-on: invalid-runner-fixture
+    steps:
+      - run: true
