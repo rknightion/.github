@@ -34,7 +34,7 @@ on:
         type: boolean
         default: true
       skip-docs-only-lint:
-        description: Skip both linters only when the pinned PR diff changes exclusively root or docs/ Markdown paths.
+        description: Skip Zizmor for a proved root or docs/ Markdown-only diff with independent lint inputs. Actionlint still runs.
         type: boolean
         default: false
       enforce-all-prs:
@@ -123,21 +123,26 @@ jobs:
 
       - name: Checkout the pull request head
         id: head
-        if: ${{ !cancelled() && steps.validate.outcome == 'success' && (inputs.check-backlog || inputs.check-acceptance || inputs.check-privacy || inputs.skip-docs-only-lint) }}
+        if: ${{ !cancelled() && steps.validate.outcome == 'success' && (inputs.check-backlog || inputs.check-acceptance || inputs.check-privacy || (inputs.check-zizmor && inputs.skip-docs-only-lint)) }}
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: ${{ github.event.pull_request.head.sha }}
           path: head
-          fetch-depth: ${{ (inputs.check-backlog || inputs.check-privacy || inputs.skip-docs-only-lint) && '0' || '1' }}
+          fetch-depth: ${{ (inputs.check-backlog || inputs.check-privacy || (inputs.check-zizmor && inputs.skip-docs-only-lint)) && '0' || '1' }}
           persist-credentials: false
 
       - name: Classify the complete pull request diff
         id: paths
-        if: ${{ !cancelled() && steps.judge.outcome == 'success' && steps.head.outcome == 'success' && (inputs.check-backlog || inputs.skip-docs-only-lint) }}
+        if: ${{ !cancelled() && steps.judge.outcome == 'success' && steps.head.outcome == 'success' && (inputs.check-backlog || (inputs.check-zizmor && inputs.skip-docs-only-lint)) }}
         env:
           BASE_SHA: ${{ github.event.pull_request.base.sha }}
           HEAD_SHA: ${{ github.event.pull_request.head.sha }}
-        run: python3 -I judge/scripts/pr-metadata/metadata.py classify head "$BASE_SHA" "$HEAD_SHA"
+          CONSIDER_ZIZMOR_SKIP: ${{ inputs.check-zizmor && inputs.skip-docs-only-lint }}
+          ZIZMOR_CONFIG: ${{ inputs.zizmor-config }}
+        run: |
+          args=()
+          if [[ "$CONSIDER_ZIZMOR_SKIP" == true ]]; then args+=(--zizmor-policy="$ZIZMOR_CONFIG"); fi
+          python3 -I judge/scripts/pr-metadata/metadata.py classify head "$BASE_SHA" "$HEAD_SHA" "${args[@]}"
 
       - name: Verify backlog/ is frozen
         if: ${{ !cancelled() && steps.validate.outcome == 'success' && inputs.check-backlog }}
@@ -181,11 +186,12 @@ jobs:
         run: bash ../judge/scripts/pr-metadata/privacy.sh
 
       # Keep the old lint target: the PR merge commit, distinct from the head
-      # used by the acceptance and privacy checkers. No usable classification
-      # output means full lint. A positive docs-only result is the sole opt-out.
+      # used by the acceptance and privacy checkers. Actionlint's ShellCheck can
+      # also read Markdown files when shell steps source them, so always run it.
+      # Only an explicit skip from the classifier can omit enabled Zizmor.
       - name: Checkout the pull request merge tree for lint
         id: lint
-        if: ${{ !cancelled() && steps.validate.outcome == 'success' && (inputs.check-actionlint || inputs.check-zizmor) && (!inputs.skip-docs-only-lint || steps.paths.outputs.docs-only != 'true') }}
+        if: ${{ !cancelled() && steps.validate.outcome == 'success' && (inputs.check-actionlint || (inputs.check-zizmor && (steps.paths.outcome != 'success' || steps.paths.outputs.skip-zizmor != 'true'))) }}
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: ${{ github.sha }}
@@ -202,7 +208,7 @@ jobs:
 
       - name: Select the Zizmor policy
         id: zizmor_config
-        if: ${{ !cancelled() && steps.lint.outcome == 'success' && steps.judge.outcome == 'success' && inputs.check-zizmor }}
+        if: ${{ !cancelled() && steps.lint.outcome == 'success' && steps.judge.outcome == 'success' && inputs.check-zizmor && (steps.paths.outcome != 'success' || steps.paths.outputs.skip-zizmor != 'true') }}
         env:
           ZIZMOR_CONFIG: ${{ inputs.zizmor-config }}
         run: python3 -I judge/scripts/pr-metadata/metadata.py zizmor-config lint -- "$ZIZMOR_CONFIG"
