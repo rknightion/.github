@@ -1,10 +1,9 @@
 import importlib.util
 import os
-from pathlib import Path
 import subprocess
 import tempfile
 import unittest
-
+from pathlib import Path
 
 SCRIPT = Path(__file__).parents[1] / "scripts/pr-metadata/metadata.py"
 SPEC = importlib.util.spec_from_file_location("pr_metadata", SCRIPT)
@@ -143,7 +142,13 @@ class PullRequestDiffTests(unittest.TestCase):
         self.assertEqual(metadata.classify(self.tree, self.base, head)["backlog"], "modified")
 
     def test_unknown_or_empty_diff_runs_lint(self):
-        cases = [("f" * 40, self.base, "unknown"), (self.base, "f" * 40, "unknown"), (self.base, self.base, "frozen")]
+        cases = [
+            ("f" * 40, self.base, "unknown"),
+            (self.base, "f" * 40, "unknown"),
+            ("--help", self.base, "unknown"),
+            (self.base, "--help", "unknown"),
+            (self.base, self.base, "frozen"),
+        ]
         for base, head, freeze in cases:
             with self.subTest(base=base, head=head):
                 self.assertEqual(self.classify(base, head), {"skip-zizmor": "false", "backlog": freeze})

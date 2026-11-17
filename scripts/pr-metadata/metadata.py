@@ -2,10 +2,10 @@
 
 import argparse
 import os
-from pathlib import Path
 import re
 import subprocess
 import sys
+from pathlib import Path
 
 COMMIT = re.compile(rb"[0-9a-f]{40}")
 DEFAULT_ZIZMOR_CONFIG = Path(".github/zizmor.yml")
@@ -16,10 +16,14 @@ ZIZMOR_INPUT_NAMES = {
 
 
 def git(repository, *args):
-    return subprocess.check_output(["git", "-C", str(repository), *args])
+    # Callers provide fixed Git subcommands and flags. Commit arguments have been
+    # checked as full SHAs, and the checkout path is a separate -C argument.
+    return subprocess.check_output(["git", "-C", str(repository), *args], shell=False)  # nosec B603
 
 
 def changed_files(repository, base, head):
+    if not COMMIT.fullmatch(base.encode("ascii")) or not COMMIT.fullmatch(head.encode("ascii")):
+        raise ValueError("the pull request base or head is not a full commit SHA")
     if git(repository, "rev-parse", "--is-shallow-repository").strip() != b"false":
         raise ValueError("the checkout has shallow history")
     if git(repository, "rev-parse", "HEAD").strip() != head.encode("ascii"):
@@ -86,7 +90,7 @@ def classify(repository, base, head, *, zizmor_policy=None):
 
     offending = [name for status, name, _ in files if status != "D" and name.startswith("backlog/")]
     for name in offending:
-        print(f"Frozen backlog path added or changed: {ascii(name)}")
+        print(f"Frozen backlog path added or changed: {name!a}")
     # Custom policy paths can overlap the documentation paths, including after a rename.
     default_policy = zizmor_policy is not None and Path(zizmor_policy) == DEFAULT_ZIZMOR_CONFIG
     skip_zizmor = default_policy and bool(files) and all(regular and is_documentation(name) for _, name, regular in files)
