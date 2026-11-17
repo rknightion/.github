@@ -51,6 +51,7 @@ SHA-pinned and kept current by Renovate (`helpers:pinGitHubActionDigests`).
 | `zizmor.yml` | GitHub Actions security audit. Same-repo runs upload SARIF; fork PRs use annotations, so the scan still gates without forbidden Security-tab writes. |
 | `ac-evidence.yml` | Pull request check `Acceptance evidence`: a PR that closes an issue must show one evidence row per acceptance criterion; the checker runs from the caller's pinned reusable commit, not the caller's tree, but a PR that edits the caller workflow can repoint or stub it, so the binding is enforced outside the workflow (the tracker's close and a required check). Caller snippet, inputs, PR template and spec: [`docs/ac-evidence/README.md`](docs/ac-evidence/README.md). |
 | `actionlint.yml` | GitHub Actions workflow correctness lint (non-gating). |
+| `pr-metadata.yml` | Opt-in [packed PR metadata checks](docs/pr-metadata.md) with read-only permissions. |
 | `dependency-review.yml` | PR dependency review; fails on newly introduced high-severity vulns. |
 | `docker-security.yml` | hadolint (Dockerfile lint) + Trivy fs scan (vuln/misconfig/secret), both SARIF, non-gating. |
 | `scorecard.yml` | OpenSSF Scorecard supply-chain analysis (SARIF → Security tab) + publishes to the OpenSSF API for the [scorecard.dev](https://scorecard.dev) badge. No PAT needed — the fleet uses Repository Rulesets, readable with the default token. |
