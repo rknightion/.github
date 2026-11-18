@@ -83,9 +83,13 @@ history, meraki-dashboard-ha's `validate-success`, or brewmdm-control-plane's el
 
 `required_check.expansion` defines the additional job name, workflow path and exact repository
 enrollment list. The published list is empty. Use a private copy of the standard with one
-approved enrollment and pass it through `--standard` with one matching `--repo`. Scheduled,
-owner-wide and multi-repository runs leave this expansion idle. The normal settings floor still
-applies. Removing an enrollment leaves an already-required check in place.
+approved enrollment and pass it through `--standard` with one matching `--repo`.
+Use `--expand-required-check-only --dry-run` to review the exact before and after ruleset.
+Removing `--dry-run` in that mode recomputes proof and can append only the additional check to
+one unambiguous existing active gate. This operation leaves the other repository settings and
+rulesets alone. The normal settings floor runs independently. Scheduled, owner-wide and
+multi-repository runs leave enrollment idle. Removing an enrollment leaves an already-required
+check in place.
 
 Stage the rollout in order.
 
@@ -107,7 +111,9 @@ Stage the rollout in order.
    It checks both the job's rendered name and the linked check run's GitHub Actions integration.
    With no open PRs, use a disposable draft for the proof. Shared heads, unreadable evidence,
    skipped or red checks, merge queues, competing requirements and changing snapshots defer the
-   addition. Resolve other ruleset drift before expanding. Confirm the job name is exclusive to
+   addition. When multiple runs on one head share the latest creation timestamp, all must have
+   successful current attempts with the expected check. An incomplete run listing also holds.
+   Confirm the job name is exclusive to
    the metadata workflow and check any classic branch protection before applying.
 3. Review the dry-run report, then have the authorized maintainer apply the single-repo expansion.
    Re-read the live ruleset and check both contexts and integration IDs. Wait for the new rule to

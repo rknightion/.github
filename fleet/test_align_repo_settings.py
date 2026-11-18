@@ -259,6 +259,9 @@ class ExpansionGH(FakeGH):
         self.check_app = 15368
         self.job_conclusion = "success"
         self.run_conclusion = "success"
+        self.run_peers = []
+        self.run_total = None
+        self.run_peers_first = True
         self.unavailable_head = None
         self.wrong_title = False
         self.workflow_error = False
@@ -304,16 +307,21 @@ class ExpansionGH(FakeGH):
             if self.unavailable_head == head:
                 return 200, {"workflow_runs": []}
             number = pr["number"]
-            return 200, {"workflow_runs": [
-                {"id": number, "run_attempt": 2, "event": "pull_request", "head_sha": head,
-                 "workflow_id": self.run_workflow_id, "path": METADATA, "status": "completed", "conclusion": self.run_conclusion,
-                 "check_suite_id": number + 1000, "display_title": f"PR {number if not self.wrong_title else 99} metadata"}
-            ]}
+            run = {"id": number, "run_attempt": 2, "event": "pull_request", "head_sha": head,
+                   "workflow_id": self.run_workflow_id, "path": METADATA, "status": "completed",
+                   "conclusion": self.run_conclusion, "created_at": "2026-01-01T00:00:01Z",
+                   "check_suite_id": number + 1000, "display_title": f"PR {number if not self.wrong_title else 99} metadata"}
+            peers = [dict(run, id=number + 100 * index, check_suite_id=number + 1000 + 100 * index)
+                     | fields for index, fields in enumerate(self.run_peers, start=1)]
+            runs = peers + [run] if self.run_peers_first else [run] + peers
+            return 200, {"total_count": len(runs) if self.run_total is None else self.run_total,
+                         "workflow_runs": runs}
         if "/check-runs/" in path:
-            number = int(path.rsplit("/", 1)[1])
+            run_id = int(path.rsplit("/", 1)[1])
+            number = run_id % 100
             head = next(pr["head"]["sha"] for pr in self.pulls if pr["number"] == number)
             return 200, {"name": METADATA_CHECK, "app": {"id": self.check_app}, "head_sha": head,
-                         "check_suite": {"id": number + 1000}, "status": "completed", "conclusion": "success"}
+                         "check_suite": {"id": run_id + 1000}, "status": "completed", "conclusion": "success"}
         status, body = super().get(path, ok)
         self.ruleset_reads += 1
         if self.ruleset_changes and self.ruleset_reads > 1:
@@ -346,6 +354,79 @@ class RequiredCheckExpansion(unittest.TestCase):
             "required_status_checks"].append({"context": METADATA_CHECK, "integration_id": 15368})
         self.assertEqual(body, expected)
         self.assertEqual(gh.censuses, 2)
+
+    def align_only(self, gh, enrolled=True, **repo_options):
+        runner = align.Aligner(gh, self.standard(enrolled), sweep=True, expansion_repo=EXPANSION_REPO)
+        runner.align_required_check_only(repo(EXPANSION_REPO, **repo_options))
+        return runner
+
+    def test_expansion_only_preserves_all_other_settings_and_rules(self):
+        gh = ExpansionGH()
+        gh.rulesets[0]["rules"][0]["parameters"]["allowed_merge_methods"] = ["squash"]
+        gh.rulesets[0]["bypass_actors"].append(dict(APP))
+        gh.rulesets.append(base_main())
+        expected = align.ruleset_body(gh.rulesets[0])
+        next(rule for rule in expected["rules"] if rule["type"] == "required_status_checks")[
+            "parameters"]["required_status_checks"].append({"context": METADATA_CHECK, "integration_id": 15368})
+        runner = self.align_only(gh)
+        self.assertEqual(gh.writes, [("PUT", f"/repos/{EXPANSION_REPO}/rulesets/20", expected)])
+        self.assertEqual(runner.changes[0]["before"], align.ruleset_body(gh.rulesets[0]))
+        self.assertEqual(runner.changes[0]["after"], expected)
+        self.assertEqual(gh.censuses, 2)
+        self.assertFalse(any("/security" in path or "/actions/permissions" in path or "/caches" in path
+                             for path in gh.reads))
+
+    def test_expansion_only_holds_without_an_unambiguous_readable_gate(self):
+        for problem in ("missing", "competing", "bypass unreadable", "unprotected", "workflow differs"):
+            with self.subTest(problem=problem):
+                gh = ExpansionGH()
+                if problem == "missing":
+                    gh.rulesets = [base_main()]
+                elif problem == "competing":
+                    gh.rulesets.append(tracker_gate(rid=30))
+                elif problem == "bypass unreadable":
+                    del gh.rulesets[0]["bypass_actors"]
+                elif problem == "unprotected":
+                    gh.main_heads[0]["protected"] = False
+                else:
+                    gh.trees["b" * 40]["tree"][0]["sha"] = "e" * 40
+                runner = self.align_only(gh)
+                self.assertEqual(gh.writes, [])
+                self.assertTrue(any(f["kind"] == "required-check-expansion-held" for f in runner.findings))
+
+    def test_expansion_only_has_no_write_for_existing_check_or_unenrolled_repo(self):
+        for condition in ("already required", "unenrolled", "archived"):
+            with self.subTest(condition=condition):
+                gh = ExpansionGH()
+                if condition == "already required":
+                    next(rule for rule in gh.rulesets[0]["rules"] if rule["type"] == "required_status_checks")[
+                        "parameters"]["required_status_checks"].append({
+                            "context": METADATA_CHECK, "integration_id": 15368})
+                self.align_only(gh, condition != "unenrolled", archived=condition == "archived")
+                self.assertEqual(gh.writes, [])
+                self.assertEqual(gh.censuses, 0)
+
+    def test_expansion_only_proves_all_tied_latest_runs(self):
+        for conclusion in ("cancelled", "success"):
+            for peer_first in (False, True):
+                with self.subTest(conclusion=conclusion, peer_first=peer_first):
+                    gh = ExpansionGH()
+                    gh.run_peers = [{"conclusion": conclusion}]
+                    gh.run_peers_first = peer_first
+                    self.align_only(gh)
+                    self.assertEqual(len(gh.writes), int(conclusion == "success"))
+                    if conclusion == "success":
+                        self.assertIn(f"/repos/{EXPANSION_REPO}/check-runs/111", gh.reads)
+                        self.assertIn(f"/repos/{EXPANSION_REPO}/check-runs/11", gh.reads)
+
+    def test_expansion_only_uses_creation_time_and_requires_a_complete_run_list(self):
+        for reported_total, expected_writes in ((2, 1), (3, 0)):
+            with self.subTest(reported_total=reported_total):
+                gh = ExpansionGH()
+                gh.run_peers = [{"conclusion": "cancelled", "created_at": "2026-01-01T00:00:00Z"}]
+                gh.run_total = reported_total
+                self.align_only(gh)
+                self.assertEqual(len(gh.writes), expected_writes)
 
     def test_requires_enrollment_and_explicit_single_repo_selection(self):
         for enrolled, selected in [(False, True), (True, False), (False, False)]:
