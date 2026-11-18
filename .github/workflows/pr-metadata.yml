@@ -1,0 +1,239 @@
+name: PR metadata (reusable)
+
+# Opt-in PR check. Pin this reusable to a trusted commit. Keep the standalone
+# ac-evidence.yml caller wherever the tracker needs it to verify issue closure.
+on:
+  workflow_call:
+    inputs:
+      runs-on:
+        description: Runner label.
+        required: true
+        type: string
+      harden:
+        description: Audit runner egress with Harden Runner. Set false on self-hosted runners without its Enterprise agent.
+        required: true
+        type: boolean
+      check-backlog:
+        description: Prevent additions and changes under the retired backlog/ path.
+        type: boolean
+        default: true
+      check-acceptance:
+        description: Run the acceptance checker alongside the existing tracker-recognised check during evaluation.
+        type: boolean
+        default: false
+      check-privacy:
+        description: Sweep the lines added by the pull request using base-commit repository rules.
+        type: boolean
+        default: true
+      check-actionlint:
+        description: Run actionlint with the caller's configuration.
+        type: boolean
+        default: true
+      check-zizmor:
+        description: Run enforcing Zizmor with annotations and read-only PR permissions.
+        type: boolean
+        default: true
+      skip-docs-only-lint:
+        description: Skip Zizmor for a proved root or docs/ Markdown-only diff with independent lint inputs. Actionlint still runs.
+        type: boolean
+        default: false
+      enforce-all-prs:
+        description: Require every pull request to close an issue with evidence or explicitly opt out.
+        type: boolean
+        default: false
+      release-please-author:
+        description: Trusted release-please login for the oversized-body exception. Empty disables the exception.
+        type: string
+        default: ""
+      node-version:
+        description: Exact Node version for the acceptance checker.
+        type: string
+        default: "24.22.1"
+      strict-addresses:
+        description: Include RFC 1918, link-local and CGNAT IPv4 addresses in the privacy sweep.
+        type: boolean
+        default: false
+      zizmor-config:
+        description: Zizmor policy path relative to the lint checkout. The default uses the pinned policy if the file is absent.
+        type: string
+        default: .github/zizmor.yml
+
+permissions: {}
+
+concurrency:
+  group: pr-metadata-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  pr-metadata:
+    name: PR metadata
+    runs-on: ${{ inputs.runs-on }}
+    timeout-minutes: 25
+    permissions:
+      contents: read
+      issues: read
+      pull-requests: read
+    steps:
+      - name: Harden the runner (audit egress)
+        if: ${{ inputs.harden }}
+        uses: step-security/harden-runner@46b06cea07f9e64621fdf066ba77ac6915163d43 # v2.22.3
+        with:
+          egress-policy: audit
+
+      - name: Validate the pull request and reusable commits
+        id: validate
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          JOB_WORKFLOW_SHA: ${{ job.workflow_sha }}
+          ENABLED: ${{ inputs.check-backlog || inputs.check-acceptance || inputs.check-privacy || inputs.check-actionlint || inputs.check-zizmor }}
+        run: |
+          if [[ "$EVENT_NAME" != pull_request ]]; then
+            echo '::error title=PR metadata::call this workflow from a pull_request event'
+            exit 1
+          fi
+          if ! [[ "$PR_NUMBER" =~ ^[1-9][0-9]*$ && "$BASE_SHA" =~ ^[0-9a-f]{40}$ && "$HEAD_SHA" =~ ^[0-9a-f]{40}$ ]]; then
+            echo '::error title=PR metadata::the pull request number or commits are malformed'
+            exit 1
+          fi
+          if ! [[ "$JOB_WORKFLOW_SHA" =~ ^[0-9a-f]{40}$ ]]; then
+            echo '::error title=PR metadata::job.workflow_sha is not a commit'
+            exit 1
+          fi
+          if [[ "$ENABLED" != true ]]; then
+            echo '::error title=PR metadata::enable at least one metadata check'
+            exit 1
+          fi
+
+      - name: Checkout the pinned checker sources
+        id: judge
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          repository: rknightion/.github
+          ref: ${{ job.workflow_sha }}
+          path: judge
+          persist-credentials: false
+          sparse-checkout: |
+            scripts/pr-metadata/
+            scripts/ac-evidence/ac-evidence-check.mjs
+            vended/privacy/
+          sparse-checkout-cone-mode: false
+
+      - name: Checkout the pull request head
+        id: head
+        if: ${{ !cancelled() && steps.validate.outcome == 'success' && (inputs.check-backlog || inputs.check-acceptance || inputs.check-privacy || (inputs.check-zizmor && inputs.skip-docs-only-lint)) }}
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          path: head
+          fetch-depth: ${{ (inputs.check-backlog || inputs.check-privacy || (inputs.check-zizmor && inputs.skip-docs-only-lint)) && '0' || '1' }}
+          persist-credentials: false
+
+      - name: Classify the complete pull request diff
+        id: paths
+        if: ${{ !cancelled() && steps.judge.outcome == 'success' && steps.head.outcome == 'success' && (inputs.check-backlog || (inputs.check-zizmor && inputs.skip-docs-only-lint)) }}
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          CONSIDER_ZIZMOR_SKIP: ${{ inputs.check-zizmor && inputs.skip-docs-only-lint }}
+          ZIZMOR_CONFIG: ${{ inputs.zizmor-config }}
+        run: |
+          args=()
+          if [[ "$CONSIDER_ZIZMOR_SKIP" == true ]]; then args+=(--zizmor-policy="$ZIZMOR_CONFIG"); fi
+          python3 -I judge/scripts/pr-metadata/metadata.py classify head "$BASE_SHA" "$HEAD_SHA" "${args[@]}"
+
+      - name: Verify backlog/ is frozen
+        if: ${{ !cancelled() && steps.validate.outcome == 'success' && inputs.check-backlog }}
+        env:
+          BACKLOG: ${{ steps.paths.outputs.backlog }}
+        run: |
+          case "$BACKLOG" in
+            frozen) echo 'No file under backlog/ is added or changed.' ;;
+            modified) echo '::error title=Backlog freeze::this pull request adds or changes files under backlog/'; exit 1 ;;
+            *) echo '::error title=Backlog freeze::the complete pull request file list could not be proved'; exit 1 ;;
+          esac
+
+      - name: Set up Node for acceptance evidence
+        id: node
+        if: ${{ !cancelled() && steps.judge.outcome == 'success' && steps.head.outcome == 'success' && inputs.check-acceptance }}
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: ${{ inputs.node-version }}
+          package-manager-cache: false
+
+      - name: Check acceptance evidence
+        if: ${{ !cancelled() && steps.node.outcome == 'success' && inputs.check-acceptance }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          PR_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          AC_EVIDENCE_ENFORCE_ALL_PRS: ${{ inputs.enforce-all-prs && 'true' || 'false' }}
+          AC_EVIDENCE_RELEASE_AUTHOR: ${{ inputs.release-please-author }}
+          AC_EVIDENCE_TREE: head
+        run: |
+          echo "::notice title=Acceptance evidence binding::pr=${PR_NUMBER} head=${PR_HEAD_SHA}"
+          node judge/scripts/ac-evidence/ac-evidence-check.mjs < /dev/null
+
+      - name: Sweep added lines for private information
+        if: ${{ !cancelled() && steps.judge.outcome == 'success' && steps.head.outcome == 'success' && inputs.check-privacy }}
+        working-directory: head
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          STRICT_ADDRESSES: ${{ inputs.strict-addresses && 'true' || 'false' }}
+        run: bash ../judge/scripts/pr-metadata/privacy.sh
+
+      # Keep the old lint target: the PR merge commit, distinct from the head
+      # used by the acceptance and privacy checkers. Actionlint's ShellCheck can
+      # also read Markdown files when shell steps source them, so always run it.
+      # Only an explicit skip from the classifier can omit enabled Zizmor.
+      - name: Checkout the pull request merge tree for lint
+        id: lint
+        if: ${{ !cancelled() && steps.validate.outcome == 'success' && (inputs.check-actionlint || (inputs.check-zizmor && (steps.paths.outcome != 'success' || steps.paths.outputs.skip-zizmor != 'true'))) }}
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.sha }}
+          path: lint
+          persist-credentials: false
+
+      - name: Run actionlint
+        if: ${{ !cancelled() && steps.lint.outcome == 'success' && steps.judge.outcome == 'success' && inputs.check-actionlint }}
+        working-directory: lint
+        env:
+          RUNNER_ARCH: ${{ runner.arch }}
+          RUNNER_OS: ${{ runner.os }}
+        run: bash ../judge/scripts/pr-metadata/actionlint.sh
+
+      - name: Select the Zizmor policy
+        id: zizmor_config
+        if: ${{ !cancelled() && steps.lint.outcome == 'success' && steps.judge.outcome == 'success' && inputs.check-zizmor && (steps.paths.outcome != 'success' || steps.paths.outputs.skip-zizmor != 'true') }}
+        env:
+          ZIZMOR_CONFIG: ${{ inputs.zizmor-config }}
+        run: python3 -I judge/scripts/pr-metadata/metadata.py zizmor-config lint -- "$ZIZMOR_CONFIG"
+
+      - name: Check for pip
+        id: zizmor_pip
+        if: ${{ !cancelled() && steps.zizmor_config.outcome == 'success' }}
+        run: |
+          if python3 -m pip --version >/dev/null 2>&1; then
+            echo 'available=true' >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Set up Python for Zizmor
+        id: zizmor_python
+        if: ${{ !cancelled() && steps.zizmor_pip.outcome == 'success' && steps.zizmor_pip.outputs.available != 'true' }}
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: '3.13'
+
+      - name: Run Zizmor
+        if: ${{ !cancelled() && steps.zizmor_pip.outcome == 'success' && (steps.zizmor_pip.outputs.available == 'true' || steps.zizmor_python.outcome == 'success') }}
+        uses: zizmorcore/zizmor-action@53290badfa369cb0bf7ad16342cb62c2fa47ac7b # v0.8.0
+        with:
+          version: 1.31.1
+          inputs: lint
+          config: ${{ steps.zizmor_config.outputs.path }}
+          advanced-security: false
+          annotations: true
