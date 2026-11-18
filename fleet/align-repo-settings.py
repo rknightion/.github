@@ -1086,12 +1086,22 @@ class Aligner:
 
     def expansion_check_available(self, root: str, workflow_id: int, path: str, context: str,
                                   app: int, number: int, sha: str) -> bool:
-        query = urllib.parse.urlencode({"event": "pull_request", "head_sha": sha, "per_page": 1})
+        query = urllib.parse.urlencode({"event": "pull_request", "head_sha": sha, "per_page": 100})
         _, response = self.gh.get(f"{root}/actions/workflows/{workflow_id}/runs?{query}")
         runs = response["workflow_runs"]
-        if not runs:
+        if not runs or response["total_count"] != len(runs) or len({run["id"] for run in runs}) != len(runs):
             return False
-        run = runs[0]  # latest run for this workflow, event and head
+        timestamps = [dt.datetime.fromisoformat(run["created_at"].replace("Z", "+00:00")) for run in runs]
+        if any(timestamp.tzinfo is None for timestamp in timestamps):
+            return False
+        latest = max(timestamps)
+        # Independent events can share the same GitHub timestamp. Require all latest peers,
+        # since an endpoint's listing order cannot prove which tied event is authoritative.
+        return all(self.expansion_run_succeeded(root, workflow_id, path, context, app, number, sha, run)
+                   for run, timestamp in zip(runs, timestamps) if timestamp == latest)
+
+    def expansion_run_succeeded(self, root: str, workflow_id: int, path: str, context: str,
+                                app: int, number: int, sha: str, run: dict) -> bool:
         if (run["workflow_id"], run["path"].split("@", 1)[0], run["head_sha"], run["event"],
             run["display_title"], run["status"], run["conclusion"]) != (
                 workflow_id, path, sha, "pull_request", f"PR {number} metadata", "completed", "success"):
@@ -1183,6 +1193,40 @@ class Aligner:
             return None
         checks.append({"context": context, "integration_id": app})
         return context
+
+    def align_required_check_only(self, repo: dict):
+        """Append a proven check to one existing gate without reconciling its other policy."""
+        full = repo["full_name"]
+        required = self.std["required_check"]
+        expansion = required.get("expansion")
+        if not expansion or full != self.expansion_repo or full not in expansion["repos"]:
+            return
+        if classify(repo, self.std, {}) is None:
+            return
+        branch = repo.get("default_branch")
+        root = f"/repos/{full}"
+        listed = self.gh.paginate(f"{root}/rulesets?includes_parents=false&per_page=100")
+        candidates = []
+        for rule in listed:
+            _, current = self.gh.get(f"{root}/rulesets/{rule['id']}")
+            refs = (current.get("conditions") or {}).get("ref_name") or {}
+            if (branch and current.get("target") == "branch" and current.get("enforcement") == "active"
+                    and refs.get("include") in (["~DEFAULT_BRANCH"], [f"refs/heads/{branch}"])
+                    and not refs.get("exclude") and ruleset_is_gated(current, required["context"])):
+                candidates.append(current)
+        if len(candidates) != 1 or not isinstance(candidates[0].get("bypass_actors"), list):
+            self.finding(full, "required-check-expansion-held",
+                         "need one active default-branch primary gate with readable bypass actors")
+            return
+        current = candidates[0]
+        before = ruleset_body(current)
+        want = ruleset_body(current)
+        context = self.expand_required_check(repo, current, want)
+        if context:
+            path = f"{root}/rulesets/{current['id']}"
+            self.gh.write("PUT", path, want)
+            self.changes.append({"scope": full, "area": "rulesets", "detail": f"added required check {context}",
+                                 "path": path, "before": before, "after": want})
 
     def align_rulesets(self, repo: dict, profile: dict) -> str:
         """How the default branch ends up gated: 'ci' (ci-success), 'other' (other required checks), 'none'."""
@@ -1504,12 +1548,29 @@ def token_for(owner: str) -> str:
     return subprocess.run(["gh", "auth", "token"], capture_output=True, text=True, check=True).stdout.strip()
 
 
+def run_check_expansion(std: dict, full: str, dry_run: bool) -> int:
+    gh = GitHub(token_for(full.split("/", 1)[0]), dry_run)
+    aligner = Aligner(gh, std, sweep=False, expansion_repo=full)
+    try:
+        _, repo = gh.get(f"/repos/{full}")
+        if repo["full_name"] != full:
+            raise ValueError("repo readback does not match the explicit selection")
+        aligner.align_required_check_only(repo)
+    except (ApiError, KeyError, TypeError, ValueError) as exc:
+        aligner.errors.append({"scope": full, "area": "rulesets", "error": str(exc)})
+    print(json.dumps({"dry_run": dry_run, "repo": full, "changes": aligner.changes,
+                      "findings": aligner.findings, "errors": aligner.errors, "api_calls": gh.calls}, indent=1))
+    return 2 if aligner.errors else 0
+
+
 def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--standard", default=os.path.join(HERE, "repo-settings-standard.json"))
     ap.add_argument("--dry-run", action="store_true")
     ap.add_argument("--owner", action="append", help="limit to an owner (repeatable)")
     ap.add_argument("--repo", action="append", help="limit to owner/name (repeatable)")
+    ap.add_argument("--expand-required-check-only", action="store_true",
+                    help="only append the proven check to a single privately enrolled repository's existing gate")
     ap.add_argument("--no-org", action="store_true", help="skip the org-level pass")
     ap.add_argument("--no-cache-sweep", action="store_true")
     ap.add_argument("--workers", type=int, default=6)
@@ -1523,6 +1584,13 @@ def main() -> int:
     except ValueError as e:
         print(f"invalid standard {args.standard}: {e}", file=sys.stderr)
         return 2
+    if args.expand_required_check_only:
+        if args.owner or len(args.repo or []) != 1:
+            ap.error("--expand-required-check-only requires one --repo and no --owner")
+        full = args.repo[0]
+        if full not in std["required_check"].get("expansion", {}).get("repos", []):
+            ap.error("--expand-required-check-only requires matching private enrollment")
+        return run_check_expansion(std, full, args.dry_run)
     os.makedirs(args.state_dir, exist_ok=True)
     blob_path = os.path.join(args.state_dir, "workflow-blobs.json")
     try:
