@@ -1,0 +1,19 @@
+version: 1
+triggers:
+  drafts: false
+  frequency: everyPush
+review:
+  effort: smart
+  smartPrompt: >-
+    Use high effort for changes to .github/workflows/, .github/actions/,
+    scripts/cloud-environment-setup.sh, scripts/ac-evidence/, scripts/privacy/,
+    vended/privacy/, fleet/align-repo-settings.py, or fleet/repo-settings-standard.json,
+    or changes to caller permissions, credential handling, required-check enrollment,
+    ruleset reconciliation, or release provenance.
+    Use low effort for documentation, backlog or tracker-only changes that
+    preserve executable policy. Use default effort otherwise.
+  incremental: true
+prSummary:
+  mode: comment
+autofix:
+  mode: disabled
