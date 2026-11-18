@@ -3,7 +3,8 @@ name: zizmor (reusable)
 # Reusable GitHub Actions security audit (zizmor). Findings upload to the caller
 # repo's Security tab as SARIF. With `enforce: true`, a pull_request run prints findings as
 # annotations instead and zizmor's own non-zero exit fails the job, so a caller that lists this job
-# in its ci-success needs blocks the merge. Push runs always upload SARIF and never fail on findings.
+# in its ci-success needs blocks the merge. Diagnostic runs can omit the upload without changing
+# which findings fail a run.
 
 on:
   workflow_call:
@@ -12,6 +13,10 @@ on:
         description: Fail pull_request runs on findings instead of only uploading SARIF.
         type: boolean
         default: false
+      upload-sarif:
+        description: Upload diagnostic SARIF when the caller supports GitHub Code Security.
+        type: boolean
+        default: true
       runs-on:
         description: "Runner label. Self-hosted callers must also set harden to false."
         required: false
@@ -43,6 +48,9 @@ jobs:
       security-events: write
       contents: read
       actions: read
+    env:
+      ZIZMOR_VERSION: '1.31.1'
+      ZIZMOR_DIAGNOSTIC_MODE: ${{ !(inputs.enforce && github.event_name == 'pull_request') && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository) }}
     steps:
       - name: Harden the runner (audit egress)
         if: ${{ inputs.harden }}
@@ -83,10 +91,37 @@ jobs:
           fi
 
       - name: Run zizmor
+        if: ${{ inputs.upload-sarif || env.ZIZMOR_DIAGNOSTIC_MODE != 'true' }}
         uses: zizmorcore/zizmor-action@53290badfa369cb0bf7ad16342cb62c2fa47ac7b # v0.8.0
         with:
-          version: 1.31.1
-          # advanced-security true uploads SARIF and never fails; false prints annotations and fails on
-          # findings. Fork PRs cannot upload, and enforced PRs must fail, so both take false.
-          advanced-security: ${{ !(inputs.enforce && github.event_name == 'pull_request') && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository) }}
+          version: ${{ env.ZIZMOR_VERSION }}
+          # Diagnostic SARIF reports findings. Enforced and fork PRs use failing annotations.
+          advanced-security: ${{ env.ZIZMOR_DIAGNOSTIC_MODE }}
           annotations: ${{ github.event_name == 'pull_request' && (inputs.enforce || github.event.pull_request.head.repo.full_name != github.repository) }}
+
+      - name: Run zizmor without uploading SARIF
+        if: ${{ !inputs.upload-sarif && env.ZIZMOR_DIAGNOSTIC_MODE == 'true' }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          scratch=$(mktemp -d "$RUNNER_TEMP/zizmor-diagnostic.XXXXXXXX")
+          trap 'rm -rf -- "$scratch"' EXIT
+
+          # Use the same hash-locked wheels and diagnostic format as the composite action.
+          # Update this lock digest with the action pin and version above.
+          lock="$scratch/requirements.txt"
+          curl --fail --silent --show-error --proto '=https' --output "$lock" \
+            "https://raw.githubusercontent.com/zizmorcore/zizmor-action/53290badfa369cb0bf7ad16342cb62c2fa47ac7b/support/locks/zizmor-$ZIZMOR_VERSION.txt"
+          printf '%s  %s\n' 'beaab5d8a31b9f9005986244d8bf944ff2b12c330569ed169f947bae83f35bd1' "$lock" | sha256sum --check
+          python3 -m venv "$scratch/venv"
+          "$scratch/venv/bin/python" -m pip download --quiet --no-input --disable-pip-version-check \
+            --only-binary=:all: --python-version=3.11 --no-deps --require-hashes \
+            --dest "$scratch" --requirement "$lock"
+          wheels=("$scratch"/*.whl)
+          [[ ${#wheels[@]} -eq 1 && -f ${wheels[0]} ]]
+          python3 -m zipfile --extract "${wheels[0]}" "$scratch/unpacked"
+          zizmor="$scratch/unpacked/zizmor-$ZIZMOR_VERSION.data/scripts/zizmor"
+          chmod +x "$zizmor"
+          "$zizmor" --persona=regular --format=sarif --collect=default --color=always -- .
