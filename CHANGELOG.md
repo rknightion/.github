@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.30.9](https://github.com/rknightion/.github/compare/v1.30.8...v1.30.9) (2026-11-18)
+
+
+### Miscellaneous
+
+* review packed metadata scripts at high effort ([#242](https://github.com/rknightion/.github/issues/242)) ([ba95dd8](https://github.com/rknightion/.github/commit/ba95dd8037f5b047364aed9499fe03d3a0c3bc46)), closes [#237](https://github.com/rknightion/.github/issues/237)
+
 ## [1.30.8](https://github.com/rknightion/.github/compare/v1.30.7...v1.30.8) (2026-11-18)
 
 
