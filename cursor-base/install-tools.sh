@@ -83,7 +83,11 @@ while read -r tool version amd64_sha arm64_sha; do
     download "$url" "$file" "$checksum"
 
     case "$tool" in
-        go) tar -xzf "$file" -C /opt ;;
+        go)
+            # The upstream test key is used by the macOS and Windows verifier tests.
+            tar --anchored --no-wildcards --exclude='go/src/crypto/x509/platform_root_key.pem' \
+                -xzf "$file" -C /opt
+            ;;
         node)
             install -d -m 0755 /opt/node
             tar -xJf "$file" -C /opt/node --strip-components=1

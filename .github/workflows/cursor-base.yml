@@ -62,15 +62,11 @@ jobs:
       - name: Build the public context
         env:
           BUILDER: ${{ steps.buildx.outputs.name }}
-          EVENT: ${{ github.event_name }}
         run: |
-          outputs=(--output type=docker)
-          if [[ "$EVENT" != pull_request ]]; then
-            outputs+=(--output "type=oci,dest=$RUNNER_TEMP/cursor-base-oci,tar=false,oci-mediatypes=true")
-          fi
           docker build --builder "$BUILDER" --platform "linux/$ARCH" -t "$TAG" \
             --label org.opencontainers.image.source=https://github.com/rknightion/.github \
-            --provenance=false --sbom=false "${outputs[@]}" cursor-base
+            --provenance=false --sbom=false --output type=docker \
+            --output "type=oci,dest=$RUNNER_TEMP/cursor-base-oci,tar=false,oci-mediatypes=true" cursor-base
 
       - name: Smoke test the native image
         run: docker run --rm --pull never --platform "linux/$ARCH" "$TAG" /usr/local/bin/cursor-base-smoke "$ARCH"
@@ -80,7 +76,6 @@ jobs:
         run: docker run --rm --pull never --privileged --network none --platform "linux/$ARCH" "$TAG" /usr/local/bin/cursor-base-smoke "$ARCH" --docker
 
       - name: Verify the publishable image is the tested image
-        if: github.event_name != 'pull_request'
         run: |
           layout="$RUNNER_TEMP/cursor-base-oci"
           digest=$(jq -er '.manifests | select(length == 1) | .[0].digest | select(test("^sha256:[0-9a-f]{64}$"))' "$layout/index.json")
@@ -95,7 +90,6 @@ jobs:
             '{digest: $digest, localBytes: $localBytes}' > "$layout/smoke-receipt.json"
 
       - name: Reject secrets in the exported image
-        if: github.event_name != 'pull_request'
         run: |
           version=0.70.0
           case "$ARCH" in
