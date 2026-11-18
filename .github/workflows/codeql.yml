@@ -12,6 +12,12 @@ on:
         description: 'JSON array of CodeQL matrix include entries, e.g. [{"language":"python","build-mode":"none"}]'
         required: true
         type: string
+      timeout-minutes:
+        description: >-
+          Optional positive whole-minute limit for each analysis job. Leave at zero to use
+          120 minutes for Swift and 360 minutes for other languages.
+        type: number
+        default: 0
       ref:
         description: "Repository ref to analyze; empty uses the triggering SHA"
         required: false
@@ -41,7 +47,7 @@ jobs:
   analyze:
     name: Analyze (${{ matrix.language }})
     runs-on: ${{ (matrix.language == 'swift' && 'macos-latest') || 'ubuntu-latest' }}
-    timeout-minutes: ${{ (matrix.language == 'swift' && 120) || 360 }}
+    timeout-minutes: ${{ inputs.timeout-minutes || (matrix.language == 'swift' && 120) || 360 }}
     permissions:
       security-events: write
       packages: read
