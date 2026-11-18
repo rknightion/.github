@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.30.10](https://github.com/rknightion/.github/compare/v1.30.9...v1.30.10) (2026-11-18)
+
+
+### Bug Fixes
+
+* **ci:** allow diagnostic zizmor without SARIF upload ([#245](https://github.com/rknightion/.github/issues/245)) ([cda9a40](https://github.com/rknightion/.github/commit/cda9a4013ef1bcf79bff4c8a2cb3c932af306563))
+
 ## [1.30.9](https://github.com/rknightion/.github/compare/v1.30.8...v1.30.9) (2026-11-18)
 
 
