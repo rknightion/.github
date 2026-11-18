@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.30.8](https://github.com/rknightion/.github/compare/v1.30.7...v1.30.8) (2026-11-18)
+
+
+### Miscellaneous
+
+* configure Cursor review for shared GitHub workflows ([#238](https://github.com/rknightion/.github/issues/238)) ([5df023e](https://github.com/rknightion/.github/commit/5df023ef22c5531c22a3c085da88155f06ce05d8))
+
 ## [1.30.7](https://github.com/rknightion/.github/compare/v1.30.6...v1.30.7) (2026-11-18)
 
 
