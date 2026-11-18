@@ -24,6 +24,7 @@ assert_equal package-architecture "$arch" "$(dpkg --print-architecture)"
 assert_equal user ubuntu "$(id -un)"
 assert_equal sudo 0 "$(sudo -n id -u)"
 id -Gn | tr ' ' '\n' | grep -x docker
+test ! -e /opt/go/src/crypto/x509/platform_root_key.pem
 
 pins=/usr/local/share/cursor-base/tools.lock
 while read -r tool version _; do
