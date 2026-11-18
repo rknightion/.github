@@ -1,0 +1,16 @@
+name: zizmor default upload proof
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+permissions: {}
+
+jobs:
+  default-upload:
+    if: github.event.pull_request.head.repo.full_name == github.repository && github.head_ref == 'ci/proof-zizmor-default-upload'
+    permissions:
+      actions: read
+      contents: read
+      security-events: write
+    uses: rknightion/.github/.github/workflows/zizmor.yml@2929e52a721bce10ae6ea15ecdc6a0c3eb142da3

@@ -1,0 +1,8 @@
+name: Static scanner fixture
+description: This action is not called by any workflow.
+runs:
+  using: composite
+  steps:
+    - uses: actions/checkout@v7
+      with:
+        persist-credentials: false
