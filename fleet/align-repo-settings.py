@@ -462,7 +462,26 @@ ALLOW_BYPASS_MODES = ("always", "pull_request")
 
 
 def validate_standard(std: dict) -> None:
-    """Raise ValueError on a malformed rulesets.tracker_bypass_allow, before anything is written."""
+    """Reject malformed per-repository settings before reading or writing any repository."""
+    required = std.get("required_check") or {}
+    if "expansion" in required:
+        if required.get("integration_id") != 15368:
+            raise ValueError("required_check.expansion requires the GitHub Actions integration")
+        expansion = required["expansion"]
+        if not isinstance(expansion, dict) or set(expansion) != {"context", "workflow", "repos"}:
+            raise ValueError("required_check.expansion needs context, workflow and repos")
+        check = expansion["context"]
+        if not isinstance(check, str) or not re.fullmatch(r"[a-z0-9][a-z0-9-]*", check) or check == required.get("context"):
+            raise ValueError("required_check.expansion.context must be a distinct, simple job name")
+        workflow = expansion["workflow"]
+        if not isinstance(workflow, str) or not re.fullmatch(r"\.github/workflows/[A-Za-z0-9_-]+\.ya?ml", workflow):
+            raise ValueError("required_check.expansion.workflow must be a workflow path")
+        enrolled = expansion["repos"]
+        if not isinstance(enrolled, list) or not all(
+            isinstance(repo, str) and re.fullmatch(r"[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+", repo)
+            and repo.split("/")[0] in std["owners"] for repo in enrolled
+        ) or len(set(enrolled)) != len(enrolled):
+            raise ValueError("required_check.expansion.repos must be a unique list of repos under configured owners")
     rcfg = std.get("rulesets") or {}
     allow = rcfg.get("tracker_bypass_allow")
     allow = {} if allow is None else allow
@@ -739,9 +758,11 @@ def artifact_retention_days(std: dict, owner: str, profile_days: int) -> int:
 
 
 class Aligner:
-    def __init__(self, gh: GitHub, std: dict, sweep: bool, blob_cache: dict | None = None):
+    def __init__(self, gh: GitHub, std: dict, sweep: bool, blob_cache: dict | None = None, *,
+                 expansion_repo: str | None = None):
         validate_standard(std)
         self.gh, self.std, self.sweep = gh, std, sweep
+        self.expansion_repo = expansion_repo
         self.blob_cache = blob_cache if blob_cache is not None else {}  # blob sha -> uses (immutable)
         self._org_pinning: dict[str, bool] = {}
         self.changes, self.findings, self.errors = [], [], []
@@ -1030,6 +1051,139 @@ class Aligner:
                           f"/repos/{full}/private-vulnerability-reporting")
             self.change(full, "security", f"private vulnerability reporting -> {sec['private_vulnerability_reporting']}")
 
+    def expansion_heads(self, path: str, branch: str) -> list[tuple[int, str, str]]:
+        heads = []
+        for pr in self.gh.paginate(path):
+            number, sha, updated = pr["number"], pr["head"]["sha"], pr["updated_at"]
+            if type(number) is not int or number <= 0 or not FULL_SHA.fullmatch(sha) \
+                    or pr["base"]["ref"] != branch or not isinstance(updated, str) or not updated:
+                raise ValueError("open PR census contained an invalid head or target")
+            heads.append((number, sha, updated))
+        if not heads or len({number for number, _, _ in heads}) != len(heads) \
+                or len({sha for _, sha, _ in heads}) != len(heads):
+            raise ValueError("need open PRs with distinct heads")
+        return sorted(heads)
+
+    def expansion_protected_head(self, path: str, branch: str) -> str:
+        _, response = self.gh.get(path)
+        sha = response["commit"]["sha"]
+        if response["name"] != branch or response["protected"] is not True or not FULL_SHA.fullmatch(sha):
+            raise ValueError("need the current protected default branch commit")
+        return sha
+
+    def expansion_workflow_blob(self, root: str, path: str, commit: str) -> str | None:
+        _, response = self.gh.get(f"{root}/git/trees/{commit}?recursive=1")
+        if response["sha"] != commit or response["truncated"] is not False:
+            raise ValueError("the metadata source tree could not be read whole at the requested commit")
+        entries = [entry for entry in response["tree"] if entry["path"] == path]
+        if len(entries) != 1:
+            return None
+        entry = entries[0]
+        sha = entry["sha"]
+        if entry["type"] != "blob" or entry["mode"] not in ("100644", "100755") or not FULL_SHA.fullmatch(sha):
+            return None
+        return sha
+
+    def expansion_check_available(self, root: str, workflow_id: int, path: str, context: str,
+                                  app: int, number: int, sha: str) -> bool:
+        query = urllib.parse.urlencode({"event": "pull_request", "head_sha": sha, "per_page": 1})
+        _, response = self.gh.get(f"{root}/actions/workflows/{workflow_id}/runs?{query}")
+        runs = response["workflow_runs"]
+        if not runs:
+            return False
+        run = runs[0]  # latest run for this workflow, event and head
+        if (run["workflow_id"], run["path"].split("@", 1)[0], run["head_sha"], run["event"],
+            run["display_title"], run["status"], run["conclusion"]) != (
+                workflow_id, path, sha, "pull_request", f"PR {number} metadata", "completed", "success"):
+            return False
+        run_id, attempt = run["id"], run["run_attempt"]
+        if any(type(value) is not int or value <= 0 for value in (run_id, attempt, run["check_suite_id"])):
+            return False
+        jobs = self.gh.paginate(f"{root}/actions/runs/{run_id}/attempts/{attempt}/jobs?per_page=100", key="jobs")
+        found = [job for job in jobs if job["name"] == context]
+        if len(found) != 1:
+            return False
+        job = found[0]
+        if (job["run_id"], job["run_attempt"], job["status"], job["conclusion"]) != (
+                run_id, attempt, "completed", "success"):
+            return False
+        linked = re.fullmatch(re.escape(API + root + "/check-runs/") + r"([1-9][0-9]*)", job["check_run_url"])
+        if not linked:
+            return False
+        _, check = self.gh.get(f"{root}/check-runs/{linked[1]}")
+        return (check["name"], check["app"]["id"], check["head_sha"], check["check_suite"]["id"],
+                check["status"], check["conclusion"]) == (
+                context, app, sha, run["check_suite_id"], "completed", "success")
+
+    def expand_required_check(self, repo: dict, current: dict | None, want: dict) -> str | None:
+        """Plan only the separately enrolled, already-proven additive gate."""
+        full = repo["full_name"]
+        required = self.std["required_check"]
+        expansion = required.get("expansion")
+        if not expansion or full != self.expansion_repo or full not in expansion["repos"]:
+            return None
+        context, path = expansion["context"], expansion["workflow"]
+        app = required["integration_id"]
+        branch = repo.get("default_branch")
+        root = f"/repos/{full}"
+        try:
+            refs = ((current or {}).get("conditions") or {}).get("ref_name") or {}
+            if not branch or not current or current.get("enforcement") != "active" \
+                    or refs.get("include") not in (["~DEFAULT_BRANCH"], [f"refs/heads/{branch}"]) or refs.get("exclude") \
+                    or "pull_request" not in rule_types(current) or normalise_ruleset(current) != normalise_ruleset(want):
+                raise ValueError("need an active, aligned default-branch PR ruleset")
+            rsc = next((r for r in want["rules"] if r["type"] == "required_status_checks"), {})
+            checks = rsc.get("parameters", {}).get("required_status_checks", [])
+            if {"context": required["context"], "integration_id": app} not in checks:
+                raise ValueError("the Actions-bound primary check must already be required")
+            existing = [check for check in checks if check["context"] == context]
+            if existing:
+                if existing != [{"context": context, "integration_id": app}]:
+                    raise ValueError("an existing context has a different integration binding")
+                return None
+            branch_ref = urllib.parse.quote(branch, safe="")
+            effective = self.gh.paginate(f"{root}/rules/branches/{branch_ref}?per_page=100")
+            if any(rule["type"] == "merge_queue" for rule in effective):
+                raise ValueError("merge queue needs separate merge_group coverage")
+            if context in required_contexts({"rules": effective}):
+                raise ValueError("the context is already required by another effective rule")
+            workflow_path = f"{root}/actions/workflows/{path.rsplit('/', 1)[1]}"
+            _, workflow = self.gh.get(workflow_path)
+            if workflow["path"] != path or workflow["state"] != "active" \
+                    or type(workflow["id"]) is not int or workflow["id"] <= 0:
+                raise ValueError("the metadata workflow must be active")
+            # Actions registers PR-only workflow files. An active workflow id is not proof its source landed.
+            branch_path = f"{root}/branches/{branch_ref}"
+            base_sha = self.expansion_protected_head(branch_path, branch)
+            base_blob = self.expansion_workflow_blob(root, path, base_sha)
+            if base_blob is None:
+                raise ValueError("the metadata workflow must be a regular file on the protected default branch")
+            query = urllib.parse.urlencode({"state": "open", "base": branch, "per_page": 100})
+            pulls_path = f"{root}/pulls?{query}"
+            heads = self.expansion_heads(pulls_path, branch)
+            for number, sha, _ in heads:
+                if self.expansion_workflow_blob(root, path, sha) != base_blob:
+                    raise ValueError(f"PR #{number} does not use the protected metadata workflow source")
+                if not self.expansion_check_available(root, workflow["id"], path, context, app, number, sha):
+                    raise ValueError(f"PR #{number} lacks a successful Actions metadata check for its current head")
+            if self.expansion_heads(pulls_path, branch) != heads:
+                raise ValueError("open PR census changed during proof collection")
+            if self.gh.get(root)[1]["default_branch"] != branch:
+                raise ValueError("the default branch changed during proof collection")
+            latest = self.gh.get(workflow_path)[1]
+            if (latest["id"], latest["path"], latest["state"]) != (workflow["id"], path, "active"):
+                raise ValueError("the metadata workflow changed during proof collection")
+            if self.expansion_protected_head(branch_path, branch) != base_sha:
+                raise ValueError("the protected default branch commit changed during proof collection")
+            _, refreshed = self.gh.get(f"{root}/rulesets/{current['id']}")
+            if normalise_ruleset(refreshed) != normalise_ruleset(current):
+                raise ValueError("the ruleset changed during proof collection")
+        except (ApiError, ValueError, KeyError, TypeError, AttributeError) as exc:
+            self.finding(full, "required-check-expansion-held", str(exc))
+            return None
+        checks.append({"context": context, "integration_id": app})
+        return context
+
     def align_rulesets(self, repo: dict, profile: dict) -> str:
         """How the default branch ends up gated: 'ci' (ci-success), 'other' (other required checks), 'none'."""
         cfg = profile.get("rulesets")
@@ -1092,6 +1246,7 @@ class Aligner:
             allow=allow if plan in ("split", "add") else [], split=plan == "split",
             drop=allow if plan == "skip" and set(HISTORY_RULES) & rule_types(floor) else [],
             keep_live=allow if plan == "conflict" else [])
+        added_check = self.expand_required_check(repo, main, want)
         if main is None:
             self.gh.write("POST", f"/repos/{full}/rulesets", want)
             self.change(full, "rulesets", f"created '{want['name']}' ({'gated' if gated else 'base'})")
@@ -1099,6 +1254,7 @@ class Aligner:
             self.gh.write("PUT", f"/repos/{full}/rulesets/{main['id']}", want)
             admin_kept = any(is_standard_bypass(a, self.std) for a in want["bypass_actors"])
             self.change(full, "rulesets", f"updated '{want['name']}' ({'gated' if gated else 'base'} floor"
+                        + (f", added required check {added_check}" if added_check else "")
                         + ((", tracker repo: allowed admin bypass" if admin_kept else ", tracker repo: no admin bypass")
                            if tracker else "")
                         + {"split": ", allowed bypass actors, history rules moved off)",
@@ -1382,7 +1538,8 @@ def main() -> int:
     total = 0
     for o in owners:
         gh = GitHub(token_for(o), args.dry_run)
-        al = Aligner(gh, std, sweep=not args.no_cache_sweep, blob_cache=blob_cache)
+        expansion_repo = args.repo[0] if args.repo and len(args.repo) == 1 else None
+        al = Aligner(gh, std, sweep=not args.no_cache_sweep, blob_cache=blob_cache, expansion_repo=expansion_repo)
         kind = std["owners"][o]["kind"]
         plans = {}
         try:
