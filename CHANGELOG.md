@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.30.7](https://github.com/rknightion/.github/compare/v1.30.6...v1.30.7) (2026-11-18)
+
+
+### Build & CI
+
+* bound measured hub validation jobs ([3862104](https://github.com/rknightion/.github/commit/3862104910f41fd0d4146cf26754b86e17232810))
+* pack pull-request metadata checks ([7b1d1df](https://github.com/rknightion/.github/commit/7b1d1df5ae19fc84d46ee684f8ac796cccc153d2))
+
 ## [1.30.6](https://github.com/rknightion/.github/compare/v1.30.5...v1.30.6) (2026-11-16)
 
 
