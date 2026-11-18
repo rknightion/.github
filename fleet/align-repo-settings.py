@@ -1064,6 +1064,26 @@ class Aligner:
             raise ValueError("need open PRs with distinct heads")
         return sorted(heads)
 
+    def expansion_protected_head(self, path: str, branch: str) -> str:
+        _, response = self.gh.get(path)
+        sha = response["commit"]["sha"]
+        if response["name"] != branch or response["protected"] is not True or not FULL_SHA.fullmatch(sha):
+            raise ValueError("need the current protected default branch commit")
+        return sha
+
+    def expansion_workflow_blob(self, root: str, path: str, commit: str) -> str | None:
+        _, response = self.gh.get(f"{root}/git/trees/{commit}?recursive=1")
+        if response["sha"] != commit or response["truncated"] is not False:
+            raise ValueError("the metadata source tree could not be read whole at the requested commit")
+        entries = [entry for entry in response["tree"] if entry["path"] == path]
+        if len(entries) != 1:
+            return None
+        entry = entries[0]
+        sha = entry["sha"]
+        if entry["type"] != "blob" or entry["mode"] not in ("100644", "100755") or not FULL_SHA.fullmatch(sha):
+            return None
+        return sha
+
     def expansion_check_available(self, root: str, workflow_id: int, path: str, context: str,
                                   app: int, number: int, sha: str) -> bool:
         query = urllib.parse.urlencode({"event": "pull_request", "head_sha": sha, "per_page": 1})
@@ -1121,7 +1141,8 @@ class Aligner:
                 if existing != [{"context": context, "integration_id": app}]:
                     raise ValueError("an existing context has a different integration binding")
                 return None
-            effective = self.gh.paginate(f"{root}/rules/branches/{urllib.parse.quote(branch, safe='')}?per_page=100")
+            branch_ref = urllib.parse.quote(branch, safe="")
+            effective = self.gh.paginate(f"{root}/rules/branches/{branch_ref}?per_page=100")
             if any(rule["type"] == "merge_queue" for rule in effective):
                 raise ValueError("merge queue needs separate merge_group coverage")
             if context in required_contexts({"rules": effective}):
@@ -1131,10 +1152,18 @@ class Aligner:
             if workflow["path"] != path or workflow["state"] != "active" \
                     or type(workflow["id"]) is not int or workflow["id"] <= 0:
                 raise ValueError("the metadata workflow must be active")
+            # Actions registers PR-only workflow files. An active workflow id is not proof its source landed.
+            branch_path = f"{root}/branches/{branch_ref}"
+            base_sha = self.expansion_protected_head(branch_path, branch)
+            base_blob = self.expansion_workflow_blob(root, path, base_sha)
+            if base_blob is None:
+                raise ValueError("the metadata workflow must be a regular file on the protected default branch")
             query = urllib.parse.urlencode({"state": "open", "base": branch, "per_page": 100})
             pulls_path = f"{root}/pulls?{query}"
             heads = self.expansion_heads(pulls_path, branch)
             for number, sha, _ in heads:
+                if self.expansion_workflow_blob(root, path, sha) != base_blob:
+                    raise ValueError(f"PR #{number} does not use the protected metadata workflow source")
                 if not self.expansion_check_available(root, workflow["id"], path, context, app, number, sha):
                     raise ValueError(f"PR #{number} lacks a successful Actions metadata check for its current head")
             if self.expansion_heads(pulls_path, branch) != heads:
@@ -1144,6 +1173,8 @@ class Aligner:
             latest = self.gh.get(workflow_path)[1]
             if (latest["id"], latest["path"], latest["state"]) != (workflow["id"], path, "active"):
                 raise ValueError("the metadata workflow changed during proof collection")
+            if self.expansion_protected_head(branch_path, branch) != base_sha:
+                raise ValueError("the protected default branch commit changed during proof collection")
             _, refreshed = self.gh.get(f"{root}/rulesets/{current['id']}")
             if normalise_ruleset(refreshed) != normalise_ruleset(current):
                 raise ValueError("the ruleset changed during proof collection")

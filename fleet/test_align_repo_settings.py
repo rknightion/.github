@@ -233,6 +233,7 @@ def tracker_gate(rid=20, bypass=()):
 
 
 EXPANSION_REPO = "rknightion/check-expansion-fixture"
+EXPANSION_BASE = "c" * 40
 METADATA = ".github/workflows/pr-metadata.yml"
 METADATA_CHECK = "pr-metadata-success"
 
@@ -250,6 +251,11 @@ class ExpansionGH(FakeGH):
             for number, head in [(11, SHA), (12, "b" * 40)]
         ]
         self.workflow = {"id": 14, "path": METADATA, "state": "active"}
+        self.main_heads = [{"name": "main", "protected": True, "commit": {"sha": EXPANSION_BASE}}]
+        blob = {"path": METADATA, "mode": "100644", "type": "blob", "sha": "d" * 40}
+        self.trees = {commit: {"sha": commit, "truncated": False, "tree": [dict(blob)]}
+                      for commit in [EXPANSION_BASE, *(pr["head"]["sha"] for pr in self.pulls)]}
+        self.run_workflow_id = 14
         self.check_app = 15368
         self.job_conclusion = "success"
         self.run_conclusion = "success"
@@ -283,6 +289,11 @@ class ExpansionGH(FakeGH):
         self.reads.append(path)
         if path == f"/repos/{EXPANSION_REPO}":
             return 200, {"default_branch": self.latest_branch}
+        if path.endswith("/branches/main"):
+            return 200, self.main_heads.pop(0) if len(self.main_heads) > 1 else self.main_heads[0]
+        if "/git/trees/" in path:
+            commit = path.rsplit("/", 1)[1].split("?", 1)[0]
+            return 200, self.trees[commit]
         if path.endswith("/actions/workflows/pr-metadata.yml"):
             if self.workflow_error:
                 raise align.ApiError("GET", path, 403, {"message": "fixture denied"})
@@ -295,7 +306,7 @@ class ExpansionGH(FakeGH):
             number = pr["number"]
             return 200, {"workflow_runs": [
                 {"id": number, "run_attempt": 2, "event": "pull_request", "head_sha": head,
-                 "workflow_id": 14, "path": METADATA, "status": "completed", "conclusion": self.run_conclusion,
+                 "workflow_id": self.run_workflow_id, "path": METADATA, "status": "completed", "conclusion": self.run_conclusion,
                  "check_suite_id": number + 1000, "display_title": f"PR {number if not self.wrong_title else 99} metadata"}
             ]}
         if "/check-runs/" in path:
@@ -348,11 +359,42 @@ class RequiredCheckExpansion(unittest.TestCase):
         for key, value in [
             ("unavailable_head", "b" * 40), ("check_app", 500), ("job_conclusion", "skipped"),
             ("run_conclusion", "failure"), ("wrong_title", True), ("workflow_error", True),
+            ("run_workflow_id", 15),
             ("census_changes", True), ("ruleset_changes", True), ("latest_branch", "other"),
         ]:
             with self.subTest(problem=key):
                 gh = ExpansionGH()
                 setattr(gh, key, value)
+                runner = self.align(gh)
+                self.assertEqual(gh.writes, [])
+                self.assertTrue(any(f["kind"] == "required-check-expansion-held" for f in runner.findings))
+
+    def test_holds_active_green_workflow_that_is_missing_from_protected_main(self):
+        gh = ExpansionGH()
+        gh.trees[EXPANSION_BASE]["tree"] = []
+        runner = self.align(gh)
+        self.assertEqual(gh.writes, [])
+        self.assertIn("protected default branch", runner.findings[-1]["detail"])
+
+    def test_holds_active_green_workflow_that_differs_on_an_open_head(self):
+        gh = ExpansionGH()
+        gh.trees["b" * 40]["tree"][0]["sha"] = "e" * 40
+        runner = self.align(gh)
+        self.assertEqual(gh.writes, [])
+        self.assertIn("PR #12", runner.findings[-1]["detail"])
+
+    def test_holds_when_protected_source_or_its_readback_is_untrusted(self):
+        for failure in ("unprotected", "symlink", "truncated", "main moved"):
+            with self.subTest(failure=failure):
+                gh = ExpansionGH()
+                if failure == "unprotected":
+                    gh.main_heads[0]["protected"] = False
+                elif failure == "symlink":
+                    gh.trees[EXPANSION_BASE]["tree"][0]["mode"] = "120000"
+                elif failure == "truncated":
+                    gh.trees[EXPANSION_BASE]["truncated"] = True
+                else:
+                    gh.main_heads.append({"name": "main", "protected": True, "commit": {"sha": "e" * 40}})
                 runner = self.align(gh)
                 self.assertEqual(gh.writes, [])
                 self.assertTrue(any(f["kind"] == "required-check-expansion-held" for f in runner.findings))

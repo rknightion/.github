@@ -102,6 +102,8 @@ Stage the rollout in order.
    aligner with the private standard and single target. Expansion needs an active default-branch
    PR ruleset already requiring the Actions-bound primary check and a successful metadata check,
    from the named workflow and latest attempt, on **every open PR head** targeting that branch.
+   The workflow file must match the regular Git blob on the protected default branch at every
+   open PR head. Jobs from an active workflow that exists only on a PR branch do not qualify.
    It checks both the job's rendered name and the linked check run's GitHub Actions integration.
    With no open PRs, use a disposable draft for the proof. Shared heads, unreadable evidence,
    skipped or red checks, merge queues, competing requirements and changing snapshots defer the
