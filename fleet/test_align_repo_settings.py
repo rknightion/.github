@@ -232,6 +232,223 @@ def tracker_gate(rid=20, bypass=()):
                           "required_status_checks": [{"context": "ci-success", "integration_id": 15368}]}}]}
 
 
+EXPANSION_REPO = "rknightion/check-expansion-fixture"
+EXPANSION_BASE = "c" * 40
+METADATA = ".github/workflows/pr-metadata.yml"
+METADATA_CHECK = "pr-metadata-success"
+
+
+class ExpansionGH(FakeGH):
+    def __init__(self):
+        current = tracker_gate()
+        current["rules"] += base_main()["rules"]
+        next(r for r in current["rules"] if r["type"] == "required_status_checks")["parameters"][
+            "required_status_checks"].append({"context": "existing-extra", "integration_id": 500})
+        super().__init__([current], loopmd=LOOPMD)
+        self.reads = []
+        self.pulls = [
+            {"number": number, "head": {"sha": head}, "base": {"ref": "main"}, "updated_at": "2026-01-01T00:00:00Z"}
+            for number, head in [(11, SHA), (12, "b" * 40)]
+        ]
+        self.workflow = {"id": 14, "path": METADATA, "state": "active"}
+        self.main_heads = [{"name": "main", "protected": True, "commit": {"sha": EXPANSION_BASE}}]
+        blob = {"path": METADATA, "mode": "100644", "type": "blob", "sha": "d" * 40}
+        self.trees = {commit: {"sha": commit, "truncated": False, "tree": [dict(blob)]}
+                      for commit in [EXPANSION_BASE, *(pr["head"]["sha"] for pr in self.pulls)]}
+        self.run_workflow_id = 14
+        self.check_app = 15368
+        self.job_conclusion = "success"
+        self.run_conclusion = "success"
+        self.unavailable_head = None
+        self.wrong_title = False
+        self.workflow_error = False
+        self.census_changes = False
+        self.ruleset_changes = False
+        self.latest_branch = "main"
+        self.effective = []
+        self.censuses = 0
+        self.ruleset_reads = 0
+
+    def paginate(self, path, key=None):
+        self.reads.append(path)
+        if "/pulls?" in path:
+            self.censuses += 1
+            if self.census_changes and self.censuses == 2:
+                return self.pulls[:1]
+            return self.pulls
+        if "/rules/branches/" in path:
+            return self.effective
+        if path.endswith("/jobs?per_page=100"):
+            run_id = int(path.split("/runs/")[1].split("/")[0])
+            return [{"name": METADATA_CHECK, "status": "completed", "conclusion": self.job_conclusion,
+                     "run_id": run_id, "run_attempt": 2,
+                     "check_run_url": f"https://api.github.com/repos/{EXPANSION_REPO}/check-runs/{run_id}"}]
+        return super().paginate(path, key)
+
+    def get(self, path, ok=(200,)):
+        self.reads.append(path)
+        if path == f"/repos/{EXPANSION_REPO}":
+            return 200, {"default_branch": self.latest_branch}
+        if path.endswith("/branches/main"):
+            return 200, self.main_heads.pop(0) if len(self.main_heads) > 1 else self.main_heads[0]
+        if "/git/trees/" in path:
+            commit = path.rsplit("/", 1)[1].split("?", 1)[0]
+            return 200, self.trees[commit]
+        if path.endswith("/actions/workflows/pr-metadata.yml"):
+            if self.workflow_error:
+                raise align.ApiError("GET", path, 403, {"message": "fixture denied"})
+            return 200, self.workflow
+        if "/actions/workflows/14/runs?" in path:
+            head = align.urllib.parse.parse_qs(align.urllib.parse.urlsplit(path).query)["head_sha"][0]
+            pr = next(pr for pr in self.pulls if pr["head"]["sha"] == head)
+            if self.unavailable_head == head:
+                return 200, {"workflow_runs": []}
+            number = pr["number"]
+            return 200, {"workflow_runs": [
+                {"id": number, "run_attempt": 2, "event": "pull_request", "head_sha": head,
+                 "workflow_id": self.run_workflow_id, "path": METADATA, "status": "completed", "conclusion": self.run_conclusion,
+                 "check_suite_id": number + 1000, "display_title": f"PR {number if not self.wrong_title else 99} metadata"}
+            ]}
+        if "/check-runs/" in path:
+            number = int(path.rsplit("/", 1)[1])
+            head = next(pr["head"]["sha"] for pr in self.pulls if pr["number"] == number)
+            return 200, {"name": METADATA_CHECK, "app": {"id": self.check_app}, "head_sha": head,
+                         "check_suite": {"id": number + 1000}, "status": "completed", "conclusion": "success"}
+        status, body = super().get(path, ok)
+        self.ruleset_reads += 1
+        if self.ruleset_changes and self.ruleset_reads > 1:
+            body["rules"] += [{"type": "required_linear_history"}]
+        return status, body
+
+
+class RequiredCheckExpansion(unittest.TestCase):
+    def standard(self, enrolled=True):
+        std = json.loads(json.dumps(STD))
+        std["required_check"]["expansion"] = {
+            "context": METADATA_CHECK, "workflow": METADATA, "repos": [EXPANSION_REPO] if enrolled else [],
+        }
+        return std
+
+    def align(self, gh, enrolled=True, explicitly_selected=True):
+        std = self.standard(enrolled)
+        runner = align.Aligner(gh, std, sweep=False, expansion_repo=EXPANSION_REPO if explicitly_selected else None)
+        runner.ci_success_reported = lambda _: True
+        runner.align_rulesets(repo(EXPANSION_REPO), std["profiles"]["oss"])
+        return runner
+
+    def test_adds_only_the_bound_context_on_an_already_aligned_gate(self):
+        gh = ExpansionGH()
+        self.align(gh)
+        (method, path, body), = gh.writes
+        self.assertEqual((method, path), ("PUT", f"/repos/{EXPANSION_REPO}/rulesets/20"))
+        expected = align.ruleset_body(gh.rulesets[0])
+        next(r for r in expected["rules"] if r["type"] == "required_status_checks")["parameters"][
+            "required_status_checks"].append({"context": METADATA_CHECK, "integration_id": 15368})
+        self.assertEqual(body, expected)
+        self.assertEqual(gh.censuses, 2)
+
+    def test_requires_enrollment_and_explicit_single_repo_selection(self):
+        for enrolled, selected in [(False, True), (True, False), (False, False)]:
+            with self.subTest(enrolled=enrolled, selected=selected):
+                gh = ExpansionGH()
+                self.align(gh, enrolled, selected)
+                self.assertEqual(gh.writes, [])
+                self.assertFalse(any("/pulls?" in p or "/actions/" in p or "/check-runs" in p for p in gh.reads))
+
+    def test_defers_on_missing_or_untrusted_evidence(self):
+        for key, value in [
+            ("unavailable_head", "b" * 40), ("check_app", 500), ("job_conclusion", "skipped"),
+            ("run_conclusion", "failure"), ("wrong_title", True), ("workflow_error", True),
+            ("run_workflow_id", 15),
+            ("census_changes", True), ("ruleset_changes", True), ("latest_branch", "other"),
+        ]:
+            with self.subTest(problem=key):
+                gh = ExpansionGH()
+                setattr(gh, key, value)
+                runner = self.align(gh)
+                self.assertEqual(gh.writes, [])
+                self.assertTrue(any(f["kind"] == "required-check-expansion-held" for f in runner.findings))
+
+    def test_holds_active_green_workflow_that_is_missing_from_protected_main(self):
+        gh = ExpansionGH()
+        gh.trees[EXPANSION_BASE]["tree"] = []
+        runner = self.align(gh)
+        self.assertEqual(gh.writes, [])
+        self.assertIn("protected default branch", runner.findings[-1]["detail"])
+
+    def test_holds_active_green_workflow_that_differs_on_an_open_head(self):
+        gh = ExpansionGH()
+        gh.trees["b" * 40]["tree"][0]["sha"] = "e" * 40
+        runner = self.align(gh)
+        self.assertEqual(gh.writes, [])
+        self.assertIn("PR #12", runner.findings[-1]["detail"])
+
+    def test_holds_when_protected_source_or_its_readback_is_untrusted(self):
+        for failure in ("unprotected", "symlink", "truncated", "main moved"):
+            with self.subTest(failure=failure):
+                gh = ExpansionGH()
+                if failure == "unprotected":
+                    gh.main_heads[0]["protected"] = False
+                elif failure == "symlink":
+                    gh.trees[EXPANSION_BASE]["tree"][0]["mode"] = "120000"
+                elif failure == "truncated":
+                    gh.trees[EXPANSION_BASE]["truncated"] = True
+                else:
+                    gh.main_heads.append({"name": "main", "protected": True, "commit": {"sha": "e" * 40}})
+                runner = self.align(gh)
+                self.assertEqual(gh.writes, [])
+                self.assertTrue(any(f["kind"] == "required-check-expansion-held" for f in runner.findings))
+
+    def test_holds_when_no_current_pr_or_sha_is_shared(self):
+        for pulls in ([], [dict(pr, head={"sha": SHA}) for pr in ExpansionGH().pulls]):
+            gh = ExpansionGH()
+            gh.pulls = pulls
+            self.align(gh)
+            self.assertEqual(gh.writes, [])
+
+    def test_leaves_existing_additional_context_when_unenrolled(self):
+        gh = ExpansionGH()
+        checks = next(r for r in gh.rulesets[0]["rules"] if r["type"] == "required_status_checks")[
+            "parameters"]["required_status_checks"]
+        checks.append({"context": METADATA_CHECK, "integration_id": 15368})
+        for enrolled in (True, False):
+            self.align(gh, enrolled)
+            self.assertEqual(gh.writes, [])
+
+    def test_does_not_enroll_while_applying_the_existing_gate_floor(self):
+        gh = ExpansionGH()
+        gh.rulesets[0]["rules"][0]["parameters"]["allowed_merge_methods"] = ["squash"]
+        self.align(gh)
+        self.assertEqual(len(gh.writes), 1)
+        self.assertNotIn(METADATA_CHECK, align.required_contexts(gh.writes[0][2]))
+        self.assertEqual(gh.censuses, 0)
+
+    def test_merge_queue_and_effective_context_collision_hold(self):
+        for rules in [
+            [{"type": "merge_queue"}],
+            [{"type": "required_status_checks", "parameters": {
+                "required_status_checks": [{"context": METADATA_CHECK, "integration_id": 500}]}}],
+        ]:
+            gh = ExpansionGH()
+            gh.effective = rules
+            self.align(gh)
+            self.assertEqual(gh.writes, [])
+
+    def test_invalid_enrollment_is_rejected(self):
+        for key, value in [
+            ("repos", ["unknown-owner/fixture"]), ("repos", [EXPANSION_REPO, EXPANSION_REPO]),
+            ("repos", "all"), ("context", "ci-success"), ("workflow", "../workflow.yml"),
+        ]:
+            std = self.standard()
+            std["required_check"]["expansion"][key] = value
+            with self.subTest(key=key, value=value), self.assertRaises(ValueError):
+                align.validate_standard(std)
+        std = self.standard()
+        std["required_check"]["integration_id"] = 500
+        with self.assertRaisesRegex(ValueError, "GitHub Actions integration"):
+            align.validate_standard(std)
+
+
 class LoopMd(unittest.TestCase):
     def test_reads_the_opening_keys_only(self):
         self.assertEqual(align.loopmd_tracker(LOOPMD), "github")

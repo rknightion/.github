@@ -41,6 +41,7 @@ jobs:
     uses: ./.github/workflows/codeql.yml
     with:
       languages: '[{"language":"actions","build-mode":"none"}]'
+      timeout-minutes: 5
 
   # This repo's own task surface. `just check` is the complete local gate
   # (fmt-check + lint + test + check-vended); this job is what makes it enforced
@@ -123,6 +124,7 @@ jobs:
   ci-success:
     name: ci-success
     runs-on: ubuntu-latest
+    timeout-minutes: 5
     if: always()
     needs: [actionlint, zizmor, codeql, just, ac-evidence, privacy-sweep, backlog-freeze]
     steps:
