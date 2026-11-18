@@ -11,6 +11,9 @@ name: release-please
 on:
   push:
     branches: [main]
+    paths-ignore:
+      - 'cursor-base/**'
+      - '.github/workflows/cursor-base.yml'
   workflow_dispatch: {}
 
 permissions:
@@ -23,6 +26,14 @@ concurrency:
 
 jobs:
   release-please:
+    # The initial publisher merge also changes this workflow. Later image-only
+    # pushes are excluded by path above. Manual dispatch remains available.
+    if: >-
+      github.event_name != 'push' || github.event.commits[1] != null ||
+      github.event.before != 'bcd63fb1280a94687555d8669abc8a7445ab0101' ||
+      github.event.head_commit.message != format(
+        'ci: add release-isolated Cursor base publication{0}{0}Task: none, workflow change requires tracker handoff',
+        fromJSON('"\n"'))
     runs-on: ubuntu-24.04
     timeout-minutes: 15
     permissions:
