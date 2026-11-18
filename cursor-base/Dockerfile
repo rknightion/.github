@@ -2,9 +2,9 @@
 FROM ubuntu:24.04@sha256:73b999393d07f2bf65a40373778a44dc9a6d54ad7718d29247d8ff9413c4d6a8 AS ubuntu-base
 
 # The minimal Ubuntu image does not yet carry a TLS trust store. Use the
-# checksum-pinned public Ubuntu package to bootstrap the HTTPS apt snapshot.
+# checksum-pinned public Ubuntu package to bootstrap the HTTPS apt archive.
 FROM ubuntu-base AS bootstrap-ca
-ADD --checksum=sha256:f9fbacd417b515450b831032cc39d18059e9874e67525679a43c16071dabf9a0 https://snapshot.ubuntu.com/ubuntu/20261117T000000Z/pool/main/c/ca-certificates/ca-certificates_20260816ubuntu0.24.04.2_all.deb /tmp/ca-certificates.deb
+ADD --checksum=sha256:f9fbacd417b515450b831032cc39d18059e9874e67525679a43c16071dabf9a0 https://archive.ubuntu.com/ubuntu/pool/main/c/ca-certificates/ca-certificates_20260816ubuntu0.24.04.2_all.deb /tmp/ca-certificates.deb
 RUN dpkg-deb -x /tmp/ca-certificates.deb /tmp/ca \
     && cat /tmp/ca/usr/share/ca-certificates/mozilla/*.crt > /tmp/ca-certificates.crt
 
@@ -24,19 +24,40 @@ RUN --mount=type=bind,source=install-tools.sh,target=/tmp/install-tools.sh \
     chmod 0644 /usr/local/share/cursor-base/tools.lock; \
     export DEBIAN_FRONTEND=noninteractive; \
     mv /etc/apt/sources.list.d/ubuntu.sources /tmp/ubuntu.sources; \
+    case "$TARGETARCH" in \
+      amd64) archive=https://archive.ubuntu.com/ubuntu/ ;; \
+      arm64) archive=https://ports.ubuntu.com/ubuntu-ports/ ;; \
+      *) exit 1 ;; \
+    esac; \
     printf '%s\n' \
       'Types: deb' \
-      'URIs: https://snapshot.ubuntu.com/ubuntu/20261117T000000Z/' \
+      "URIs: $archive" \
       'Suites: noble noble-updates noble-security' \
       'Components: main universe' \
-      'Signed-By: /usr/share/keyrings/ubuntu-archive-keyring.gpg' \
-      'Check-Valid-Until: no' > /etc/apt/sources.list.d/snapshot.sources; \
+      "Architectures: $TARGETARCH" \
+      'Signed-By: /usr/share/keyrings/ubuntu-archive-keyring.gpg' > /etc/apt/sources.list.d/build.sources; \
     apt-get -o APT::Update::Error-Mode=any update; \
     apt-get install -y --no-install-recommends \
-      build-essential ca-certificates curl fuse-overlayfs git iproute2 iptables \
-      jq libatomic1 openssh-client procps python3 python3-venv ripgrep shellcheck sudo unzip xz-utils; \
+      build-essential=12.10ubuntu1 \
+      ca-certificates=20260816ubuntu0.24.04.2 \
+      curl=8.5.0-2ubuntu10.16 \
+      fuse-overlayfs=1.13-1 \
+      git=1:2.43.0-1ubuntu7.4 \
+      iproute2=6.1.0-1ubuntu6.4 \
+      iptables=1.8.10-3ubuntu2 \
+      jq=1.7.1-3ubuntu0.24.04.2 \
+      libatomic1=14.2.0-4ubuntu2~24.04.1 \
+      openssh-client=1:9.6p1-3ubuntu13.20 \
+      procps=2:4.0.4-4ubuntu3.3 \
+      python3=3.12.3-0ubuntu2.1 \
+      python3-venv=3.12.3-0ubuntu2.1 \
+      ripgrep=14.1.0-1 \
+      shellcheck=0.9.0-1 \
+      sudo=1.9.15p5-3ubuntu5.24.04.4 \
+      unzip=6.0-28ubuntu4.1 \
+      xz-utils=5.6.1+really5.4.5-1ubuntu0.4; \
     bash /tmp/install-tools.sh "$TARGETARCH"; \
-    rm -f /etc/apt/sources.list.d/snapshot.sources; \
+    rm -f /etc/apt/sources.list.d/build.sources; \
     mv /tmp/ubuntu.sources /etc/apt/sources.list.d/ubuntu.sources; \
     apt-get clean; \
     rm -rf /var/lib/apt/lists/*; \
