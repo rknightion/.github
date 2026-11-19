@@ -371,27 +371,73 @@ jobs:
         run: |
           # shellcheck disable=SC2046  # intentional word-splitting of -t flags and digest refs
           docker buildx imagetools create \
+            --metadata-file "$RUNNER_TEMP/published-image.json" \
             $(jq -cr '.tags | map("-t " + .) | join(" ")' <<< "$DOCKER_METADATA_OUTPUT_JSON") \
             $(printf "${REGISTRY}/${IMAGE_NAME}@sha256:%s " *)
 
-      - name: Inspect image and capture digest
+      - name: Capture the exact published digest
         id: digest
-        env:
-          REGISTRY: ${{ env.REGISTRY }}
-          IMAGE_NAME: ${{ env.IMAGE_NAME }}
-          VERSION: ${{ steps.meta.outputs.version }}
         run: |
-          digest=$(docker buildx imagetools inspect \
-            "${REGISTRY}/${IMAGE_NAME}:${VERSION}" \
-            --format '{{json .Manifest.Digest}}' | tr -d '"')
+          digest=$(jq -er '."containerimage.descriptor".digest |
+            strings | select(test("^sha256:[0-9a-f]{64}$"))' "$RUNNER_TEMP/published-image.json")
           echo "digest=${digest}" >> "$GITHUB_OUTPUT"
 
       - name: Sign the published image
         if: inputs.sign
         env:
-          TAGS: ${{ steps.meta.outputs.tags }}
+          IMAGE: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
           DIGEST: ${{ steps.digest.outputs.digest }}
-        run: echo "${TAGS}" | xargs -I {} cosign sign --yes "{}@${DIGEST}"
+          # GitHub Cloud exposes the defining workflow in the job context.
+          # Parse its documented fields until actionlint models them directly.
+          SIGNER_REF: ${{ fromJSON(toJSON(job)).workflow_ref }}
+          SIGNER_SHA: ${{ fromJSON(toJSON(job)).workflow_sha }}
+        run: |
+          set -euo pipefail
+          if [[ ! "$DIGEST" =~ ^sha256:[0-9a-f]{64}$ || -z "$SIGNER_REF" || ! "$SIGNER_SHA" =~ ^[0-9a-f]{40}$ ]]; then
+            echo '::error::Missing immutable image digest or signing workflow identity'
+            exit 1
+          fi
+          image_ref="${IMAGE}@${DIGEST}"
+          verify=(cosign verify
+            --certificate-identity "https://github.com/${SIGNER_REF}"
+            --certificate-oidc-issuer https://token.actions.githubusercontent.com
+            --certificate-github-workflow-repository "$GITHUB_REPOSITORY"
+            --certificate-github-workflow-ref "$GITHUB_REF"
+            --certificate-github-workflow-sha "$GITHUB_SHA"
+            "$image_ref")
+
+          verify_image_signature() {
+            local verified
+            if verified=$("${verify[@]}"); then
+              # Cosign also verifies other OCI attestations. Require the image-signature predicate.
+              if ! jq -e --arg ref "$image_ref" --arg digest "$DIGEST" '
+                type == "array" and any(.[];
+                  .critical.type == "https://sigstore.dev/cosign/sign/v1" and
+                  .critical.identity["docker-reference"] == $ref and
+                  .critical.image["docker-manifest-digest"] == $digest)
+              ' <<< "$verified" >/dev/null; then
+                echo '::error::No verified image signature matches this index'
+                return 1
+              fi
+            else
+              return "$?"
+            fi
+          }
+
+          if [[ "${SIGNER_REF##*@}" == "$SIGNER_SHA" ]]; then
+            if verify_image_signature; then
+              echo "Reusing the verified signature for ${image_ref}"
+              exit 0
+            else
+              verification_status=$?
+              # Cosign exit 10 means no signatures were found. Other errors fail closed.
+              if (( verification_status != 10 )); then
+                exit "$verification_status"
+              fi
+            fi
+          fi
+          cosign sign --yes "$image_ref"
+          verify_image_signature
 
       - name: Generate build-provenance attestation
         if: inputs.provenance

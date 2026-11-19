@@ -3,6 +3,7 @@
 Execute the workflow's actual version shell, then check the metadata/build/signing
 connections. This does not replace Actions CI or a two-platform OCI readback.
 """
+import json
 import os
 from pathlib import Path
 import re
@@ -125,16 +126,121 @@ class ContainerPublish(unittest.TestCase):
         self.assertIn("${BUILD_DIGEST#sha256:}", export)
         merge = step(self.merge, "Create manifest list and push")
         self.assertIn('${REGISTRY}/${IMAGE_NAME}@sha256:%s', merge)
-        digest = step(self.merge, "Inspect image and capture digest")
+        self.assertIn('--metadata-file "$RUNNER_TEMP/published-image.json"', merge)
+        digest = step(self.merge, "Capture the exact published digest")
         self.assertIn("        id: digest\n", digest)
-        self.assertIn("--format '{{json .Manifest.Digest}}'", digest)
+        self.assertIn('."containerimage.descriptor".digest', digest)
+        self.assertNotIn("imagetools inspect", digest)
         self.assertIn('echo "digest=${digest}" >> "$GITHUB_OUTPUT"', digest)
         sign = step(self.merge, "Sign the published image")
-        self.assertEqual(mapping(sign, "env")["DIGEST"], "${{ steps.digest.outputs.digest }}")
-        self.assertIn('cosign sign --yes "{}@${DIGEST}"', sign)
+        self.assertEqual(mapping(sign, "env"), {
+            "IMAGE": "${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}",
+            "DIGEST": "${{ steps.digest.outputs.digest }}",
+            "SIGNER_REF": "${{ fromJSON(toJSON(job)).workflow_ref }}",
+            "SIGNER_SHA": "${{ fromJSON(toJSON(job)).workflow_sha }}",
+        })
         attest = step(self.merge, "Generate build-provenance attestation")
         self.assertEqual(mapping(attest, "with")["subject-digest"], "${{ steps.digest.outputs.digest }}")
         self.assertEqual(mapping(attest, "with")["subject-name"], "${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}")
+
+    def test_manifest_digest_is_read_from_the_producing_buildx_invocation(self):
+        capture = step(self.merge, "Capture the exact published digest")
+        script = textwrap.dedent(capture.split("        run: |\n", 1)[1])
+        digest = "sha256:" + "a" * 64
+        for value, expected in ((digest, 0), ("latest", 1), (None, 1)):
+            with self.subTest(value=value), tempfile.TemporaryDirectory() as tmp:
+                metadata = Path(tmp) / "published-image.json"
+                metadata.write_text(json.dumps({"containerimage.descriptor": {"digest": value}}))
+                output = Path(tmp) / "output"
+                result = subprocess.run(
+                    ["bash", "-euo", "pipefail", "-c", script],
+                    env={"PATH": os.environ["PATH"], "RUNNER_TEMP": tmp, "GITHUB_OUTPUT": str(output)},
+                    capture_output=True, timeout=10,
+                )
+                self.assertEqual(result.returncode == 0, expected == 0)
+                if expected == 0:
+                    self.assertEqual(output.read_text(), f"digest={digest}\n")
+                else:
+                    self.assertFalse(output.exists())
+
+    def test_digest_signing_reuses_only_a_verified_immutable_identity(self):
+        sign = step(self.merge, "Sign the published image")
+        script = textwrap.dedent(sign.split("        run: |\n", 1)[1])
+        signer = "example/shared/.github/workflows/container-publish.yml@"
+        uri = "https://github.com/" + signer
+        signer_sha = "b" * 40
+        repository = "example/product"
+        branch = "refs/heads/main"
+        revision = "c" * 40
+        image = "ghcr.io/example/product"
+        digest = "sha256:" + "a" * 64
+        target = f"{image}@{digest}"
+
+        def verified_json(predicate, reference=target, manifest_digest=digest):
+            return json.dumps([{"critical": {
+                "type": predicate,
+                "identity": {"docker-reference": reference},
+                "image": {"docker-manifest-digest": manifest_digest},
+            }}])
+
+        signature_type = "https://sigstore.dev/cosign/sign/v1"
+        signature = verified_json(signature_type)
+        provenance = verified_json("https://slsa.dev/provenance/v1")
+        cases = (
+            ("verified immutable reuse", signer_sha, digest, [0], ["verify"], 0, signature),
+            ("fresh signature", signer_sha, digest, [10, 0, 0], ["verify", "sign", "verify"], 0, signature),
+            ("signing error remains fatal", signer_sha, digest, [10, 1], ["verify", "sign"], 1, signature),
+            ("unverified existing attachment", signer_sha, digest, [1], ["verify"], 1, signature),
+            ("unverified fresh attachment", signer_sha, digest, [10, 0, 1], ["verify", "sign", "verify"], 1, signature),
+            ("unsigned after signing", signer_sha, digest, [10, 0, 10], ["verify", "sign", "verify"], 10, signature),
+            ("provenance is not reused", signer_sha, digest, [0], ["verify"], 1, provenance),
+            ("provenance is not a fresh signature", signer_sha, digest, [10, 0, 0], ["verify", "sign", "verify"], 1, provenance),
+            ("malformed verification output", signer_sha, digest, [0], ["verify"], 1, "not JSON"),
+            ("wrong verified digest", signer_sha, digest, [0], ["verify"], 1,
+             verified_json(signature_type, manifest_digest="sha256:" + "d" * 64)),
+            ("wrong verified reference", signer_sha, digest, [0], ["verify"], 1,
+             verified_json(signature_type, reference="ghcr.io/example/other@" + digest)),
+            ("mutable workflow never reuses", branch, digest, [0, 0], ["sign", "verify"], 0, signature),
+            ("malformed digest fails closed", signer_sha, "main", [], [], 1, signature),
+        )
+        for label, ref, payload, codes, commands, expected, output in cases:
+            with self.subTest(label=label), tempfile.TemporaryDirectory() as tmp:
+                calls = Path(tmp) / "calls"
+                fake = Path(tmp) / "cosign"
+                fake.write_text(textwrap.dedent("""\
+                    #!/usr/bin/env python3
+                    import json, os, sys
+                    from pathlib import Path
+                    calls = Path(os.environ['PROBE_CALLS'])
+                    index = len(calls.read_text().splitlines()) if calls.exists() else 0
+                    with calls.open('a') as stream:
+                        print(json.dumps(sys.argv[1:]), file=stream)
+                    code = json.loads(os.environ['PROBE_CODES'])[index]
+                    if code == 0 and sys.argv[1] == 'verify':
+                        print(os.environ['PROBE_RESULT'])
+                    sys.exit(code)
+                    """))
+                fake.chmod(0o700)
+                result = subprocess.run(
+                    ["bash", "-euo", "pipefail", "-c", script],
+                    env={"PATH": tmp + os.pathsep + os.environ["PATH"], "IMAGE": image,
+                         "DIGEST": payload, "SIGNER_REF": signer + ref, "SIGNER_SHA": signer_sha,
+                         "GITHUB_REPOSITORY": repository, "GITHUB_REF": branch, "GITHUB_SHA": revision,
+                         "PROBE_CALLS": str(calls), "PROBE_CODES": json.dumps(codes), "PROBE_RESULT": output},
+                    capture_output=True, timeout=10,
+                )
+                self.assertEqual(result.returncode, expected, result.stderr.decode())
+                recorded = [json.loads(line) for line in calls.read_text().splitlines()] if calls.exists() else []
+                self.assertEqual([call[0] for call in recorded], commands)
+                for call in recorded:
+                    if call[0] == "sign":
+                        self.assertEqual(call, ["sign", "--yes", target])
+                    else:
+                        self.assertEqual(call, ["verify", "--certificate-identity", uri + ref,
+                                                "--certificate-oidc-issuer", "https://token.actions.githubusercontent.com",
+                                                "--certificate-github-workflow-repository", repository,
+                                                "--certificate-github-workflow-ref", branch,
+                                                "--certificate-github-workflow-sha", revision, target])
 
 
 if __name__ == "__main__":
