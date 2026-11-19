@@ -1,0 +1,15 @@
+name: Signature contract proof
+
+on:
+  pull_request:
+    branches: [main]
+    types: [opened, synchronize]
+
+permissions: {}
+
+jobs:
+  proof:
+    if: github.head_ref == 'proof/cf-image-signature-gates'
+    permissions:
+      contents: read
+    uses: ./.github/workflows/signature-contract-proof-reusable.yml

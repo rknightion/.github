@@ -1,0 +1,72 @@
+name: Verify the image signature contract
+
+on:
+  workflow_call:
+
+permissions: {}
+
+jobs:
+  verify:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 8
+    permissions:
+      contents: read
+    steps:
+      - name: Check the native reusable context
+        env:
+          WORKFLOW_REF: ${{ fromJSON(toJSON(job)).workflow_ref }}
+          WORKFLOW_SHA: ${{ fromJSON(toJSON(job)).workflow_sha }}
+        run: |
+          set -euo pipefail
+          [[ "${WORKFLOW_REF%@*}" == "$GITHUB_REPOSITORY/.github/workflows/signature-contract-proof-reusable.yml" ]]
+          [[ "${WORKFLOW_REF##*@}" == "$GITHUB_REF" || "${WORKFLOW_REF##*@}" == "$GITHUB_SHA" ]]
+          [[ "$WORKFLOW_SHA" == "$GITHUB_SHA" && "$WORKFLOW_SHA" =~ ^[0-9a-f]{40}$ ]]
+          printf 'Defining reusable ref %s\nDefining reusable SHA %s\n' "$WORKFLOW_REF" "$WORKFLOW_SHA"
+
+      - name: Checkout proof source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+
+      - name: Install the pinned publisher Cosign
+        uses: sigstore/cosign-installer@6f9f17788090df1f26f669e9d70d6ae9567deba6 # v4.1.2
+
+      - name: Verify the exact production step without signing
+        env:
+          PRODUCTION_SHA: 30f74003ecaffd79e7b31f54c0bffeb013313142
+        run: |
+          set -euo pipefail
+          export SIGNATURE_PROOF_DIR="$RUNNER_TEMP/signature-contract"
+          export PRODUCTION_WORKFLOW="$SIGNATURE_PROOF_DIR/container-publish.yml"
+          export HOME="$SIGNATURE_PROOF_DIR/home" DOCKER_CONFIG="$SIGNATURE_PROOF_DIR/docker"
+          mkdir -p "$HOME" "$DOCKER_CONFIG"
+          git show "$PRODUCTION_SHA:.github/workflows/container-publish.yml" > "$PRODUCTION_WORKFLOW"
+          cmp "$PRODUCTION_WORKFLOW" .github/workflows/container-publish.yml
+          printf 'Production verifier source SHA %s\n' "$PRODUCTION_SHA"
+
+          index=c243ed01704178b718092e4414a0d8d957772a250c1c45aa4222d7b58d4a5171
+          artifact=6b7b0cfe0c08eb1e9892e06a8870ac292faa8c5e53564bb19efa0293691a3fdf
+          layer=74b7649e592d61341e1abac7945fd95b9dd84f426b2e2a2c7c05d29e8fbdd3b7
+          scope=$(curl -fsSL --get https://ghcr.io/token --data-urlencode service=ghcr.io \
+            --data-urlencode scope=repository:rknightion/cf2otel:pull | jq -er .token)
+          echo "::add-mask::$scope"
+          curl -fsSL -H "Authorization: Bearer $scope" -H 'Accept: application/vnd.oci.image.index.v1+json' \
+            "https://ghcr.io/v2/rknightion/cf2otel/manifests/sha256:$index" > "$SIGNATURE_PROOF_DIR/image.json"
+          curl -fsSL -H "Authorization: Bearer $scope" -H 'Accept: application/vnd.oci.image.manifest.v1+json' \
+            "https://ghcr.io/v2/rknightion/cf2otel/manifests/sha256:$artifact" > "$SIGNATURE_PROOF_DIR/attestation-artifact.json"
+          curl -fsSL -H "Authorization: Bearer $scope" \
+            "https://ghcr.io/v2/rknightion/cf2otel/blobs/sha256:$layer" > "$SIGNATURE_PROOF_DIR/bundle.json"
+          printf '%s  %s\n' "$index" "$SIGNATURE_PROOF_DIR/image.json" \
+            "$artifact" "$SIGNATURE_PROOF_DIR/attestation-artifact.json" \
+            "$layer" "$SIGNATURE_PROOF_DIR/bundle.json" | sha256sum -c
+
+          cosign verify \
+            --certificate-identity https://github.com/rknightion/.github/.github/workflows/container-publish.yml@3aee36ed9f327d9238e387c7af7da9ec5369a263 \
+            --certificate-oidc-issuer https://token.actions.githubusercontent.com \
+            --certificate-github-workflow-repository rknightion/cf2otel \
+            --certificate-github-workflow-ref refs/heads/main \
+            --certificate-github-workflow-sha 85bcc43550e48b6412591178827114f234a747e9 \
+            ghcr.io/rknightion/cf2otel@sha256:b3a42f3b9a461727d781cc3372fb02daddb9efc32bfa54b0a38143d31bc0b7ab \
+            > "$SIGNATURE_PROOF_DIR/authentic-signature.json"
+          python3 .github/signature-proof/probe.py
