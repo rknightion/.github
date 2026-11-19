@@ -72,6 +72,17 @@ This repo's task surface is a `justfile`. Discover it, don't guess it:
 - `scripts/cloud-environment-setup.sh` has deliberately **no** recipe. It is the cloud-environment
   setup phase's entry point and local agents must not run it.
 
+## Cursor Cloud specific instructions
+
+The pinned [environment](.cursor/environment.json) runs `just setup` with public
+package sources. The repository's [justfile](justfile) supplies the tool pins.
+
+- Run `just fmt-check check-vended </dev/null` for a fast check.
+- Run `just check </dev/null` for the full local gate. Review zizmor findings
+  even if the local lint command exits successfully.
+- Use hosted runs to validate reusable workflows, Linux and macOS binaries,
+  and the authenticated broker or publishing paths. Local tests use fixtures.
+
 ## Tracking work
 
 Work is tracked in this repository's GitHub issues; they are the only queue. Do not add a checklist
