@@ -155,7 +155,7 @@ class ContainerPublish(unittest.TestCase):
                 result = subprocess.run(
                     ["bash", "-euo", "pipefail", "-c", script],
                     env={"PATH": os.environ["PATH"], "RUNNER_TEMP": tmp, "GITHUB_OUTPUT": str(output)},
-                    capture_output=True, timeout=10,
+                    capture_output=True, check=False, timeout=10,
                 )
                 self.assertEqual(result.returncode == 0, expected == 0)
                 if expected == 0:
@@ -227,7 +227,7 @@ class ContainerPublish(unittest.TestCase):
                          "DIGEST": payload, "SIGNER_REF": signer + ref, "SIGNER_SHA": signer_sha,
                          "GITHUB_REPOSITORY": repository, "GITHUB_REF": branch, "GITHUB_SHA": revision,
                          "PROBE_CALLS": str(calls), "PROBE_CODES": json.dumps(codes), "PROBE_RESULT": output},
-                    capture_output=True, timeout=10,
+                    capture_output=True, check=False, timeout=10,
                 )
                 self.assertEqual(result.returncode, expected, result.stderr.decode())
                 recorded = [json.loads(line) for line in calls.read_text().splitlines()] if calls.exists() else []
