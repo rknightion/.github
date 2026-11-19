@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.30.11](https://github.com/rknightion/.github/compare/v1.30.10...v1.30.11) (2026-11-19)
+
+
+### Bug Fixes
+
+* verify shared container image signatures before reuse ([#253](https://github.com/rknightion/.github/issues/253)) ([889fa92](https://github.com/rknightion/.github/commit/889fa92b5aa078b3e7eb66f9f6a192069d063428)), closes [#250](https://github.com/rknightion/.github/issues/250)
+
 ## [1.30.10](https://github.com/rknightion/.github/compare/v1.30.9...v1.30.10) (2026-11-18)
 
 
