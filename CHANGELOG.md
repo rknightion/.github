@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.30.12](https://github.com/rknightion/.github/compare/v1.30.11...v1.30.12) (2026-11-19)
+
+
+### Miscellaneous
+
+* add Cursor Cloud environment ([#252](https://github.com/rknightion/.github/issues/252)) ([f43336a](https://github.com/rknightion/.github/commit/f43336a5ddbddd0b388f02bc8278eda76d2032cb))
+
 ## [1.30.11](https://github.com/rknightion/.github/compare/v1.30.10...v1.30.11) (2026-11-19)
 
 
