@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.30.19](https://github.com/rknightion/.github/compare/v1.30.18...v1.30.19) (2026-11-20)
+
+
+### Bug Fixes
+
+* **vend:** quote the pre-pr-review description and lint plain frontmatter values ([#287](https://github.com/rknightion/.github/issues/287)) ([f132643](https://github.com/rknightion/.github/commit/f132643e6658fe7781489869aa6aeaf0c76b6835))
+
 ## [1.30.18](https://github.com/rknightion/.github/compare/v1.30.17...v1.30.18) (2026-11-20)
 
 
