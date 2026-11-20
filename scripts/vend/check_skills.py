@@ -222,6 +222,7 @@ def check_skill(d: Path, names: dict[str, bool], out: list[str], terms: tuple[st
     if fm is None:
         out.append(f"{skill_md}:1: no frontmatter")
         return
+    plain_scalar_rules(skill_md, fm, out)
     meta = parse_frontmatter(fm)
     if meta.get("name") != d.name:
         out.append(f"{skill_md}:1: frontmatter name {meta.get('name')!r} must equal the dir name {d.name!r}")
@@ -350,6 +351,39 @@ def run(root: Path) -> list[str]:
                 for no, message in dead_references(as_path, text, consumer, conditional=True):
                     out.append(f"{p}:{no}: {message}")
     return out
+
+
+
+TOP_KEY = re.compile(r"^([A-Za-z0-9_-]+):(?:\s(.*))?$")
+
+
+def plain_scalar_rules(skill_md: Path, fm: list[str], out: list[str]) -> None:
+    """Flag a top-level plain (unquoted) value that a real YAML parser rejects or cuts short.
+
+    parse_frontmatter is lenient, but harnesses load frontmatter with a strict YAML parser: a plain
+    value holding ': ' is a nested mapping YAML forbids, and ' #' starts a comment that silently
+    drops the rest. Quoted, block (| or >) and flow ({ or [) values are left to their own rules.
+    """
+    plain = False
+    for no, line in enumerate(fm, start=2):
+        if not line.strip() or line.lstrip().startswith("#"):
+            continue
+        m = TOP_KEY.match(line)
+        if m:
+            value = (m.group(2) or "").strip()
+            plain = bool(value) and value[0] not in "'\"|>{[&*!"
+            if not plain:
+                continue
+        elif not (plain and line[:1] in (" ", "\t")):
+            plain = False
+            continue
+        else:
+            value = line.strip()
+        key = f"`{m.group(1)}` " if m else ""
+        if ": " in value or value.endswith(":"):
+            out.append(f"{skill_md}:{no}: frontmatter {key}plain value holds ': ', which is not valid YAML; quote it")
+        elif " #" in value:
+            out.append(f"{skill_md}:{no}: frontmatter {key}plain value holds ' #', which YAML reads as a comment; quote it")
 
 
 def main(argv: list[str] | None = None) -> int:
