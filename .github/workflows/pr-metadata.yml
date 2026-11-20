@@ -226,7 +226,7 @@ jobs:
         if: ${{ !cancelled() && steps.zizmor_pip.outcome == 'success' && steps.zizmor_pip.outputs.available != 'true' }}
         uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
         with:
-          python-version: '3.13'
+          python-version: '3.15'
 
       - name: Run Zizmor
         if: ${{ !cancelled() && steps.zizmor_pip.outcome == 'success' && (steps.zizmor_pip.outputs.available == 'true' || steps.zizmor_python.outcome == 'success') }}
