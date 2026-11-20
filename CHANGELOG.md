@@ -1,5 +1,14 @@
 # Changelog
 
+## [1.30.17](https://github.com/rknightion/.github/compare/v1.30.16...v1.30.17) (2026-11-20)
+
+
+### Build & CI
+
+* **deps:** update docker/login-action action to v4.8.0 ([#276](https://github.com/rknightion/.github/issues/276)) ([6efc17a](https://github.com/rknightion/.github/commit/6efc17a372004ad915e017265070bed10ca4b759))
+* **deps:** update ghcr.io/zizmorcore/zizmor docker tag to v1.32.0 ([#277](https://github.com/rknightion/.github/issues/277)) ([75ade48](https://github.com/rknightion/.github/commit/75ade484c40ee9283e1a03c4db88dd7a7260ca39))
+* **deps:** update ossf/scorecard-action action to v2.6.0 ([#278](https://github.com/rknightion/.github/issues/278)) ([4b705f8](https://github.com/rknightion/.github/commit/4b705f83b80b06a0e96db015b90dfecb80d76c1e))
+
 ## [1.30.16](https://github.com/rknightion/.github/compare/v1.30.15...v1.30.16) (2026-11-20)
 
 
