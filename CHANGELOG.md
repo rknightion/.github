@@ -1,5 +1,15 @@
 # Changelog
 
+## [1.30.13](https://github.com/rknightion/.github/compare/v1.30.12...v1.30.13) (2026-11-20)
+
+
+### Build & CI
+
+* **deps:** update actions/dependency-review-action action to v5.0.1 ([#257](https://github.com/rknightion/.github/issues/257)) ([56ea682](https://github.com/rknightion/.github/commit/56ea682cf71a8692e9a372280084d6e162c972be))
+* **deps:** update github/codeql-action action to v4.39.3 ([#258](https://github.com/rknightion/.github/issues/258)) ([ae67d9f](https://github.com/rknightion/.github/commit/ae67d9fc5419d45ba828de8eb2c5aa7e765a0c93))
+* **deps:** update oras-project/setup-oras action to v2.0.4 ([#259](https://github.com/rknightion/.github/issues/259)) ([db6b956](https://github.com/rknightion/.github/commit/db6b956217224506e4dd48bebfe866c26b9fa605))
+* **deps:** update sigstore/cosign-installer action to v4.1.3 ([#260](https://github.com/rknightion/.github/issues/260)) ([533c106](https://github.com/rknightion/.github/commit/533c106931d9957525517c995e470ce54bf58922))
+
 ## [1.30.12](https://github.com/rknightion/.github/compare/v1.30.11...v1.30.12) (2026-11-19)
 
 
