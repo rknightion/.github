@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.30.22](https://github.com/rknightion/.github/compare/v1.30.21...v1.30.22) (2026-11-20)
+
+
+### Documentation
+
+* name the fast pre-push gate and the retarget remedy ([#293](https://github.com/rknightion/.github/issues/293)) ([e1ad29c](https://github.com/rknightion/.github/commit/e1ad29cb99d1cc1004a72b78fefbe2342d2c410d))
+
 ## [1.30.21](https://github.com/rknightion/.github/compare/v1.30.20...v1.30.21) (2026-11-20)
 
 
