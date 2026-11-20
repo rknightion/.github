@@ -1,5 +1,14 @@
 # Changelog
 
+## [1.30.14](https://github.com/rknightion/.github/compare/v1.30.13...v1.30.14) (2026-11-20)
+
+
+### Build & CI
+
+* **deps:** update actions/setup-go action to v7.1.0 ([#264](https://github.com/rknightion/.github/issues/264)) ([48010fa](https://github.com/rknightion/.github/commit/48010fae7cb90fd0004ab03e4a4dd952a8b2a2c6))
+* **deps:** update actions/setup-node action to v7.1.0 ([#265](https://github.com/rknightion/.github/issues/265)) ([4a2c95f](https://github.com/rknightion/.github/commit/4a2c95f8fadecbf6d8b9af18b4ed5864eae5bdd7))
+* **deps:** update zizmorcore/zizmor-action action to v0.8.1 ([#263](https://github.com/rknightion/.github/issues/263)) ([3ea101e](https://github.com/rknightion/.github/commit/3ea101eedadbdccc94f2efca2ef59ca71a3084f3))
+
 ## [1.30.13](https://github.com/rknightion/.github/compare/v1.30.12...v1.30.13) (2026-11-20)
 
 
