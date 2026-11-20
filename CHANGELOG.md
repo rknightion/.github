@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.30.16](https://github.com/rknightion/.github/compare/v1.30.15...v1.30.16) (2026-11-20)
+
+
+### Build & CI
+
+* **deps:** update dependency python to 3.15 ([#273](https://github.com/rknightion/.github/issues/273)) ([a2a21b7](https://github.com/rknightion/.github/commit/a2a21b7feb71ac5f0bf03e031f6a0e9906ec01dc))
+* **deps:** update dependency zizmor to v1.32.0 ([#274](https://github.com/rknightion/.github/issues/274)) ([894da44](https://github.com/rknightion/.github/commit/894da44aae621af3dee3ead6f2a22e761550b6a7))
+
 ## [1.30.15](https://github.com/rknightion/.github/compare/v1.30.14...v1.30.15) (2026-11-20)
 
 
