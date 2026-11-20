@@ -1,5 +1,14 @@
 # Changelog
 
+## [1.30.15](https://github.com/rknightion/.github/compare/v1.30.14...v1.30.15) (2026-11-20)
+
+
+### Build & CI
+
+* **deps:** update actions/setup-python action to v7.1.0 ([#267](https://github.com/rknightion/.github/issues/267)) ([a23e9f7](https://github.com/rknightion/.github/commit/a23e9f7ff04e5717433cbced857dd12742dd99ec))
+* **deps:** update azure/setup-helm action to v5.1.0 ([#268](https://github.com/rknightion/.github/issues/268)) ([33b0e4c](https://github.com/rknightion/.github/commit/33b0e4c8bc2925cb74d9ca4f8e962c87f102d5f9))
+* **deps:** update dependency goreleaser/goreleaser to v2.20.3 ([#269](https://github.com/rknightion/.github/issues/269)) ([1959753](https://github.com/rknightion/.github/commit/1959753b652b78a0e608047fe8e2b55cbb567c2e))
+
 ## [1.30.14](https://github.com/rknightion/.github/compare/v1.30.13...v1.30.14) (2026-11-20)
 
 
