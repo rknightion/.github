@@ -1,5 +1,15 @@
 # Changelog
 
+## [1.30.18](https://github.com/rknightion/.github/compare/v1.30.17...v1.30.18) (2026-11-20)
+
+
+### Build & CI
+
+* **deps:** update github/codeql-action action to v4.39.4 ([#282](https://github.com/rknightion/.github/issues/282)) ([eab3c9e](https://github.com/rknightion/.github/commit/eab3c9e56616f126c741c57f24d097a8889aabc7))
+* **deps:** update rknightion/.github action to v1.30.14 ([#283](https://github.com/rknightion/.github/issues/283)) ([e5536a7](https://github.com/rknightion/.github/commit/e5536a7da4ec7e414eddd9f76c90e11ac2670389))
+* **deps:** update rknightion/.github action to v1.30.15 ([#284](https://github.com/rknightion/.github/issues/284)) ([4d4de07](https://github.com/rknightion/.github/commit/4d4de0735c22550f97786663aa491db90c9ee917))
+* **deps:** update step-security/harden-runner action to v2.23.0 ([#285](https://github.com/rknightion/.github/issues/285)) ([c7b905d](https://github.com/rknightion/.github/commit/c7b905db26170ae1534d1b27ee22139a4da8b4e3))
+
 ## [1.30.17](https://github.com/rknightion/.github/compare/v1.30.16...v1.30.17) (2026-11-20)
 
 
