@@ -129,6 +129,19 @@ class TestStructure(LintCase):
         self.add_skill("nodesc-skill", description="")
         self.assertFinding("description is missing or empty")
 
+    def test_plain_description_with_colon_space_is_invalid_yaml(self) -> None:
+        self.add_skill("colon-skill", description="Review a diff. Not for proving work is done: AGENTS.md covers it.")
+        self.assertFinding("not valid YAML")
+
+    def test_plain_value_with_space_hash_is_cut_short(self) -> None:
+        self.add_skill("hash-skill", description="Check a change #1 thing")
+        self.assertFinding("reads as a comment")
+
+    def test_quoted_description_with_colon_space_passes(self) -> None:
+        self.add_skill("quoted-skill", description='"Not for proving work is done: AGENTS.md covers it."')
+        rc, out = self.lint()
+        self.assertEqual(rc, 0, out)
+
     def test_bad_license(self) -> None:
         self.add_skill("gpl-skill", license="GPL-3.0")
         self.assertFinding("license must be MIT or Apache-2.0")
