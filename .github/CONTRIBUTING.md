@@ -5,8 +5,11 @@ repository has one, or an `AGENTS.md`, that file wins.
 
 - Outside contributors: fork the repository and work on a branch of your fork. Tick "Allow edits by
   maintainers" when you open the pull request.
-- Run `just setup` once, then `just check` before you push, where the repository has a `justfile`.
-  Say in the pull request what you ran and what you could not run.
+- Run `just setup` once, where the repository has a `justfile`. Before you push, run `just
+  check-fast` if the `justfile` has that recipe, otherwise `just check`. Say in the pull request
+  what you ran and what you left to CI.
+- After changing a pull request's base branch, push a commit or run `gh pr update-branch`: the
+  required workflow does not restart for a base change.
 - The pull request title is a Conventional Commit subject (`fix: ...`, `feat: ...`), using a type
   from the repository's `release-please-config.json`.
 - Say how the pull request relates to an issue, on a line of its own: `Refs #N` when it works on
