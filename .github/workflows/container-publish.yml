@@ -20,6 +20,10 @@ on:
         description: "Release tag (vX.Y.Z) when invoked by release-please; empty for edge builds"
         type: string
         default: ""
+      publish-branch-tags-on-prerelease:
+        description: "Publish branch-derived tags on hyphenated release tags; set false to publish only version tags"
+        type: boolean
+        default: true
       image-name:
         description: "Image repository under ghcr.io/<owner>; empty publishes <owner>/<repo>"
         type: string
@@ -349,8 +353,8 @@ jobs:
         with:
           images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
           tags: |
-            type=ref,event=branch
-            type=sha,prefix={{branch}}-,enable={{is_default_branch}}
+            type=ref,event=branch,enable=${{ inputs.publish-branch-tags-on-prerelease || !contains(inputs.release-tag, '-') }}
+            type=sha,prefix={{branch}}-,enable=${{ (inputs.publish-branch-tags-on-prerelease || !contains(inputs.release-tag, '-')) && '{{is_default_branch}}' || 'false' }}
             type=semver,pattern={{version}},value=${{ inputs.release-tag }},enable=${{ inputs.release-tag != '' }}
             type=semver,pattern={{major}}.{{minor}},value=${{ inputs.release-tag }},enable=${{ inputs.release-tag != '' }}
             type=semver,pattern={{major}},value=${{ inputs.release-tag }},enable=${{ inputs.release-tag != '' }}
