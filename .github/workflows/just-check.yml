@@ -78,7 +78,7 @@ jobs:
           persist-credentials: false
 
       - name: Set up just
-        uses: rknightion/.github/.github/actions/setup-just@23bab39d89d6688e10ed593fdd955963bba4822f # v1.30.25
+        uses: rknightion/.github/.github/actions/setup-just@6368cfb938f61a7f307c84215a79b9d1aafff25b # v1.30.26
         with:
           just-version: ${{ inputs.just-version }}
 
