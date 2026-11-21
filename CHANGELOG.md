@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.31.0](https://github.com/rknightion/.github/compare/v1.30.36...v1.31.0) (2026-11-21)
+
+
+### Features
+
+* allow callers to suppress branch tags on prereleases ([c70ab6e](https://github.com/rknightion/.github/commit/c70ab6eca493b032d2efe284792964458099d6fc)), closes [#1113](https://github.com/rknightion/.github/issues/1113)
+
 ## [1.30.36](https://github.com/rknightion/.github/compare/v1.30.35...v1.30.36) (2026-11-21)
 
 
