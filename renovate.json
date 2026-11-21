@@ -8,6 +8,13 @@
       "matchManagers": ["github-actions", "custom.regex"],
       "semanticCommitType": "build",
       "semanticCommitScope": "deps"
+    },
+    {
+      "description": "Except the hub's own pins. Releasing a bump of rknightion/.github cuts the release that Renovate bumps next, an endless hourly loop that every consumer then picks up. Commit them as the hidden `pin` type (release-please-config.json), so they ride along with the next real release instead. Must follow the build(deps) rule, which it overrides.",
+      "matchManagers": ["github-actions"],
+      "matchDepNames": ["rknightion/.github"],
+      "semanticCommitType": "pin",
+      "semanticCommitScope": "self"
     }
   ],
   "customManagers": [

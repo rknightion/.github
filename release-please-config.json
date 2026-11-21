@@ -19,7 +19,8 @@
         { "type": "docs", "section": "Documentation" },
         { "type": "test", "section": "Testing", "hidden": true },
         { "type": "chore", "section": "Miscellaneous" },
-        { "type": "style", "section": "Styles", "hidden": true }
+        { "type": "style", "section": "Styles", "hidden": true },
+        { "type": "pin", "section": "Hub self-pins", "hidden": true }
       ]
     }
   }
