@@ -128,6 +128,18 @@ class ContainerPublish(unittest.TestCase):
                     self.assertEqual(effective(tag, opt_in, True), expected)
                     self.assertEqual(effective(tag, opt_in, False), expected - {'main-abcdef0'})
 
+    def test_image_sha_tag_matches_snapshot_chart_app_version(self):
+        # The snapshot chart's appVersion is main-<first 12 hex of the commit>; the
+        # image sha tag must be the same length, or the chart's default image tag
+        # names an image that was never pushed.
+        metadata = step(self.merge, 'Extract Docker metadata (tags)')
+        length = re.search(r'(?m)^          DOCKER_METADATA_SHORT_SHA_LENGTH: "?(\d+)"?$', metadata)
+        self.assertIsNotNone(length, 'metadata step does not set DOCKER_METADATA_SHORT_SHA_LENGTH')
+        chart = re.search(r'short="\$\{SHORT_SHA:0:(\d+)\}"', self.workflow)
+        self.assertIsNotNone(chart, 'snapshot chart short sha not found')
+        self.assertRegex(self.workflow, r'appversion="main-\$\{short\}"')
+        self.assertEqual(length.group(1), chart.group(1))
+
     def test_stable_release_uses_exact_semver_label(self):
         for tag in ("v0.0.0", "v2.14.7", "v10.200.300", "3.2.1"):
             with self.subTest(tag=tag):
