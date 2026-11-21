@@ -74,6 +74,60 @@ class ContainerPublish(unittest.TestCase):
             )
             return dict(line.split("=", 1) for line in output.read_text().splitlines())
 
+    def test_branch_tag_input_and_effective_rules(self):
+        # Interpret the actual enable expressions and metadata rules, not a copy of the
+        # proposed condition. The pinned metadata action is additionally exercised offline
+        # in the lane evidence against these same rendered rules.
+        declaration = re.search(r'^      publish-branch-tags-on-prerelease:\n((?:^        .*\n)+)', self.workflow, re.M)
+        self.assertIsNotNone(declaration, 'missing workflow_call input')
+        self.assertRegex(declaration.group(1), r'(?m)^        type: boolean$')
+        self.assertRegex(declaration.group(1), r'(?m)^        default: true$')
+        metadata = step(self.merge, 'Extract Docker metadata (tags)')
+        rules = re.search(r'^          tags: \|\n((?:^            .*\n)+)', metadata, re.M).group(1).splitlines()
+
+        def effective(tag, opt_in, default_branch):
+            def expression(match):
+                expr = match.group(1).strip()
+                expr = re.sub(r'contains\(inputs\.release-tag,\s*\'-\'\)', str('-' in tag), expr)
+                expr = expr.replace('inputs.release-tag', repr(tag))
+                expr = expr.replace('inputs.publish-branch-tags-on-prerelease', str(opt_in))
+                expr = expr.replace('&&', ' and ').replace('||', ' or ')
+                expr = re.sub(r'!(?!=)', ' not ', expr)
+                self.assertRegex(expr, r"^[A-Za-z0-9_. '{}\"!=() -]+$")
+                return str(eval(expr.strip(), {'__builtins__': {}}, {})).lower()
+            result = set()
+            for line in rules:
+                line = re.sub(r'\$\{\{\s+(.*?)\s+\}\}', expression, line.strip())
+                fields = dict(field.split('=', 1) for field in line.split(','))
+                enabled = fields.get('enable', 'true').replace('{{is_default_branch}}', str(default_branch).lower())
+                if enabled != 'true':
+                    continue
+                kind = fields['type']
+                if kind == 'ref':
+                    result.add('main')
+                elif kind == 'sha':
+                    result.add('main-abcdef0')
+                elif kind == 'raw':
+                    result.add(fields['value'])
+                elif kind == 'semver' and tag:
+                    version = tag.removeprefix('v')
+                    pattern = fields['pattern']
+                    # metadata-action emits only full version for prereleases.
+                    if '-' in version and pattern != '{{version}}':
+                        continue
+                    parts = version.split('.')
+                    result.add({'{{version}}': version, '{{major}}.{{minor}}': '.'.join(parts[:2]),
+                                '{{major}}': parts[0]}[pattern])
+            return result
+
+        for opt_in in (True, False):
+            for tag, expected in (('', {'main', 'main-abcdef0'}),
+                                  ('v2.3.4', {'main', 'main-abcdef0', '2.3.4', '2.3', '2', 'latest'}),
+                                  ('v2.3.4-rc.1', {'2.3.4-rc.1'} | ({'main', 'main-abcdef0'} if opt_in else set()))):
+                with self.subTest(opt_in=opt_in, tag=tag):
+                    self.assertEqual(effective(tag, opt_in, True), expected)
+                    self.assertEqual(effective(tag, opt_in, False), expected - {'main-abcdef0'})
+
     def test_stable_release_uses_exact_semver_label(self):
         for tag in ("v0.0.0", "v2.14.7", "v10.200.300", "3.2.1"):
             with self.subTest(tag=tag):
