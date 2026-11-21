@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.30.36](https://github.com/rknightion/.github/compare/v1.30.35...v1.30.36) (2026-11-21)
+
+
+### Build & CI
+
+* **renovate:** stop hub self-pin bumps cutting releases ([#322](https://github.com/rknightion/.github/issues/322)) ([09f8003](https://github.com/rknightion/.github/commit/09f80037496a32c28084fad3a2682c1da2b7525c))
+
 ## [1.30.35](https://github.com/rknightion/.github/compare/v1.30.34...v1.30.35) (2026-11-21)
 
 
