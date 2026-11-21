@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.30.29](https://github.com/rknightion/.github/compare/v1.30.28...v1.30.29) (2026-11-21)
+
+
+### Build & CI
+
+* **deps:** update rknightion/.github action to v1.30.25 ([#307](https://github.com/rknightion/.github/issues/307)) ([c09747f](https://github.com/rknightion/.github/commit/c09747fcee8ade1e112ec69c79ada6576a0274ab))
+
 ## [1.30.28](https://github.com/rknightion/.github/compare/v1.30.27...v1.30.28) (2026-11-21)
 
 
