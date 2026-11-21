@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.31.1](https://github.com/rknightion/.github/compare/v1.31.0...v1.31.1) (2026-11-21)
+
+
+### Bug Fixes
+
+* **container-publish:** tag images with a 12-character sha to match the snapshot chart ([#330](https://github.com/rknightion/.github/issues/330)) ([6cbd368](https://github.com/rknightion/.github/commit/6cbd3682cd2d7f3352311be5c73d0b50be00938e))
+
 ## [1.31.0](https://github.com/rknightion/.github/compare/v1.30.36...v1.31.0) (2026-11-21)
 
 
