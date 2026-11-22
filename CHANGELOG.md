@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.31.9](https://github.com/rknightion/.github/compare/v1.31.8...v1.31.9) (2026-11-22)
+
+
+### Build & CI
+
+* **deps:** update ghcr.io/zizmorcore/zizmor docker tag to v1.33.1 ([#351](https://github.com/rknightion/.github/issues/351)) ([b416b1f](https://github.com/rknightion/.github/commit/b416b1fb830617771f75a424516205645e9f258b))
+
 ## [1.31.8](https://github.com/rknightion/.github/compare/v1.31.7...v1.31.8) (2026-11-22)
 
 
