@@ -131,7 +131,7 @@ jobs:
       # so a live cache is never this old; a quiet repo keeps its cache for a
       # month. Superseded cache manifests go untagged and fall to Prune orphans.
       - name: Prune abandoned buildcache
-        uses: dataaxiom/ghcr-cleanup-action@d52806a0dc70b430571a37da1fde39733ffd640f # v1.2.2
+        uses: dataaxiom/ghcr-cleanup-action@ac45a8c04b1eb4b27974ca79a0a74f344c93664b # v1.3.0
         with:
           token: ${{ github.token }}
           packages: ${{ inputs.packages }}
@@ -146,7 +146,7 @@ jobs:
       # Edge images from ordinary pushes to main. `main` itself is never deleted
       # (it is the moving edge pointer); only the pinned main-<sha> history is.
       - name: Prune old edge images
-        uses: dataaxiom/ghcr-cleanup-action@d52806a0dc70b430571a37da1fde39733ffd640f # v1.2.2
+        uses: dataaxiom/ghcr-cleanup-action@ac45a8c04b1eb4b27974ca79a0a74f344c93664b # v1.3.0
         with:
           token: ${{ github.token }}
           packages: ${{ inputs.packages }}
@@ -162,7 +162,7 @@ jobs:
       # images above, and the single biggest retention leak before this step
       # existed: nothing else here matches `0.0.0-main.t<epoch>.g<sha>`.
       - name: Prune old dev chart versions
-        uses: dataaxiom/ghcr-cleanup-action@d52806a0dc70b430571a37da1fde39733ffd640f # v1.2.2
+        uses: dataaxiom/ghcr-cleanup-action@ac45a8c04b1eb4b27974ca79a0a74f344c93664b # v1.3.0
         with:
           token: ${{ github.token }}
           packages: ${{ inputs.packages }}
@@ -177,7 +177,7 @@ jobs:
       # Release candidates: keep the newest N, drop the rest. Stable tags are
       # excluded by the glob -- `*-rc.*` cannot match vX.Y.Z, X.Y, X or latest.
       - name: Prune old release candidates
-        uses: dataaxiom/ghcr-cleanup-action@d52806a0dc70b430571a37da1fde39733ffd640f # v1.2.2
+        uses: dataaxiom/ghcr-cleanup-action@ac45a8c04b1eb4b27974ca79a0a74f344c93664b # v1.3.0
         with:
           token: ${{ github.token }}
           packages: ${{ inputs.packages }}
@@ -193,7 +193,7 @@ jobs:
       # cosign sha256- signatures whose subject digest is already gone. Runs last
       # so the earlier steps' orphans are swept in the same pass.
       - name: Prune orphans
-        uses: dataaxiom/ghcr-cleanup-action@d52806a0dc70b430571a37da1fde39733ffd640f # v1.2.2
+        uses: dataaxiom/ghcr-cleanup-action@ac45a8c04b1eb4b27974ca79a0a74f344c93664b # v1.3.0
         with:
           token: ${{ github.token }}
           packages: ${{ inputs.packages }}
