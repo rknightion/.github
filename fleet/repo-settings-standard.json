@@ -299,6 +299,13 @@
         "bypass_mode": "always"
       }
     ],
+    "tracker_bypass_actors": [
+      {
+        "actor_type": "RepositoryRole",
+        "actor_id": 5,
+        "bypass_mode": "pull_request"
+      }
+    ],
     "allowed_merge_methods": [
       "merge",
       "squash",

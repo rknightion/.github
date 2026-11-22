@@ -20,6 +20,9 @@ Safety rules, each one a way this could otherwise break the fleet:
   bypass actors are removed from every default-branch ruleset, and any other
   bypass actor is reported, not removed. `landing: pr` alone does not count:
   such a repo still pushes board-only commits straight to main.
+- `tracker_bypass_actors` (the admin role, bypass_mode pull_request only) goes
+  back on every tracker ruleset a merge can hit, so an admin can still merge
+  a pull request past a failing or stuck check but can never push to main.
 - `tracker_bypass_allow` names, per tracker repo, writers that keep pushing
   straight to main after cutover (validated before anything runs; the admin
   role only for a repo in `tracker_bypass_allow_admin`). A bypass covers a
@@ -512,10 +515,36 @@ def validate_standard(std: dict) -> None:
             if is_standard_bypass(a, std) and full not in admin_ok:
                 raise ValueError(f"{where}: the standard admin bypass is allowed only for a repo named in "
                                  f"rulesets.tracker_bypass_allow_admin: {a!r}")
+    pr = rcfg.get("tracker_bypass_actors")
+    pr = [] if pr is None else pr
+    if not isinstance(pr, list):
+        raise ValueError("rulesets.tracker_bypass_actors must be a list of actors")
+    for a in pr:
+        if not isinstance(a, dict) or set(a) != {"actor_type", "actor_id", "bypass_mode"} \
+                or a["actor_type"] not in ALLOW_ACTOR_TYPES or type(a["actor_id"]) is not int:
+            raise ValueError(f"rulesets.tracker_bypass_actors: each actor needs exactly actor_type, an integer "
+                             f"actor_id and bypass_mode: {a!r}")
+        if a["bypass_mode"] != "pull_request":  # a tracker repo never takes a direct push
+            raise ValueError(f"rulesets.tracker_bypass_actors: bypass_mode must be pull_request: {a!r}")
     for full in admin_ok:  # entries are well formed by now
         if not any(is_standard_bypass(a, std) for a in allow.get(full) or []):
             raise ValueError(f"rulesets.tracker_bypass_allow_admin: {full!r} must also list the admin "
                              "bypass in tracker_bypass_allow")
+
+
+def tracker_pr_actors(std: dict, full: str) -> list[dict]:
+    """Bypass actors every tracker repo gets on each default-branch ruleset that can block a merge,
+    at bypass_mode pull_request: they can merge a pull request past a failing check but can never
+    push to the branch, so deletion and force-push rules still bind them and nothing is split. An
+    actor the repo's tracker_bypass_allow already lists keeps that entry instead."""
+    allow = tracker_allow(std, full)
+    return [dict(a) for a in std["rulesets"].get("tracker_bypass_actors") or []
+            if not any(same_actor(a, w) for w in allow)]
+
+
+def with_pr_actors(actors: list[dict], rs: dict, pr: list[dict]) -> list[dict]:
+    """actors plus the tracker pull-request bypass, where the ruleset has a rule a merge can hit."""
+    return ensure_actors(actors, pr) if pr and rule_types(rs) - set(HISTORY_RULES) else actors
 
 
 def history_covered(rs: dict, default_branch: str | None) -> bool:
@@ -604,7 +633,7 @@ def ruleset_body(rs: dict) -> dict:
 
 def reconcile_main_ruleset(existing: dict | None, gated: bool, std: dict, tracker: bool = False,
                            add_bypass: bool = True, allow: list[dict] = (), split: bool | None = None,
-                           drop: list[dict] = (), keep_live: list[dict] = ()) -> dict:
+                           drop: list[dict] = (), keep_live: list[dict] = (), pr: list[dict] = ()) -> dict:
     """Desired ruleset body: the standard as a floor over whatever exists.
 
     tracker: the repo lands only by pull request, so the standard's bypass actors are removed
@@ -613,7 +642,7 @@ def reconcile_main_ruleset(existing: dict | None, gated: bool, std: dict, tracke
     history rules (deletion, non_fast_forward) are dropped here: a bypass would exempt the allowed
     actors from them, so they live on the no-bypass history ruleset (history_ruleset_body) instead.
     add_bypass=False: the target is a second ruleset the aligner does not own; leave its bypass
-    list exactly as it is."""
+    list exactly as it is. pr (tracker_pr_actors) is ensured on a tracker ruleset a merge can hit."""
     rcfg, check = std["rulesets"], std["required_check"]
     body = {
         "name": (existing or {}).get("name") or rcfg["main_name"],
@@ -666,6 +695,8 @@ def reconcile_main_ruleset(existing: dict | None, gated: bool, std: dict, tracke
             checks.append({"context": check["context"], "integration_id": check["integration_id"]})
         for c in mine:  # bound to the GitHub Actions app, so no other app or status can satisfy it
             c["integration_id"] = check["integration_id"]
+    if tracker:
+        body["bypass_actors"] = with_pr_actors(body["bypass_actors"], body, pr)
     return body
 
 
@@ -1238,6 +1269,7 @@ class Aligner:
         detailed = [self.gh.get(f"/repos/{full}/rulesets/{r['id']}")[1] for r in listed]
         tracker = self.is_tracker_repo(full)
         allow = tracker_allow(self.std, full) if tracker else []
+        pr = tracker_pr_actors(self.std, full) if tracker else []
         hname = self.std["rulesets"]["history_name"]
         named, can_split = None, False
         if allow:  # the aligner owns a companion with the history name outright
@@ -1289,22 +1321,24 @@ class Aligner:
             main, add_ci, self.std, tracker, add_bypass=owned,
             allow=allow if plan in ("split", "add") else [], split=plan == "split",
             drop=allow if plan == "skip" and set(HISTORY_RULES) & rule_types(floor) else [],
-            keep_live=allow if plan == "conflict" else [])
+            keep_live=allow if plan == "conflict" else [], pr=pr)
         added_check = self.expand_required_check(repo, main, want)
         if main is None:
             self.gh.write("POST", f"/repos/{full}/rulesets", want)
             self.change(full, "rulesets", f"created '{want['name']}' ({'gated' if gated else 'base'})")
         elif normalise_ruleset(want) != normalise_ruleset(main):
             self.gh.write("PUT", f"/repos/{full}/rulesets/{main['id']}", want)
-            admin_kept = any(is_standard_bypass(a, self.std) for a in want["bypass_actors"])
+            admin = next((a.get("bypass_mode") for a in want["bypass_actors"] if is_standard_bypass(a, self.std)), None)
             self.change(full, "rulesets", f"updated '{want['name']}' ({'gated' if gated else 'base'} floor"
                         + (f", added required check {added_check}" if added_check else "")
-                        + ((", tracker repo: allowed admin bypass" if admin_kept else ", tracker repo: no admin bypass")
+                        + ((", tracker repo: " + {None: "no admin bypass", "pull_request": "admin bypass on pull "
+                                                  "requests only"}.get(admin, "allowed admin bypass"))
                            if tracker else "")
-                        + {"split": ", allowed bypass actors, history rules moved off)",
+                        + {"split": ", allowed bypass actors"
+                           + (", history rules moved off)" if rule_types(main) & set(HISTORY_RULES) else ")"),
                            "add": ", allowed bypass actors)"}.get(plan, ")"))
         if tracker:
-            self.strip_tracker_bypass(full, others, want, allow, db, can_split)
+            self.strip_tracker_bypass(full, others, want, allow, db, can_split, pr)
         if allow:
             self.report_unreached(full, detailed, db)
         if cfg.get("release_tags"):
@@ -1357,15 +1391,16 @@ class Aligner:
                              "it and their pushes may be refused")
 
     def strip_tracker_bypass(self, full: str, others: list[dict], main_want: dict, allow: list[dict] = (),
-                             default_branch: str | None = None, can_split: bool = False):
+                             default_branch: str | None = None, can_split: bool = False, pr: list[dict] = ()):
         """Tracker repos: remove the standard's bypass actors from every other default-branch
         ruleset too, and report any bypass actor left, which a human has to decide on. The repo's
         allowed actors go on every one that can block an ordinary push (a push must clear every
         ruleset) and are never reported; history rules move to the no-bypass history ruleset only
-        from rulesets it fully covers (allow_plan)."""
+        from rulesets it fully covers (allow_plan). The pull-request-only bypass (pr) goes on every one a
+        merge can hit and is never reported either."""
         def key(a):
             return f"{a.get('actor_type')}:{a.get('actor_id')}"
-        allowed = {key(a) for a in allow}
+        allowed = {key(a) for a in list(allow) + list(pr)}
         left = {key(a) for a in main_want.get("bypass_actors") or []}
         for r in others:
             actors = r.get("bypass_actors") or []
@@ -1379,6 +1414,7 @@ class Aligner:
             else:
                 keep = plan_actors(stripped, allow, plan,
                                    bool(rule_types(r) & set(HISTORY_RULES)))
+            keep = with_pr_actors(keep, r, pr)
             left |= {key(a) for a in keep}
             rules = r.get("rules") or []
             rules_keep = [x for x in rules if not isinstance(x, dict) or x.get("type") not in HISTORY_RULES] \
@@ -1389,13 +1425,18 @@ class Aligner:
                 body["bypass_actors"] = keep
                 body["rules"] = json.loads(json.dumps(rules_keep))
                 self.gh.write("PUT", f"/repos/{full}/rulesets/{r['id']}", body)
-                admin_gone = any(is_standard_bypass(a, self.std) for a in actors) \
-                    and not any(is_standard_bypass(a, self.std) for a in keep)
-                what = (["removed admin bypass from"] if admin_gone else []) \
-                    + (["ensured allowed bypass actors on"] if len(keep) > len(stripped) or (keep != stripped
-                       and len(keep) == len(stripped)) else []) \
+                def admin_mode(xs):
+                    return next((a.get("bypass_mode") for a in xs if is_standard_bypass(a, self.std)), None)
+                was, now = admin_mode(actors), admin_mode(keep)
+                # the pr actors are their own change line; judge the allowed writers without them
+                keep_w = [a for a in keep if not any(same_actor(a, p) for p in pr)]
+                stripped = [a for a in stripped if not any(same_actor(a, p) for p in pr)]
+                what = (["removed admin bypass from"] if was and not now else []) \
+                    + (["set admin bypass to pull requests only on"] if now == "pull_request" != was else []) \
+                    + (["ensured allowed bypass actors on"] if len(keep_w) > len(stripped) or (keep_w != stripped
+                       and len(keep_w) == len(stripped)) else []) \
                     + (["removed allowed bypass actors exempt from history rules on"]
-                       if len(keep) < len(stripped) else []) \
+                       if len(keep_w) < len(stripped) else []) \
                     + (["moved history rules off"] if len(rules_keep) != len(rules) else [])
                 self.change(full, "rulesets", f"{' and '.join(what)} '{r.get('name')}' (tracker repo)")
         left -= allowed
