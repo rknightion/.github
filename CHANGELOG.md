@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.31.6](https://github.com/rknightion/.github/compare/v1.31.5...v1.31.6) (2026-11-22)
+
+
+### Build & CI
+
+* **deps:** update actions/github-script action to v9 ([#343](https://github.com/rknightion/.github/issues/343)) ([f3f3ad7](https://github.com/rknightion/.github/commit/f3f3ad749729fb640ddac7fd686a694625818ada))
+
 ## [1.31.5](https://github.com/rknightion/.github/compare/v1.31.4...v1.31.5) (2026-11-22)
 
 
