@@ -3,10 +3,6 @@ description: >-
   Install a pinned `just` command runner, so a workflow step can be a one-line
   `just <recipe>` call instead of carrying shell logic.
 
-# A wrapper, not a reimplementation. extractions/setup-just resolves the release
-# binary and puts it in the runner tool cache already (~2 MB, seconds), so an
-# extra actions/cache step buys nothing and is deliberately absent.
-#
 # The point of the wrapper is that the fleet's just VERSION is pinned in exactly
 # one place. `just --fmt` output is explicitly outside just's semver
 # compatibility guarantee, so an unpinned bump turns `just fmt-check` red across
@@ -20,8 +16,7 @@ inputs:
     default: "1.59.0"
   github-token:
     description: >-
-      Token used to fetch the release asset. Defaults to the job token; pass one
-      explicitly only if a runner hits an unauthenticated rate limit.
+      Retained for compatibility; public release downloads do not use a token.
     required: false
     default: ${{ github.token }}
 
@@ -29,7 +24,7 @@ runs:
   using: composite
   steps:
     # Enforce the "pin exactly" contract: a range, "latest" or an empty value
-    # would let extractions/setup-just float to whatever release is newest.
+    # would let the installer float to whatever release is newest.
     - name: Check the just version is an exact pin
       shell: bash
       env:
@@ -47,8 +42,70 @@ runs:
           echo "::error::just-version must be an exact X.Y.Z version, got '${shown}'"
           exit 1
         }
-    - uses: extractions/setup-just@53165ef7e734c5c07cb06b3c8e7b647c5aa16db3 # v4.0.0
+    - name: Install verified just release
+      id: install
+      shell: bash
+      env:
+        JUST_VERSION: ${{ inputs.just-version }}
+      run: |
+        case "$RUNNER_OS" in
+          Linux) platform=unknown-linux-musl ;;
+          macOS) platform=apple-darwin ;;
+          *) echo "::error::Unsupported runner OS: $RUNNER_OS"; exit 1 ;;
+        esac
+        case "$RUNNER_ARCH" in
+          X64) arch=x86_64 ;;
+          ARM64) arch=aarch64 ;;
+          *) echo "::error::Unsupported runner architecture: $RUNNER_ARCH"; exit 1 ;;
+        esac
+        asset="just-${JUST_VERSION}-${arch}-${platform}.tar.gz"
+        url="https://github.com/casey/just/releases/download/${JUST_VERSION}"
+        runner_temp=$(cd "$RUNNER_TEMP" && pwd -P)
+        case "$runner_temp" in
+          *$'\n'*|*$'\r'*) echo "::error::Runner temporary path contains a newline"; exit 1 ;;
+        esac
+        install_dir=$(mktemp -d "${runner_temp}/setup-just.XXXXXXXX")
+        trap 'rm -rf -- "$install_dir"' EXIT
+        cd "$install_dir"
+        if ! curl --retry 5 --retry-all-errors --retry-delay 2 --fail --location \
+          --output "$asset" "$url/$asset"; then
+          echo "::error::Failed to download $asset"
+          exit 1
+        fi
+        if ! curl --retry 5 --retry-all-errors --retry-delay 2 --fail --location \
+          --output SHA256SUMS "$url/SHA256SUMS"; then
+          echo "::error::Failed to download SHA256SUMS for just $JUST_VERSION"
+          exit 1
+        fi
+        awk -v asset="$asset" '$2 == asset { print }' SHA256SUMS > selected.sha256
+        if [[ $(wc -l < selected.sha256) -ne 1 ]]; then
+          echo "::error::Expected exactly one checksum for $asset"
+          exit 1
+        fi
+        if command -v sha256sum >/dev/null 2>&1; then
+          sha256sum -c selected.sha256
+        else
+          shasum -a 256 -c selected.sha256
+        fi
+        tar -xzf "$asset" just
+        if ! installed_version=$("$install_dir/just" --version); then
+          echo "::error::Downloaded just failed to report its version"
+          exit 1
+        fi
+        if [[ "$installed_version" != "just $JUST_VERSION" ]]; then
+          echo "::error::Downloaded just reports an unexpected version"
+          exit 1
+        fi
+        echo "$installed_version"
+        rm -f -- "$asset" SHA256SUMS selected.sha256
+        printf 'path=%s\n' "$install_dir" >> "$GITHUB_OUTPUT"
+        trap - EXIT
+    - name: Add just to PATH
+      uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd # v8
+      env:
+        JUST_INSTALL_DIR: ${{ steps.install.outputs.path }}
       with:
-        # zizmor flags the input expression itself; the step above refuses anything but an exact X.Y.Z.
-        just-version: ${{ inputs.just-version }} # zizmor: ignore[unpinned-tools]
-        github-token: ${{ inputs.github-token }}
+        # github-script requires a nonempty token even when no API is called.
+        github-token: unused
+        script: |
+          core.addPath(process.env.JUST_INSTALL_DIR)
