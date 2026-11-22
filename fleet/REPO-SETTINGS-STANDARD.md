@@ -133,9 +133,25 @@ are the sanctioned direct pushers; any other bypass actor
 already on its rulesets keeps working until a human removes it, and is reported (below)
 (`landing: pr` alone does not count: those repos still push board-only commits straight to main). There the aligner adds no admin bypass and removes the standard's own one from every
 default-branch ruleset, except as `tracker_bypass_allow_admin` below allows for a flagged repo. Any other bypass actor is left in place and reported as `tracker-bypass`
-for a human to decide. The key is read the way agent-docs `loop-lint` reads them (opening
+for a human to decide. The admin role then goes back on at `pull_request` only (below), so a pull
+request can still be merged past a failing check. The key is read the way agent-docs `loop-lint` reads them (opening
 `key: value` lines before the first `## `, fences skipped). An unreadable `LOOP.md` stops the
 rulesets pass for that repo rather than guessing.
+
+`rulesets.tracker_bypass_actors` in the JSON is the escape route every tracker repo keeps: today the
+admin role (`RepositoryRole` 5) at `bypass_mode: pull_request`. GitHub's "For pull requests only"
+bypass requires the actor to open a pull request and then lets them merge it past the ruleset's
+pull-request and status-check rules; it never lets them push to the branch. So a red, stuck or
+misconfigured required check never strands a pull request, while a direct push, a force-push and a
+branch deletion stay refused for everyone. Because the actor cannot push, the history rules need no
+split for it: it is ensured on every default-branch ruleset that has any rule besides `deletion` and
+`non_fast_forward` (a ruleset with only those has nothing a merge can hit, and gets none), the
+standard's own target included, conflict rulesets too, and an existing `always` admin entry is narrowed
+to `pull_request`. It is never reported as `tracker-bypass`. A repo whose `tracker_bypass_allow` lists
+the same actor (`m7kni/rkps-awsinfra`'s flagged admin) keeps that entry instead. Every entry needs
+exactly `actor_type`, an integer `actor_id` and `bypass_mode`, which must be `pull_request`; the
+aligner exits 2 otherwise. Bypassing is a deliberate act: the merge box says it bypasses the rules, and
+the audit log records it.
 
 `rulesets.tracker_bypass_allow` in the JSON is the per-repo exception to that: writers that keep
 pushing straight to `main` after a repo's issues and agents move to GitHub. A bypass covers a whole
@@ -215,8 +231,8 @@ Current entries:
 admin bypass (or adds a no-bypass pull-request ruleset), then `LOOP.md` declares `tracker: github`.
 In between the aligner still treats the repo as a Backlog repo, so a run may re-add the admin bypass
 to a ruleset named `main` (or the repo's only default-branch ruleset). That is expected; land the
-`LOOP.md` change promptly. After cutover the next run removes the admin bypass again and, for a listed
-repo, adds the allowed actors. On a repo in `tracker_bypass_allow_admin` the admin bypass is instead
+`LOOP.md` change promptly. After cutover the next run narrows the admin bypass to pull requests only
+(`tracker_bypass_actors`) and, for a listed repo, adds the allowed actors. On a repo in `tracker_bypass_allow_admin` the admin bypass is instead
 kept or added on rulesets the listed actors go on and kept as found on a conflict ruleset; it is
 removed from history-only rulesets and from rulesets with no rules at all.
 

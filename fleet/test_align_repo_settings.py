@@ -232,6 +232,16 @@ def tracker_gate(rid=20, bypass=()):
                           "required_status_checks": [{"context": "ci-success", "integration_id": 15368}]}}]}
 
 
+class WithoutTrackerPrBypass(unittest.TestCase):
+    """Pins the writer and history-rule handling that predates rulesets.tracker_bypass_actors, so
+    these tests run without it; TrackerPrBypass covers it on the same layouts."""
+
+    def setUp(self):
+        saved = STD["rulesets"].pop("tracker_bypass_actors", None)
+        if saved is not None:
+            self.addCleanup(STD["rulesets"].__setitem__, "tracker_bypass_actors", saved)
+
+
 EXPANSION_REPO = "rknightion/check-expansion-fixture"
 EXPANSION_BASE = "c" * 40
 METADATA = ".github/workflows/pr-metadata.yml"
@@ -329,7 +339,7 @@ class ExpansionGH(FakeGH):
         return status, body
 
 
-class RequiredCheckExpansion(unittest.TestCase):
+class RequiredCheckExpansion(WithoutTrackerPrBypass):
     def standard(self, enrolled=True):
         std = json.loads(json.dumps(STD))
         std["required_check"]["expansion"] = {
@@ -543,7 +553,7 @@ class LoopMd(unittest.TestCase):
         self.assertEqual(align.loopmd_tracker("# L\n~~~\n```\n~~~\ntracker: github\n"), "github")
 
 
-class TrackerRulesets(unittest.TestCase):
+class TrackerRulesets(WithoutTrackerPrBypass):
     def test_reconcile_removes_standard_bypass_keeps_others(self):
         rs = base_main(bypass=(ADMIN, APP))
         want = align.reconcile_main_ruleset(rs, True, STD, tracker=True)
@@ -684,7 +694,7 @@ def history_ruleset(rid=40, bypass=(), enforcement="active"):
             "rules": [{"type": "deletion"}, {"type": "non_fast_forward"}]}
 
 
-class TrackerBypassAllow(unittest.TestCase):
+class TrackerBypassAllow(WithoutTrackerPrBypass):
     """Per-repo machine writers that keep pushing straight to main on a tracker repo.
 
     A bypass covers a whole ruleset, so the writers may only sit on rulesets without deletion or
@@ -1096,7 +1106,7 @@ def factory_integrity(bypass=(ADMIN,)):
     return rs
 
 
-class FactoryAndAwsinfra(unittest.TestCase):
+class FactoryAndAwsinfra(WithoutTrackerPrBypass):
     """The two live layouts behind the factory and rkps-awsinfra entries, before and after cutover."""
     run_rulesets = TrackerBypassAllow.run_rulesets
     puts_by_id = TrackerBypassAllow.puts_by_id
@@ -1205,6 +1215,124 @@ class FactoryAndAwsinfra(unittest.TestCase):
         self.assertFalse(any(align.is_standard_bypass(a, STD) for b in puts.values() for a in b["bypass_actors"]))
 
 
+PR_ADMIN = dict(ADMIN, bypass_mode="pull_request")
+
+
+def review_gate(rid=30, bypass=()):
+    rs = tracker_gate(rid, bypass)
+    rs["name"] = "review"
+    rs["rules"] = [r for r in rs["rules"] if r["type"] == "pull_request"]
+    return rs
+
+
+class TrackerPrBypass(unittest.TestCase):
+    """A tracker repo's admin role can merge a pull request past a failing check but never push to
+    the default branch (bypass_mode pull_request), so deletion and force-push rules still bind it."""
+    run_rulesets = TrackerBypassAllow.run_rulesets
+    puts_by_id = TrackerBypassAllow.puts_by_id
+    kinds = TrackerBypassAllow.kinds
+
+    def run_plain(self, gh):
+        al = align.Aligner(gh, STD, sweep=False)
+        al.ci_success_reported = lambda full: self.fail("gate found in rulesets; no GraphQL needed")
+        al.align_rulesets(repo("rknightion/x"), STD["profiles"]["oss"])
+        return al
+
+    def writes(self, gh):
+        return [w for w in gh.writes if w[0] in ("PUT", "POST")]
+
+    def test_shipped_standard_names_the_admin_on_pull_requests_only(self):
+        self.assertEqual(STD["rulesets"]["tracker_bypass_actors"], [PR_ADMIN])
+        self.assertEqual(align.tracker_pr_actors(STD, "rknightion/x"), [PR_ADMIN])
+
+    def test_gate_gets_it_and_the_history_only_ruleset_does_not(self):
+        gh = FakeGH([base_main(), tracker_gate()], loopmd=LOOPMD)
+        al = self.run_plain(gh)
+        puts = self.puts_by_id(gh)
+        self.assertEqual(puts["10"]["bypass_actors"], [])  # nothing on it a merge needs to bypass
+        self.assertEqual(puts["20"]["bypass_actors"], [PR_ADMIN])
+        self.assertLessEqual(HISTORY_RULES, rule_types(puts["20"]))  # no split: pull_request mode never pushes
+        self.assertFalse([w for w in gh.writes if w[0] == "POST"])
+        self.assertFalse([f for f in al.findings if f["kind"] == "tracker-bypass"])
+        self.assertTrue(any("admin bypass on pull requests only" in c["detail"] for c in al.changes))
+
+    def test_always_admin_is_narrowed_then_left_alone(self):
+        gh = FakeGH([tracker_gate(bypass=(ADMIN,))], loopmd=LOOPMD)
+        self.run_plain(gh)
+        (put,) = [b for m, _p, b in gh.writes if m == "PUT"]
+        self.assertEqual(put["bypass_actors"], [PR_ADMIN])
+        again = FakeGH([dict(put, id=20)], loopmd=LOOPMD)
+        self.run_plain(again)
+        self.assertEqual(self.writes(again), [])
+
+    def test_another_merge_blocking_ruleset_gets_it_too(self):
+        gh = FakeGH([tracker_gate(), review_gate(bypass=(ADMIN,))], loopmd=LOOPMD)
+        al = self.run_plain(gh)
+        self.assertEqual(self.puts_by_id(gh)["30"]["bypass_actors"], [PR_ADMIN])
+        self.assertIn("set admin bypass to pull requests only on 'review' (tracker repo)",
+                      [c["detail"] for c in al.changes])
+        self.assertFalse([c for c in al.changes if "removed admin bypass" in c["detail"]])
+
+    def test_an_unlisted_actor_is_still_reported_and_the_admin_is_not(self):
+        gh = FakeGH([tracker_gate(bypass=(ADMIN, APP))], loopmd=LOOPMD)
+        al = self.run_plain(gh)
+        (put,) = [b for m, _p, b in gh.writes if m == "PUT"]
+        self.assertEqual(actor_keys(put["bypass_actors"]), actor_keys([APP, PR_ADMIN]))
+        (f,) = [f for f in al.findings if f["kind"] == "tracker-bypass"]
+        self.assertIn("Integration:3512185", f["detail"])
+        self.assertNotIn("RepositoryRole:5", f["detail"])
+
+    def test_new_ruleset_has_it_only_when_gated(self):
+        pr = align.tracker_pr_actors(STD, "rknightion/x")
+        self.assertEqual(align.reconcile_main_ruleset(None, True, STD, tracker=True, pr=pr)["bypass_actors"],
+                         [PR_ADMIN])
+        self.assertEqual(align.reconcile_main_ruleset(None, False, STD, tracker=True, pr=pr)["bypass_actors"], [])
+
+    def test_backlog_repo_keeps_the_always_admin(self):
+        gh = FakeGH([tracker_gate(bypass=(ADMIN,))])  # no LOOP.md
+        self.run_plain(gh)
+        for _m, p, b in self.writes(gh):
+            self.assertEqual(b["bypass_actors"], [ADMIN], p)
+
+    def test_flagged_admin_keeps_always(self):
+        self.assertEqual(align.tracker_pr_actors(STD, AWSINFRA), [])
+        gh = FakeGH([base_main(24047088, bypass=(ADMIN,)), tracker_gate()], loopmd=LOOPMD)
+        al, _ = self.run_rulesets(gh, AWSINFRA)
+        puts = self.puts_by_id(gh)
+        self.assertEqual(actor_keys(puts["20"]["bypass_actors"]), actor_keys([ADMIN, RENOVATE, BROKER]))
+        self.assertEqual(puts["24047088"]["bypass_actors"], [])
+        self.assertEqual(self.kinds(al), [])
+
+    def test_factory_engine_and_admin_on_main_history_binds_both(self):
+        gh = FakeGH([factory_main(), factory_integrity()], loopmd=LOOPMD)
+        al, _ = self.run_rulesets(gh, FACTORY)
+        puts = self.puts_by_id(gh)
+        self.assertEqual(puts["26286216"]["bypass_actors"], [])
+        self.assertEqual(actor_keys(puts["26101867"]["bypass_actors"]), actor_keys([ENGINE, PR_ADMIN]))
+        self.assertEqual(self.kinds(al), [])
+
+    def test_factory_after_cutover_only_gains_it_and_says_so_exactly(self):
+        main = factory_main(bypass=(ENGINE,))
+        main["rules"] = [r for r in main["rules"] if r["type"] not in HISTORY_RULES]
+        gh = FakeGH([main, factory_integrity(bypass=())], loopmd=LOOPMD)
+        al, _ = self.run_rulesets(gh, FACTORY)
+        (put,) = [b for m, _p, b in gh.writes if m == "PUT"]
+        self.assertEqual(actor_keys(put["bypass_actors"]), actor_keys([ENGINE, PR_ADMIN]))
+        (c,) = al.changes
+        self.assertIn("admin bypass on pull requests only", c["detail"])
+        self.assertNotIn("history rules moved off", c["detail"])  # they were already off
+
+    def test_conflict_ruleset_gets_it_but_not_the_writers(self):
+        gate = tracker_gate(bypass=(ADMIN,))
+        gate["conditions"]["ref_name"]["include"].append("refs/heads/release/*")
+        gh = FakeGH([gate, history_ruleset()], loopmd=LOOPMD)
+        al, _ = self.run_rulesets(gh, LISTED)
+        put = self.puts_by_id(gh)["20"]
+        self.assertLessEqual(HISTORY_RULES, rule_types(put))
+        self.assertEqual(put["bypass_actors"], [PR_ADMIN])
+        self.assertEqual(self.kinds(al), ["tracker-bypass-allow-conflict"])
+
+
 class StandardValidation(unittest.TestCase):
     def std_with(self, actors, full=LISTED):
         std = json.loads(json.dumps(STD))
@@ -1239,6 +1367,17 @@ class StandardValidation(unittest.TestCase):
         std = json.loads(json.dumps(STD))
         std["rulesets"]["tracker_bypass_allow"] = None  # absent or null: no allow-list
         std["rulesets"]["tracker_bypass_allow_admin"] = None
+        align.validate_standard(std)
+
+    def test_rejects_bad_tracker_pr_actors(self):
+        for whole in (dict(PR_ADMIN), "x", [ADMIN], [dict(PR_ADMIN, actor_id="5")],
+                      [dict(PR_ADMIN, actor_type="Bot")], [dict(PR_ADMIN, extra=1)]):
+            std = json.loads(json.dumps(STD))
+            std["rulesets"]["tracker_bypass_actors"] = whole
+            with self.assertRaises(ValueError, msg=repr(whole)):
+                align.validate_standard(std)
+        std = json.loads(json.dumps(STD))
+        std["rulesets"]["tracker_bypass_actors"] = None
         align.validate_standard(std)
 
     def test_history_name_is_always_required(self):
