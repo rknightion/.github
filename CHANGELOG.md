@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.31.4](https://github.com/rknightion/.github/compare/v1.31.3...v1.31.4) (2026-11-22)
+
+
+### Bug Fixes
+
+* **binaries:** keep release checkout tied to its tag ([5f51534](https://github.com/rknightion/.github/commit/5f515342255bcb4d0909687a26327639074cc35b)), closes [#1116](https://github.com/rknightion/.github/issues/1116)
+
 ## [1.31.3](https://github.com/rknightion/.github/compare/v1.31.2...v1.31.3) (2026-11-22)
 
 
