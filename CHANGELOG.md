@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.31.5](https://github.com/rknightion/.github/compare/v1.31.4...v1.31.5) (2026-11-22)
+
+
+### Bug Fixes
+
+* **setup-just:** verify fixed release downloads ([5563ee9](https://github.com/rknightion/.github/commit/5563ee9a7a35c94e5520b105f1560b1faf8a6a13)), closes [#1118](https://github.com/rknightion/.github/issues/1118)
+
 ## [1.31.4](https://github.com/rknightion/.github/compare/v1.31.3...v1.31.4) (2026-11-22)
 
 
