@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.31.2](https://github.com/rknightion/.github/compare/v1.31.1...v1.31.2) (2026-11-22)
+
+
+### Build & CI
+
+* **deps:** update dataaxiom/ghcr-cleanup-action action to v1.3.0 ([#333](https://github.com/rknightion/.github/issues/333)) ([91a08c7](https://github.com/rknightion/.github/commit/91a08c7093995704c82aaef5b7f5f9ebeb59e447))
+
 ## [1.31.1](https://github.com/rknightion/.github/compare/v1.31.0...v1.31.1) (2026-11-21)
 
 
