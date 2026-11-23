@@ -17,6 +17,7 @@ import {
   isReleaseNotesOverflow,
   parseAcceptanceCriteria,
   parseClosesTargets,
+  parseEvidenceLine,
   parseEvidenceTable,
   parseTaskNone,
 } from "./ac-evidence-check.mjs";
@@ -627,4 +628,64 @@ test("a closing form names an issue in any owner, and the command refuses an iss
   assert.equal(r.status, 1, r.out);
   assert.match(r.out, /another repository/);
   assert.ok(!r.calls.some((c) => c.url.includes("Another-Owner")), "no request is made for another repository");
+});
+
+// One evidence line is enough: a pull request that closes an issue passes with the table or with a line that starts
+// "Evidence:" and says something, and fails with neither.
+const lineBody = (closes, evidence) => `## What changed
+
+The run summary keeps the retry-after.
+
+${closes}
+
+${evidence}
+`;
+
+test("an Evidence line is read only at the start of a line, outside a comment, with text after it", () => {
+  assert.equal(parseEvidenceLine("Evidence: just check exit 0 on the head"), true);
+  assert.equal(parseEvidenceLine("text\n  evidence:   node --test passes, 40 of 40\n"), true);
+  assert.equal(parseEvidenceLine("Evidence:"), false);
+  assert.equal(parseEvidenceLine("Evidence:   \nnext line"), false);
+  assert.equal(parseEvidenceLine("Evidence: -- "), false);
+  assert.equal(parseEvidenceLine("Evidence: - just check exit 0"), true);
+  assert.equal(parseEvidenceLine("<!-- Evidence: just check exit 0 -->"), false);
+  assert.equal(parseEvidenceLine("The Evidence: line goes here"), false);
+  assert.equal(parseEvidenceLine("## Acceptance evidence\n"), false);
+});
+
+test("a pull request that closes an issue passes with one Evidence line and no table", async () => {
+  const r = await checkEvidence({ ...base, body: lineBody("Closes #101", "Evidence: node --test exit 0, 12 of 12 pass") });
+  ok(r);
+  assert.equal(r.applicable, true);
+  assert.equal(r.evidenceLine, true);
+  assert.deepEqual(r.checked.map((c) => c.number), [101]);
+  // Several issues, one line.
+  ok(await checkEvidence({ ...base, body: lineBody("Closes #101\nCloses #102", "Evidence: just check exit 0") }));
+  // The same with enforcement for every pull request on.
+  ok(await checkEvidence({ ...base, body: lineBody("Closes #101", "Evidence: just check exit 0"), enforceAll: true }));
+});
+
+test("the table still passes on its own, and a body with neither the table nor an Evidence line fails", async () => {
+  ok(await checkEvidence({ ...base, body: prBody("Closes #101", table(...row101)) }));
+  bad(await checkEvidence({ ...base, body: lineBody("Closes #101", "Verified by hand.") }), /Evidence:.*Acceptance evidence/);
+  bad(await checkEvidence({ ...base, body: lineBody("Closes #101", "Evidence:") }), /Evidence:.*Acceptance evidence/);
+  bad(await checkEvidence({ ...base, body: lineBody("Closes #101", "<!-- Evidence: just check exit 0 -->") }), /Evidence:.*Acceptance evidence/);
+  // An empty table with no Evidence line still fails as before.
+  bad(await checkEvidence({ ...base, body: prBody("Closes #101", table()) }), /empty/);
+});
+
+test("an Evidence line still needs every closed target to be a readable issue of this repository", async () => {
+  bad(await checkEvidence({ ...base, body: lineBody("Closes #999", "Evidence: just check exit 0") }), /#999.*could not be read/);
+  bad(await checkEvidence({ ...base, body: lineBody("Closes #103", "Evidence: just check exit 0") }), /#103.*pull request/i);
+  // An issue with no AC list is fine with an Evidence line: there are no rows to match.
+  ok(await checkEvidence({ ...base, body: lineBody("Closes #104", "Evidence: just check exit 0") }));
+});
+
+test("an Evidence line changes nothing for a pull request that closes no issue", async () => {
+  const dormant = await checkEvidence({ ...base, body: "A doc fix.\n\nEvidence: just check exit 0\n", enforceAll: false });
+  ok(dormant);
+  assert.equal(dormant.applicable, false);
+  // With enforcement on, an Evidence line is not a Task: none line.
+  bad(await checkEvidence({ ...base, body: "A doc fix.\n\nEvidence: just check exit 0\n", enforceAll: true }), /Task: none/);
+  ok(await checkEvidence({ ...base, body: "A doc fix.\n\nTask: none, documentation only\nEvidence: just check exit 0\n", enforceAll: true }));
 });

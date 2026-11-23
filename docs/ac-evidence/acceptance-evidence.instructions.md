@@ -14,8 +14,10 @@ optionally followed by a colon. Spaces or tabs separate it from the issue, which
 address. A number followed by a letter or digit is not a number. When the description has no closing
 form, say nothing about this.
 
-The description then holds an "Acceptance evidence" table with the columns issue, AC, AC text, evidence
-class and proof, one row per acceptance criterion of each closed issue. The `Acceptance evidence` CI
+The description then holds either one line starting `Evidence:` that names a command and its result, or
+an "Acceptance evidence" table with the columns issue, AC, AC text, evidence class and proof, one row per
+acceptance criterion of each closed issue. For a line, judge whether the command exists and whether its
+result shows the closed issue is done, and count it as one row. The rest of this file is about the table. The `Acceptance evidence` CI
 check already checks that the rows match the issue's list and that a cited file exists, so do not repeat
 that. Your part is whether each row's proof shows what its AC text asks for.
 

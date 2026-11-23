@@ -1,7 +1,9 @@
 // ac-evidence-check: a pull request that closes an issue shows evidence for every acceptance criterion (AC) of
 // that issue, and the evidence rows say what the issue says.
 //
-// The pull request body carries a table under "Acceptance evidence" (issue, AC, AC text, evidence class, proof).
+// One line in the pull request body that starts "Evidence:" and says what was run and what it showed is enough: the
+// closed targets must then be readable issues of this repository, and nothing more is matched. The longer form, still
+// accepted, is a table under "Acceptance evidence" (issue, AC, AC text, evidence class, proof).
 // For each issue the body closes, this reads the issue's `- [ ] ACn text` list and fails when the rows do not
 // match it (count, number or exact text), when a proof cites a repository file the pull request head does not
 // have, or when the table is empty. Whether a proof really proves its AC is judged by review, not here.
@@ -47,6 +49,12 @@ export function parseClosesTargets(body, defaultRepo) {
     }
   }
   return targets;
+}
+
+// "Evidence: <command and result>": one line, at the start of a line and outside a comment, that is enough evidence for
+// a pull request that closes an issue. The Acceptance evidence table is the longer alternative and is still accepted.
+export function parseEvidenceLine(body) {
+  return /^[ \t]*Evidence:[^\n\r]*[A-Za-z0-9]/im.test(stripComments(body ?? ""));
 }
 
 // "Task: none, <reason>": a change that closes no issue says so, and why.
@@ -188,7 +196,7 @@ export function parseEvidenceTable(body) {
   const section = sectionOf(text, heading);
   if (!section.found) {
     errors.push("the pull request body has no \"Acceptance evidence\" section");
-    return { rows: [], errors };
+    return { rows: [], errors, found: false };
   }
   if (section.count > 1) {
     errors.push("the pull request body has more than one \"Acceptance evidence\" section");
@@ -258,18 +266,38 @@ export async function checkEvidence({ body, defaultRepo, enforceAll = false, get
   if (targets.length === 0) {
     if (!enforceAll) return { applicable: false, errors, checked: [] };
     if (parseTaskNone(body) || isReleaseNotesOverflow(body, pull, defaultRepo, releaseAuthor)) return { applicable: true, errors, checked: [], taskNone: true };
-    errors.push("this pull request needs either a Closes target (Closes #N) with an Acceptance evidence table, or a line \"Task: none, <reason>\"");
+    errors.push("this pull request needs either a Closes target (Closes #N) with an \"Evidence: <command and result>\" line or an Acceptance evidence table, or a line \"Task: none, <reason>\"");
     return { applicable: true, errors, checked: [] };
   }
   if (targets.length > MAX_TARGETS) {
     errors.push(`this pull request closes ${targets.length} issues; the check reads at most ${MAX_TARGETS}`);
     return { applicable: true, errors, checked: [] };
   }
+  // One Evidence line is enough. Each closed target must still be a readable issue of this repository, and no row is
+  // matched against its criteria, so the table is not read.
+  if (parseEvidenceLine(body)) {
+    const checked = [];
+    for (const target of targets) {
+      const ref = refOf(target);
+      try {
+        const issue = await getIssue(target);
+        if (issue.pull_request) errors.push(`${ref} is a pull request, not an issue`);
+        else checked.push({ repo: target.repo, number: target.number, evidenceLine: true });
+      } catch (error) {
+        errors.push(`${ref}: ${error.message}`);
+      }
+    }
+    return { applicable: true, errors, checked, evidenceLine: true };
+  }
   const table = parseEvidenceTable(body);
+  if (table.found === false) {
+    errors.push("the pull request body has no \"Evidence: <command and result>\" line and no \"Acceptance evidence\" section: a pull request that closes an issue needs one of them");
+    return { applicable: true, errors, checked: [] };
+  }
   errors.push(...table.errors);
   if (table.errors.length > 0) return { applicable: true, errors, checked: [] };
   if (table.rows.length === 0) {
-    errors.push("the Acceptance evidence table is empty: a pull request that closes an issue owes one row per acceptance criterion");
+    errors.push("the Acceptance evidence table is empty: a pull request that closes an issue owes one row per acceptance criterion, or an \"Evidence: <command and result>\" line instead of the table");
     return { applicable: true, errors, checked: [] };
   }
 
@@ -421,7 +449,9 @@ async function main(env) {
   } else if (result.taskNone) {
     console.log("Acceptance evidence not owed: this pull request states Task: none with a reason.");
   } else {
-    for (const c of result.checked) console.log(`${c.repo}#${c.number}: ${c.criteria} acceptance criteria, each with one row of evidence.`);
+    for (const c of result.checked) {
+      console.log(c.evidenceLine ? `${c.repo}#${c.number}: closed with an Evidence line.` : `${c.repo}#${c.number}: ${c.criteria} acceptance criteria, each with one row of evidence.`);
+    }
   }
   return 0;
 }

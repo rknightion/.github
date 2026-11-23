@@ -90,9 +90,10 @@ Work is tracked in this repository's GitHub issues; they are the only queue. Do 
 file beside them. The `backlog/` board is retired and frozen: a pull request may delete or move files
 there, never add or change one (`ci.yml` job `backlog-freeze`).
 
-- A pull request body says how it relates to an issue, on a line of its own: `Closes #N` with an
-  `Acceptance evidence` table (header exactly `| Issue | AC | AC text | Evidence class | Proof |`, one
-  row for each acceptance criterion of that issue), `Refs #N` when it only relates to one, or
+- A pull request body says how it relates to an issue, on a line of its own: `Closes #N` with a line
+  `Evidence: <command and result>` (an `Acceptance evidence` table, header exactly
+  `| Issue | AC | AC text | Evidence class | Proof |`, one row for each acceptance criterion of that
+  issue, is still accepted in its place), `Refs #N` when it only relates to one, or
   `Task: none, <reason>`. There is no pull request template here on purpose: in this repository it
   would become the default for every `rknightion` repository.
 - A pull request that changes `.github/workflows/` or `.github/actions/` carries no closing keyword:
