@@ -20,7 +20,7 @@ What you did not run or could not observe. Write "nothing" only if that is true.
 
 ## Acceptance evidence
 
-<!-- One row per acceptance criterion of every issue this change closes, copied exactly from the issue's "- [ ] ACn" list. Evidence class is code, live or browser. In Proof, put repository paths in backticks, and write anything else (a command, a read-back, a run) without them. Delete the example row. Leave the table out only when the change closes no issue. -->
+<!-- A change that closes an issue needs one line of its own, "Evidence: <command and result>", and then this section can go. Otherwise: one row per acceptance criterion of every issue this change closes, copied exactly from the issue's "- [ ] ACn" list. Evidence class is code, live or browser. In Proof, put repository paths in backticks, and write anything else (a command, a read-back, a run) without them. Delete the example row. Leave the table out only when the change closes no issue. -->
 
 | Issue | AC | AC text | Evidence class | Proof |
 | --- | --- | --- | --- | --- |

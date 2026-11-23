@@ -1,7 +1,8 @@
 # Acceptance evidence check
 
 The reusable workflow `.github/workflows/ac-evidence.yml` fails a pull request that closes an issue
-without showing evidence for every acceptance criterion (AC) of that issue. Whether a proof really proves
+without showing evidence: either one `Evidence:` line, or a table with a row for every acceptance
+criterion (AC) of that issue. Whether a proof really proves
 its AC is a reviewer's call; the check only enforces shape. The checker is
 `scripts/ac-evidence/ac-evidence-check.mjs`, its tests sit beside it.
 
@@ -9,8 +10,13 @@ Provenance: ported from a private project's checker with its rules, messages and
 
 ## What it checks
 
-For each issue the pull request body closes, the checker reads that issue's `- [ ] ACn text` list and
-fails when:
+A pull request that closes an issue passes with one line of its own, outside an HTML comment, that
+starts `Evidence:` and carries text with a letter or digit after it, for example
+`Evidence: just check exit 0 on the head`. With such a line the table is not read, and the check fails
+only when a closed target is in another repository, is a pull request, or cannot be read.
+
+Without an `Evidence:` line, for each issue the pull request body closes, the checker reads that
+issue's `- [ ] ACn text` list and fails when:
 
 - the body has no "Acceptance evidence" table, or the table is empty;
 - the rows do not match the issue's list in number, AC number or exact text (whitespace is normalised);
