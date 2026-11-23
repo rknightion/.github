@@ -1,5 +1,17 @@
 # Changelog
 
+## [1.31.11](https://github.com/rknightion/.github/compare/v1.31.10...v1.31.11) (2026-11-23)
+
+
+### Build & CI
+
+* detect dotfile release-please configs and move CodeQL off pull requests ([e7ca46f](https://github.com/rknightion/.github/commit/e7ca46f7704ff3dd11db1a378da2e66888f6f217))
+
+
+### Documentation
+
+* **vended:** make review on demand and track work in labelled issues ([#362](https://github.com/rknightion/.github/issues/362)) ([e0a95ce](https://github.com/rknightion/.github/commit/e0a95ce880fb8a425b098cf6c5b17ee74f5dc6fe))
+
 ## [1.31.10](https://github.com/rknightion/.github/compare/v1.31.9...v1.31.10) (2026-11-23)
 
 
