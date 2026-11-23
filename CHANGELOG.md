@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.31.10](https://github.com/rknightion/.github/compare/v1.31.9...v1.31.10) (2026-11-23)
+
+
+### Build & CI
+
+* **deps:** update dependency zizmor to v1.33.1 ([#355](https://github.com/rknightion/.github/issues/355)) ([1605605](https://github.com/rknightion/.github/commit/160560540a68844bce43365bc321430106ceab30))
+
 ## [1.31.9](https://github.com/rknightion/.github/compare/v1.31.8...v1.31.9) (2026-11-22)
 
 
