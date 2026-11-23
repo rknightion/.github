@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.32.0](https://github.com/rknightion/.github/compare/v1.31.11...v1.32.0) (2026-11-23)
+
+
+### Features
+
+* **ac-evidence:** accept one Evidence line in place of the evidence table ([#368](https://github.com/rknightion/.github/issues/368)) ([c56215d](https://github.com/rknightion/.github/commit/c56215db51679a35a48b0f6065f7d41366974cf2))
+
 ## [1.31.11](https://github.com/rknightion/.github/compare/v1.31.10...v1.31.11) (2026-11-23)
 
 
