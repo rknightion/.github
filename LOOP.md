@@ -15,11 +15,12 @@ The tracker working model is `~/repos/agent-docs/docs/github-tracker.md` (mainta
 
 ## Queue
 
-- The queue is `just tracker queue`: open issues at Project Status Ready on the rknightion Project.
-- A charter selects work by labels and Project fields. Never queue `needs-owner` or `needs-triage`,
-  the Dependency Dashboard (#3) or the bot-owned Release train status issue (#52).
-- Only the root writes issues and the Project, through `just tracker`. A lane returns the status and
-  the AC ticks it wants.
+- The queue is the open issues labelled `ready` (`gh issue list --label ready`). The other working
+  labels are `blocked`, `needs-owner`, `p1`, `p2` and `p3`; no Project is read or written.
+- Never queue `needs-owner`, `needs-triage` or `blocked`, the Dependency Dashboard (#3) or the
+  bot-owned Release train status issue (#52).
+- Issues are created, labelled, commented on and closed with `gh` (`just tracker` is a thin wrapper
+  over it); a close carries a comment with the evidence.
 - A queue row names the issue as `#N`. A legacy board id (`GHC-0001`) resolves with `just issue <ID>`;
   `.github/tracker/id-map.json` is the map.
 

@@ -96,8 +96,11 @@ there, never add or change one (`ci.yml` job `backlog-freeze`).
   would become the default for every `rknightion` repository.
 - A pull request that changes `.github/workflows/` or `.github/actions/` carries no closing keyword:
   write `Task: none, <reason>`, with `Refs #N` beside it if you like.
-- Contributors never need the project board or the tracker tooling; a maintainer handles both.
-  Only the root or the interactive main thread writes issues and the Project, through `just tracker`.
+- Work is tracked in issues and labels only; no Project is read or written. The queue is the open
+  issues labelled `ready`; the other working labels are `blocked`, `needs-owner`, `p1`, `p2` and
+  `p3`. Maintainers and the owner's agents create, label, comment on and close issues with `gh`
+  (`just tracker` is a thin wrapper over it), and every close carries the evidence. Contributors
+  never label or close issues.
 - Issues and pull requests are public, so they carry no real identifiers: no email addresses,
   handles, account ids, host or device names, addresses or coordinates. Write the shape, not the
   instance. The `privacy-sweep` check scans the lines a pull request adds; the sweep names no real
