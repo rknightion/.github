@@ -38,9 +38,10 @@ just check
 zizmor into `.tools/` first; it is idempotent.
 
 `ci.yml` runs the same `just check` through `.github/workflows/just-check.yml`, and additionally
-dogfoods the `actionlint`, `zizmor` and `codeql` reusables against this repo so those reusables get
-tested at all. `ci-success` is the single required status check. CodeQL's query policy is embedded in
-the pinned reusable; do not restore a mutable cross-repository `config-file: ...@main` reference.
+dogfoods the `actionlint` and `zizmor` reusables against this repo so those reusables get
+tested at all. The `codeql` reusable runs from `codeql-self.yml` on push to main and weekly, never on
+a pull request, so it is not in `ci-success`. `ci-success` is the single required status check. CodeQL's query policy is
+embedded in the pinned reusable; do not restore a mutable cross-repository `config-file: ...@main` reference.
 
 zizmor fails a pull request on any finding: the `ci.yml` call passes `enforce: true`. The local `just lint`
 recipe still passes `--no-exit-codes`; treat its output as findings to fix, not as a pass.

@@ -361,6 +361,9 @@
       "rules": [
         "deletion",
         "update"
+      ],
+      "repos": [
+        "rknightion/mq-exporter-dist"
       ]
     }
   },

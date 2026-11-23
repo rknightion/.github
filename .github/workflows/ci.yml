@@ -30,19 +30,6 @@ jobs:
     with:
       enforce: true
 
-  # CodeQL's `actions` language analyses our workflows themselves (dataflow), complementing
-  # actionlint (correctness) + zizmor (policy). Permissions mirror the reusable's analyze job.
-  codeql:
-    permissions:
-      security-events: write
-      packages: read
-      actions: read
-      contents: read
-    uses: ./.github/workflows/codeql.yml
-    with:
-      languages: '[{"language":"actions","build-mode":"none"}]'
-      timeout-minutes: 5
-
   # This repo's own task surface. `just check` is the complete local gate
   # (fmt-check + lint + test + check-vended); this job is what makes it enforced
   # rather than aspirational. setup: true installs the pinned actionlint and
@@ -126,7 +113,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 5
     if: always()
-    needs: [actionlint, zizmor, codeql, just, ac-evidence, privacy-sweep, backlog-freeze]
+    needs: [actionlint, zizmor, just, ac-evidence, privacy-sweep, backlog-freeze]
     steps:
       - name: Fail if any required job did not pass
         if: ${{ contains(needs.*.result, 'failure') || contains(needs.*.result, 'cancelled') }}

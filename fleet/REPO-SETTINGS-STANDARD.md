@@ -246,8 +246,13 @@ no-bypass pull-request ruleset before `LOOP.md` declares `tracker: github`.
 `ungated_repos` in the JSON stay on base deliberately (no pull_request CI): rkps-awsinfra,
 portina-site, agent-docs, dmarc-reporties-docs.
 
-**`release-tags`**, on every repo with `release-please-config.json`: `refs/tags/v*` cannot be
-deleted or moved, no bypass. Callers pin `rknightion/.github` reusables to release SHAs, so a moved
+**`release-tags`**, on every repo with `release-please-config.json` or `.release-please-config.json`
+at the repo root, and on every repo listed in `rulesets.release_tags.repos` (currently
+`rknightion/mq-exporter-dist`):
+`refs/tags/v*` cannot be deleted or moved, no bypass. The `repos` key is optional and is validated
+like the other `rulesets` keys: a unique list of `owner/repo` under a configured owner. The dotfile
+detection also reaches one private repo whose `ui-v*` tags do not match `v*`, so the
+rule is inert there. Callers pin `rknightion/.github` reusables to release SHAs, so a moved
 tag is a supply-chain change. Immutable releases are the next step, enabled per repo only after its
 release flow creates a draft, attaches assets, then publishes; a publish-then-upload flow breaks
 under immutability.

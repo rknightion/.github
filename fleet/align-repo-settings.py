@@ -464,6 +464,9 @@ ALLOW_ACTOR_TYPES = ("Integration", "RepositoryRole", "Team")
 ALLOW_BYPASS_MODES = ("always", "pull_request")
 
 
+RELEASE_PLEASE_CONFIGS = ("release-please-config.json", ".release-please-config.json")
+
+
 def validate_standard(std: dict) -> None:
     """Reject malformed per-repository settings before reading or writing any repository."""
     required = std.get("required_check") or {}
@@ -515,6 +518,13 @@ def validate_standard(std: dict) -> None:
             if is_standard_bypass(a, std) and full not in admin_ok:
                 raise ValueError(f"{where}: the standard admin bypass is allowed only for a repo named in "
                                  f"rulesets.tracker_bypass_allow_admin: {a!r}")
+    tag_repos = (rcfg.get("release_tags") or {}).get("repos")
+    tag_repos = [] if tag_repos is None else tag_repos
+    if not isinstance(tag_repos, list) or not all(
+        isinstance(r, str) and re.fullmatch(r"[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+", r)
+        and r.split("/")[0] in std["owners"] for r in tag_repos
+    ) or len(set(tag_repos)) != len(tag_repos):
+        raise ValueError("rulesets.release_tags.repos must be a unique list of owner/repo under configured owners")
     pr = rcfg.get("tracker_bypass_actors")
     pr = [] if pr is None else pr
     if not isinstance(pr, list):
@@ -1447,8 +1457,11 @@ class Aligner:
 
     def align_release_tags(self, repo: dict, detailed: list[dict]):
         full, tcfg = repo["full_name"], self.std["rulesets"]["release_tags"]
-        status, _, _ = self.gh.call("GET", f"/repos/{full}/contents/release-please-config.json")
-        if status != 200:
+        listed = full in (tcfg.get("repos") or [])
+        # Either spelling of the release-please config marks a release repo: some repos keep it as a dotfile.
+        if not listed and not any(
+                self.gh.call("GET", f"/repos/{full}/contents/{name}")[0] == 200
+                for name in RELEASE_PLEASE_CONFIGS):
             return
         for r in detailed:
             inc = ((r.get("conditions") or {}).get("ref_name") or {}).get("include") or []

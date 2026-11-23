@@ -1416,6 +1416,85 @@ class StandardValidation(unittest.TestCase):
             align.Aligner(FakeGH(), self.std_with([{"actor_type": "Integration", "actor_id": 1}]), sweep=False)
 
 
+class ReleaseGH(FakeGH):
+    """Answers 200 for the named repo-root files, 404 for every other one."""
+
+    def __init__(self, files=()):
+        super().__init__()
+        self.files, self.reads = set(files), []
+
+    def call(self, method, path, body=None, raw_url=None):
+        self.reads.append(path)
+        if any(path.endswith("/contents/" + f) for f in self.files):
+            return 200, {"name": "x"}, {}
+        return super().call(method, path, body, raw_url)
+
+
+class ReleaseTags(unittest.TestCase):
+    TAG_BODY_RULES = [{"type": "deletion"}, {"type": "update"}]
+
+    def run_repo(self, full, files=(), std=None):
+        gh = ReleaseGH(files)
+        al = align.Aligner(gh, std or STD, sweep=False)
+        al.align_release_tags(repo(full), [])
+        return gh.writes, al.changes
+
+    def test_root_config_gets_the_ruleset(self):
+        writes, changes = self.run_repo("rknightion/plain", ["release-please-config.json"])
+        self.assertEqual([(m, p) for m, p, _ in writes], [("POST", "/repos/rknightion/plain/rulesets")])
+        self.assertEqual(writes[0][2]["rules"], self.TAG_BODY_RULES)
+        self.assertEqual(writes[0][2]["conditions"]["ref_name"]["include"], ["refs/tags/v*"])
+        self.assertEqual(writes[0][2]["bypass_actors"], [])
+        self.assertEqual(len(changes), 1)
+
+    def test_dotfile_config_gets_the_ruleset(self):
+        writes, _ = self.run_repo("rknightion/dotfile", [".release-please-config.json"])
+        self.assertEqual([(m, p) for m, p, _ in writes], [("POST", "/repos/rknightion/dotfile/rulesets")])
+
+    def test_listed_repo_gets_the_ruleset_without_a_config(self):
+        std = json.loads(json.dumps(STD))
+        std["rulesets"]["release_tags"]["repos"] = ["rknightion/listed"]
+        writes, _ = self.run_repo("rknightion/listed", std=std)
+        self.assertEqual([(m, p) for m, p, _ in writes], [("POST", "/repos/rknightion/listed/rulesets")])
+
+    def test_unlisted_repo_without_a_config_is_left_alone(self):
+        std = json.loads(json.dumps(STD))
+        std["rulesets"]["release_tags"]["repos"] = ["rknightion/listed"]
+        self.assertEqual(self.run_repo("rknightion/other", std=std)[0], [])
+
+    def test_a_present_ruleset_is_not_rewritten(self):
+        gh = ReleaseGH([".release-please-config.json"])
+        have = {"id": 7, "name": "release-tags", "target": "tag", "enforcement": "active",
+                "conditions": {"ref_name": {"include": ["refs/tags/v*"], "exclude": []}},
+                "bypass_actors": [], "rules": list(self.TAG_BODY_RULES)}
+        align.Aligner(gh, STD, sweep=False).align_release_tags(repo("rknightion/dotfile"), [have])
+        self.assertEqual(gh.writes, [])
+
+    def test_shipped_standard_lists_mq_exporter_dist(self):
+        self.assertEqual(STD["rulesets"]["release_tags"]["repos"], ["rknightion/mq-exporter-dist"])
+        writes, _ = self.run_repo("rknightion/mq-exporter-dist")
+        self.assertEqual([(m, p) for m, p, _ in writes], [("POST", "/repos/rknightion/mq-exporter-dist/rulesets")])
+
+    def test_validation_of_the_repos_key(self):
+        def check(value, ok):
+            std = json.loads(json.dumps(STD))
+            std["rulesets"]["release_tags"]["repos"] = value
+            if ok:
+                align.validate_standard(std)
+            else:
+                with self.assertRaises(ValueError, msg=repr(value)):
+                    align.validate_standard(std)
+        check([], True)
+        check(None, True)
+        check(["rknightion/a", "m7kni/b"], True)
+        for bad in ("rknightion/a", {"rknightion/a": 1}, [5], ["no-slash"], ["a/b/c"], ["other-owner/x"],
+                    ["rknightion/a", "rknightion/a"]):
+            check(bad, False)
+        std = json.loads(json.dumps(STD))
+        del std["rulesets"]["release_tags"]["repos"]  # the key is optional
+        align.validate_standard(std)
+
+
 class AutoMerge(unittest.TestCase):
     def run_gate(self, current, gate):
         gh = FakeGH()
