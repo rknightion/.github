@@ -53,6 +53,14 @@ while read -r tool version amd64_sha arm64_sha; do
             url="https://github.com/astral-sh/uv/releases/download/${version}/${file}"
             member="${prefix}/uv"
             ;;
+        python)
+            # Must follow uv in tools.lock. uv also checks its own embedded digest.
+            build="${version#*+}"
+            file="cpython-${version}-${machine}-unknown-linux-gnu-install_only_stripped.tar.gz"
+            url="https://github.com/astral-sh/python-build-standalone/releases/download/${build}/${file/+/%2B}"
+            mkdir -p "python-mirror/$build"
+            file="python-mirror/$build/$file"
+            ;;
         just)
             file="just-${version}-${machine}-unknown-linux-musl.tar.gz"
             url="https://github.com/casey/just/releases/download/${version}/${file}"
@@ -93,6 +101,15 @@ while read -r tool version amd64_sha arm64_sha; do
             tar -xJf "$file" -C /opt/node --strip-components=1
             ;;
         fnm) unzip -p "$file" fnm > fnm.bin; install -m 0755 fnm.bin /usr/local/bin/fnm ;;
+        python)
+            # Installed in the user's default uv directory so uv can still add
+            # other versions there. The Dockerfile hands ~/.local to ubuntu.
+            id -u ubuntu >/dev/null 2>&1 || useradd -m -s /bin/bash ubuntu
+            UV_CACHE_DIR="$work/uv-cache" \
+                UV_PYTHON_INSTALL_DIR=/home/ubuntu/.local/share/uv/python \
+                UV_PYTHON_INSTALL_MIRROR="file://$work/python-mirror" \
+                uv python install --no-bin "cpython-${version%+*}-linux-${machine}-gnu"
+            ;;
         docker-ce|docker-ce-cli|containerd.io|docker-buildx-plugin|docker-compose-plugin)
             packages+=("./$file")
             continue
