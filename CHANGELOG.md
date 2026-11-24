@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.32.5](https://github.com/rknightion/.github/compare/v1.32.4...v1.32.5) (2026-11-24)
+
+
+### Build & CI
+
+* run PR metadata checks in their own workflow so body edits do not restart CI ([#386](https://github.com/rknightion/.github/issues/386)) ([58ccb93](https://github.com/rknightion/.github/commit/58ccb937980630263c466fc0b22b0ba53ee12936))
+
 ## [1.32.4](https://github.com/rknightion/.github/compare/v1.32.3...v1.32.4) (2026-11-24)
 
 
