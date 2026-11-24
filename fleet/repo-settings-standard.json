@@ -36,10 +36,8 @@
     "context": "ci-success",
     "integration_id": 15368,
     "lookback_commits": 30,
-    "expansion": {
-      "context": "pr-metadata-success",
-      "workflow": ".github/workflows/pr-metadata.yml",
-      "repos": []
+    "metadata": {
+      "context": "pr-metadata-success"
     }
   },
   "actions_allowlist": {

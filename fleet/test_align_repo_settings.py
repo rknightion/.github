@@ -207,6 +207,9 @@ class FakeGH:
             return 200, {"encoding": "base64", "content": base64.b64encode(self.loopmd.encode()).decode()}, {}
         return 404, None, {}  # no release-please-config.json
 
+    def graphql(self, query, variables, write=False):  # no check run has reported anywhere
+        return {"repository": {"defaultBranchRef": None, "pullRequests": {"nodes": []}}}
+
 
 LOOPMD = "# Loop: x\ntier: guarded\ngate: just check\ntracker: github\nlanding: pr\n\n## Queue\n"
 ADMIN = {"actor_type": "RepositoryRole", "actor_id": 5, "bypass_mode": "always"}
@@ -242,302 +245,204 @@ class WithoutTrackerPrBypass(unittest.TestCase):
             self.addCleanup(STD["rulesets"].__setitem__, "tracker_bypass_actors", saved)
 
 
-EXPANSION_REPO = "rknightion/check-expansion-fixture"
-EXPANSION_BASE = "c" * 40
-METADATA = ".github/workflows/pr-metadata.yml"
-METADATA_CHECK = "pr-metadata-success"
+META = "pr-metadata-success"
+META_BOUND = {"context": META, "integration_id": 15368}
 
 
-class ExpansionGH(FakeGH):
-    def __init__(self):
-        current = tracker_gate()
-        current["rules"] += base_main()["rules"]
-        next(r for r in current["rules"] if r["type"] == "required_status_checks")["parameters"][
-            "required_status_checks"].append({"context": "existing-extra", "integration_id": 500})
-        super().__init__([current], loopmd=LOOPMD)
-        self.reads = []
-        self.pulls = [
-            {"number": number, "head": {"sha": head}, "base": {"ref": "main"}, "updated_at": "2026-01-01T00:00:00Z"}
-            for number, head in [(11, SHA), (12, "b" * 40)]
+def aligned_gate(rid=20, extra=()):
+    """A default-branch gate already at the standard's floor, so any write comes from the metadata check."""
+    g = align.reconcile_main_ruleset(tracker_gate(rid), True, STD)
+    g["id"] = rid
+    rsc = next(r for r in g["rules"] if r["type"] == "required_status_checks")
+    rsc["parameters"]["required_status_checks"] += [dict(c) for c in extra]
+    return g
+
+
+def required(body):
+    return [c for r in body["rules"] if r["type"] == "required_status_checks"
+            for c in r["parameters"]["required_status_checks"]]
+
+
+class ChecksGH(FakeGH):
+    """Answers the per-repo check query: ci and meta are the aliased check-run counts on one commit."""
+
+    def __init__(self, rulesets=None, ci=0, meta=0, on="branch"):
+        super().__init__(rulesets)
+        self.ci, self.meta, self.on, self.queries = ci, meta, on, []
+
+    def graphql(self, query, variables, write=False):
+        self.queries.append((query, dict(variables)))
+        commit = {"checkSuites": {"nodes": [{"ci": {"totalCount": self.ci}, "meta": {"totalCount": self.meta}}]}}
+        history = [commit] if self.on == "branch" else []
+        prs = [{"commits": {"nodes": [{"commit": commit}]}}] if self.on == "pr" else []
+        return {"repository": {"defaultBranchRef": {"target": {"history": {"nodes": history}}},
+                                "pullRequests": {"nodes": prs}}}
+
+
+class MetadataCheck(unittest.TestCase):
+    """pr-metadata-success joins ci-success as a floor once it has reported from the Actions app."""
+
+    def run_rulesets(self, gh, meta=None, ci=None):
+        al = align.Aligner(gh, STD, sweep=False)
+        if ci is not None:
+            al.ci_success_reported = lambda full: ci
+        if meta is not None:
+            al.metadata_reported = meta if callable(meta) else (lambda full: meta)
+        gate = al.align_rulesets(repo("rknightion/x"), STD["profiles"]["oss"])
+        return al, gate
+
+    def puts(self, gh):
+        return [w for w in gh.writes if w[0] in ("PUT", "POST")]
+
+    def test_shipped_standard_names_the_metadata_check(self):
+        self.assertEqual(STD["required_check"].get("metadata"), {"context": META})
+        self.assertNotIn("expansion", STD["required_check"])
+
+    def test_added_when_gated_and_reported(self):
+        gh = FakeGH(rulesets=[aligned_gate()])
+        al, gate = self.run_rulesets(gh, meta=True)
+        self.assertEqual(gate, "ci")
+        [(method, path, body)] = self.puts(gh)
+        self.assertEqual((method, path), ("PUT", "/repos/rknightion/x/rulesets/20"))
+        self.assertIn(META_BOUND, required(body))
+        self.assertIn({"context": "ci-success", "integration_id": 15368}, required(body))
+        [change] = al.changes
+        self.assertIn("added required check pr-metadata-success", change["detail"])
+        self.assertEqual(al.findings, [])
+
+    def test_not_added_when_not_reported(self):
+        gh = FakeGH(rulesets=[aligned_gate()])
+        al, gate = self.run_rulesets(gh, meta=False)
+        self.assertEqual(gate, "ci")
+        self.assertEqual(self.puts(gh), [])
+        self.assertEqual((al.changes, al.findings), ([], []))
+
+    def test_not_added_when_the_ruleset_is_base(self):
+        gh = ChecksGH(rulesets=[base_main()], ci=0, meta=1)  # reported, but ci-success never has
+        al, gate = self.run_rulesets(gh)
+        self.assertEqual(gate, "none")
+        self.assertEqual(len(gh.queries), 1)
+        for _, _, body in self.puts(gh):
+            self.assertNotIn(META, [c.get("context") for c in required(body)])
+        self.assertFalse(any(META in f["detail"] for f in al.findings))
+        base = align.reconcile_main_ruleset(base_main(), False, STD, metadata=True)
+        self.assertNotIn("required_status_checks", rule_types(base))
+
+    def test_not_added_to_a_gate_on_other_checks_only(self):
+        other = aligned_gate()
+        rsc = next(r for r in other["rules"] if r["type"] == "required_status_checks")
+        rsc["parameters"]["required_status_checks"] = [{"context": "validate-success", "integration_id": 15368}]
+        gh = ChecksGH(rulesets=[other], ci=0, meta=1)
+        al, gate = self.run_rulesets(gh)
+        self.assertEqual(gate, "other")
+        self.assertEqual(self.puts(gh), [])
+
+    def test_existing_entry_is_kept_and_rebound_to_actions(self):
+        for stale in ({"context": META, "integration_id": 1}, {"context": META}):
+            with self.subTest(stale=stale):
+                gh = FakeGH(rulesets=[aligned_gate(extra=[stale])])
+                al, _ = self.run_rulesets(gh, meta=lambda full: self.fail("already required; no query needed"))
+                [(_, _, body)] = self.puts(gh)
+                self.assertEqual([c for c in required(body) if c["context"] == META], [META_BOUND])
+                self.assertNotIn("added required check", al.changes[0]["detail"])
+
+    def test_never_removed_by_a_later_run(self):
+        gh = FakeGH(rulesets=[aligned_gate(extra=[META_BOUND])])
+        al, _ = self.run_rulesets(gh, meta=lambda full: self.fail("already required; no query needed"))
+        self.assertEqual(self.puts(gh), [])
+        want = align.reconcile_main_ruleset(aligned_gate(extra=[META_BOUND]), True, STD)
+        self.assertIn(META_BOUND, required(want))
+        # an unrelated change on a later run still carries it
+        drifted = aligned_gate(extra=[META_BOUND])
+        drifted["rules"] = [r for r in drifted["rules"] if r["type"] != "deletion"]
+        gh = FakeGH(rulesets=[drifted])
+        self.run_rulesets(gh, meta=False)
+        [(_, _, body)] = self.puts(gh)
+        self.assertIn(META_BOUND, required(body))
+
+    def test_one_query_names_both_checks_and_binds_metadata_to_actions(self):
+        for on in ("branch", "pr"):
+            with self.subTest(on=on):
+                gh = ChecksGH(rulesets=[base_main()], ci=1, meta=1, on=on)
+                al, gate = self.run_rulesets(gh)
+                self.assertEqual(gate, "ci")
+                self.assertEqual(len(gh.queries), 1)
+                query, variables = gh.queries[0]
+                self.assertEqual((variables["c"], variables["m"], variables["a"]), ("ci-success", META, 15368))
+                flat = "".join(query.split())
+                self.assertIn("ci:checkRuns(first:1,filterBy:{checkName:$c})", flat)
+                self.assertIn("meta:checkRuns(first:1,filterBy:{checkName:$m,appId:$a})", flat)
+                [(_, _, body)] = self.puts(gh)
+                self.assertIn(META_BOUND, required(body))
+                self.assertIn("added required check pr-metadata-success", al.changes[0]["detail"])
+
+    def test_gated_ruleset_costs_one_query_only_when_the_check_is_missing(self):
+        gh = ChecksGH(rulesets=[aligned_gate()], ci=1, meta=1)
+        al = align.Aligner(gh, STD, sweep=False)
+        al.ci_success_reported = lambda full: self.fail("gate found in rulesets; no ci-success query needed")
+        al.align_rulesets(repo("rknightion/x"), STD["profiles"]["oss"])
+        self.assertEqual(len(gh.queries), 1)
+        self.assertIn(META_BOUND, required(self.puts(gh)[0][2]))
+        gh = ChecksGH(rulesets=[aligned_gate(extra=[META_BOUND])], ci=1, meta=1)
+        al = align.Aligner(gh, STD, sweep=False)
+        al.align_rulesets(repo("rknightion/x"), STD["profiles"]["oss"])
+        self.assertEqual(gh.queries, [])
+
+    def test_a_failed_query_holds_only_the_metadata_check(self):
+        class Down(FakeGH):
+            def graphql(self, query, variables, write=False):
+                raise align.ApiError("POST", "/graphql", 502, {"message": "bad gateway"})
+        drifted = aligned_gate()
+        drifted["rules"] = [r for r in drifted["rules"] if r["type"] != "deletion"]
+        gh = Down(rulesets=[drifted])
+        al = align.Aligner(gh, STD, sweep=False)
+        gate = al.align_rulesets(repo("rknightion/x"), STD["profiles"]["oss"])
+        self.assertEqual(gate, "ci")
+        [(_, _, body)] = self.puts(gh)
+        self.assertIn("deletion", rule_types(body))  # the rest of the floor still applied
+        self.assertNotIn(META, [c["context"] for c in required(body)])
+        self.assertEqual([(e["scope"], e["area"]) for e in al.errors], [("rknightion/x", "rulesets")])
+
+    def test_new_ruleset_says_it_added_the_check(self):
+        gh = ChecksGH(rulesets=[], ci=1, meta=1)
+        al, gate = self.run_rulesets(gh)
+        [(method, _, body)] = self.puts(gh)
+        self.assertEqual(method, "POST")
+        self.assertIn(META_BOUND, required(body))
+        self.assertIn("added required check pr-metadata-success", al.changes[0]["detail"])
+
+    def test_standard_validation_rejects_a_bad_metadata_key(self):
+        bad = [
+            ("metadata", "pr-metadata-success"),
+            ("metadata", {}),
+            ("metadata", {"context": META, "workflow": ".github/workflows/pr-metadata.yml"}),
+            ("metadata", {"context": "PR metadata"}),
+            ("metadata", {"context": "ci-success"}),
+            ("metadata", {"context": ""}),
+            ("expansion", {"context": META, "workflow": ".github/workflows/pr-metadata.yml", "repos": []}),
         ]
-        self.workflow = {"id": 14, "path": METADATA, "state": "active"}
-        self.main_heads = [{"name": "main", "protected": True, "commit": {"sha": EXPANSION_BASE}}]
-        blob = {"path": METADATA, "mode": "100644", "type": "blob", "sha": "d" * 40}
-        self.trees = {commit: {"sha": commit, "truncated": False, "tree": [dict(blob)]}
-                      for commit in [EXPANSION_BASE, *(pr["head"]["sha"] for pr in self.pulls)]}
-        self.run_workflow_id = 14
-        self.check_app = 15368
-        self.job_conclusion = "success"
-        self.run_conclusion = "success"
-        self.run_peers = []
-        self.run_total = None
-        self.run_peers_first = True
-        self.unavailable_head = None
-        self.wrong_title = False
-        self.workflow_error = False
-        self.census_changes = False
-        self.ruleset_changes = False
-        self.latest_branch = "main"
-        self.effective = []
-        self.censuses = 0
-        self.ruleset_reads = 0
-
-    def paginate(self, path, key=None):
-        self.reads.append(path)
-        if "/pulls?" in path:
-            self.censuses += 1
-            if self.census_changes and self.censuses == 2:
-                return self.pulls[:1]
-            return self.pulls
-        if "/rules/branches/" in path:
-            return self.effective
-        if path.endswith("/jobs?per_page=100"):
-            run_id = int(path.split("/runs/")[1].split("/")[0])
-            return [{"name": METADATA_CHECK, "status": "completed", "conclusion": self.job_conclusion,
-                     "run_id": run_id, "run_attempt": 2,
-                     "check_run_url": f"https://api.github.com/repos/{EXPANSION_REPO}/check-runs/{run_id}"}]
-        return super().paginate(path, key)
-
-    def get(self, path, ok=(200,)):
-        self.reads.append(path)
-        if path == f"/repos/{EXPANSION_REPO}":
-            return 200, {"default_branch": self.latest_branch}
-        if path.endswith("/branches/main"):
-            return 200, self.main_heads.pop(0) if len(self.main_heads) > 1 else self.main_heads[0]
-        if "/git/trees/" in path:
-            commit = path.rsplit("/", 1)[1].split("?", 1)[0]
-            return 200, self.trees[commit]
-        if path.endswith("/actions/workflows/pr-metadata.yml"):
-            if self.workflow_error:
-                raise align.ApiError("GET", path, 403, {"message": "fixture denied"})
-            return 200, self.workflow
-        if "/actions/workflows/14/runs?" in path:
-            head = align.urllib.parse.parse_qs(align.urllib.parse.urlsplit(path).query)["head_sha"][0]
-            pr = next(pr for pr in self.pulls if pr["head"]["sha"] == head)
-            if self.unavailable_head == head:
-                return 200, {"workflow_runs": []}
-            number = pr["number"]
-            run = {"id": number, "run_attempt": 2, "event": "pull_request", "head_sha": head,
-                   "workflow_id": self.run_workflow_id, "path": METADATA, "status": "completed",
-                   "conclusion": self.run_conclusion, "created_at": "2026-01-01T00:00:01Z",
-                   "check_suite_id": number + 1000, "display_title": f"PR {number if not self.wrong_title else 99} metadata"}
-            peers = [dict(run, id=number + 100 * index, check_suite_id=number + 1000 + 100 * index)
-                     | fields for index, fields in enumerate(self.run_peers, start=1)]
-            runs = peers + [run] if self.run_peers_first else [run] + peers
-            return 200, {"total_count": len(runs) if self.run_total is None else self.run_total,
-                         "workflow_runs": runs}
-        if "/check-runs/" in path:
-            run_id = int(path.rsplit("/", 1)[1])
-            number = run_id % 100
-            head = next(pr["head"]["sha"] for pr in self.pulls if pr["number"] == number)
-            return 200, {"name": METADATA_CHECK, "app": {"id": self.check_app}, "head_sha": head,
-                         "check_suite": {"id": run_id + 1000}, "status": "completed", "conclusion": "success"}
-        status, body = super().get(path, ok)
-        self.ruleset_reads += 1
-        if self.ruleset_changes and self.ruleset_reads > 1:
-            body["rules"] += [{"type": "required_linear_history"}]
-        return status, body
-
-
-class RequiredCheckExpansion(WithoutTrackerPrBypass):
-    def standard(self, enrolled=True):
+        for key, value in bad:
+            with self.subTest(key=key, value=value):
+                std = json.loads(json.dumps(STD))
+                std["required_check"].pop("expansion", None)
+                std["required_check"][key] = value
+                with self.assertRaises(ValueError):
+                    align.validate_standard(std)
         std = json.loads(json.dumps(STD))
-        std["required_check"]["expansion"] = {
-            "context": METADATA_CHECK, "workflow": METADATA, "repos": [EXPANSION_REPO] if enrolled else [],
-        }
-        return std
-
-    def align(self, gh, enrolled=True, explicitly_selected=True):
-        std = self.standard(enrolled)
-        runner = align.Aligner(gh, std, sweep=False, expansion_repo=EXPANSION_REPO if explicitly_selected else None)
-        runner.ci_success_reported = lambda _: True
-        runner.align_rulesets(repo(EXPANSION_REPO), std["profiles"]["oss"])
-        return runner
-
-    def test_adds_only_the_bound_context_on_an_already_aligned_gate(self):
-        gh = ExpansionGH()
-        self.align(gh)
-        (method, path, body), = gh.writes
-        self.assertEqual((method, path), ("PUT", f"/repos/{EXPANSION_REPO}/rulesets/20"))
-        expected = align.ruleset_body(gh.rulesets[0])
-        next(r for r in expected["rules"] if r["type"] == "required_status_checks")["parameters"][
-            "required_status_checks"].append({"context": METADATA_CHECK, "integration_id": 15368})
-        self.assertEqual(body, expected)
-        self.assertEqual(gh.censuses, 2)
-
-    def align_only(self, gh, enrolled=True, **repo_options):
-        runner = align.Aligner(gh, self.standard(enrolled), sweep=True, expansion_repo=EXPANSION_REPO)
-        runner.align_required_check_only(repo(EXPANSION_REPO, **repo_options))
-        return runner
-
-    def test_expansion_only_preserves_all_other_settings_and_rules(self):
-        gh = ExpansionGH()
-        gh.rulesets[0]["rules"][0]["parameters"]["allowed_merge_methods"] = ["squash"]
-        gh.rulesets[0]["bypass_actors"].append(dict(APP))
-        gh.rulesets.append(base_main())
-        expected = align.ruleset_body(gh.rulesets[0])
-        next(rule for rule in expected["rules"] if rule["type"] == "required_status_checks")[
-            "parameters"]["required_status_checks"].append({"context": METADATA_CHECK, "integration_id": 15368})
-        runner = self.align_only(gh)
-        self.assertEqual(gh.writes, [("PUT", f"/repos/{EXPANSION_REPO}/rulesets/20", expected)])
-        self.assertEqual(runner.changes[0]["before"], align.ruleset_body(gh.rulesets[0]))
-        self.assertEqual(runner.changes[0]["after"], expected)
-        self.assertEqual(gh.censuses, 2)
-        self.assertFalse(any("/security" in path or "/actions/permissions" in path or "/caches" in path
-                             for path in gh.reads))
-
-    def test_expansion_only_holds_without_an_unambiguous_readable_gate(self):
-        for problem in ("missing", "competing", "bypass unreadable", "unprotected", "workflow differs"):
-            with self.subTest(problem=problem):
-                gh = ExpansionGH()
-                if problem == "missing":
-                    gh.rulesets = [base_main()]
-                elif problem == "competing":
-                    gh.rulesets.append(tracker_gate(rid=30))
-                elif problem == "bypass unreadable":
-                    del gh.rulesets[0]["bypass_actors"]
-                elif problem == "unprotected":
-                    gh.main_heads[0]["protected"] = False
-                else:
-                    gh.trees["b" * 40]["tree"][0]["sha"] = "e" * 40
-                runner = self.align_only(gh)
-                self.assertEqual(gh.writes, [])
-                self.assertTrue(any(f["kind"] == "required-check-expansion-held" for f in runner.findings))
-
-    def test_expansion_only_has_no_write_for_existing_check_or_unenrolled_repo(self):
-        for condition in ("already required", "unenrolled", "archived"):
-            with self.subTest(condition=condition):
-                gh = ExpansionGH()
-                if condition == "already required":
-                    next(rule for rule in gh.rulesets[0]["rules"] if rule["type"] == "required_status_checks")[
-                        "parameters"]["required_status_checks"].append({
-                            "context": METADATA_CHECK, "integration_id": 15368})
-                self.align_only(gh, condition != "unenrolled", archived=condition == "archived")
-                self.assertEqual(gh.writes, [])
-                self.assertEqual(gh.censuses, 0)
-
-    def test_expansion_only_proves_all_tied_latest_runs(self):
-        for conclusion in ("cancelled", "success"):
-            for peer_first in (False, True):
-                with self.subTest(conclusion=conclusion, peer_first=peer_first):
-                    gh = ExpansionGH()
-                    gh.run_peers = [{"conclusion": conclusion}]
-                    gh.run_peers_first = peer_first
-                    self.align_only(gh)
-                    self.assertEqual(len(gh.writes), int(conclusion == "success"))
-                    if conclusion == "success":
-                        self.assertIn(f"/repos/{EXPANSION_REPO}/check-runs/111", gh.reads)
-                        self.assertIn(f"/repos/{EXPANSION_REPO}/check-runs/11", gh.reads)
-
-    def test_expansion_only_uses_creation_time_and_requires_a_complete_run_list(self):
-        for reported_total, expected_writes in ((2, 1), (3, 0)):
-            with self.subTest(reported_total=reported_total):
-                gh = ExpansionGH()
-                gh.run_peers = [{"conclusion": "cancelled", "created_at": "2026-01-01T00:00:00Z"}]
-                gh.run_total = reported_total
-                self.align_only(gh)
-                self.assertEqual(len(gh.writes), expected_writes)
-
-    def test_requires_enrollment_and_explicit_single_repo_selection(self):
-        for enrolled, selected in [(False, True), (True, False), (False, False)]:
-            with self.subTest(enrolled=enrolled, selected=selected):
-                gh = ExpansionGH()
-                self.align(gh, enrolled, selected)
-                self.assertEqual(gh.writes, [])
-                self.assertFalse(any("/pulls?" in p or "/actions/" in p or "/check-runs" in p for p in gh.reads))
-
-    def test_defers_on_missing_or_untrusted_evidence(self):
-        for key, value in [
-            ("unavailable_head", "b" * 40), ("check_app", 500), ("job_conclusion", "skipped"),
-            ("run_conclusion", "failure"), ("wrong_title", True), ("workflow_error", True),
-            ("run_workflow_id", 15),
-            ("census_changes", True), ("ruleset_changes", True), ("latest_branch", "other"),
-        ]:
-            with self.subTest(problem=key):
-                gh = ExpansionGH()
-                setattr(gh, key, value)
-                runner = self.align(gh)
-                self.assertEqual(gh.writes, [])
-                self.assertTrue(any(f["kind"] == "required-check-expansion-held" for f in runner.findings))
-
-    def test_holds_active_green_workflow_that_is_missing_from_protected_main(self):
-        gh = ExpansionGH()
-        gh.trees[EXPANSION_BASE]["tree"] = []
-        runner = self.align(gh)
-        self.assertEqual(gh.writes, [])
-        self.assertIn("protected default branch", runner.findings[-1]["detail"])
-
-    def test_holds_active_green_workflow_that_differs_on_an_open_head(self):
-        gh = ExpansionGH()
-        gh.trees["b" * 40]["tree"][0]["sha"] = "e" * 40
-        runner = self.align(gh)
-        self.assertEqual(gh.writes, [])
-        self.assertIn("PR #12", runner.findings[-1]["detail"])
-
-    def test_holds_when_protected_source_or_its_readback_is_untrusted(self):
-        for failure in ("unprotected", "symlink", "truncated", "main moved"):
-            with self.subTest(failure=failure):
-                gh = ExpansionGH()
-                if failure == "unprotected":
-                    gh.main_heads[0]["protected"] = False
-                elif failure == "symlink":
-                    gh.trees[EXPANSION_BASE]["tree"][0]["mode"] = "120000"
-                elif failure == "truncated":
-                    gh.trees[EXPANSION_BASE]["truncated"] = True
-                else:
-                    gh.main_heads.append({"name": "main", "protected": True, "commit": {"sha": "e" * 40}})
-                runner = self.align(gh)
-                self.assertEqual(gh.writes, [])
-                self.assertTrue(any(f["kind"] == "required-check-expansion-held" for f in runner.findings))
-
-    def test_holds_when_no_current_pr_or_sha_is_shared(self):
-        for pulls in ([], [dict(pr, head={"sha": SHA}) for pr in ExpansionGH().pulls]):
-            gh = ExpansionGH()
-            gh.pulls = pulls
-            self.align(gh)
-            self.assertEqual(gh.writes, [])
-
-    def test_leaves_existing_additional_context_when_unenrolled(self):
-        gh = ExpansionGH()
-        checks = next(r for r in gh.rulesets[0]["rules"] if r["type"] == "required_status_checks")[
-            "parameters"]["required_status_checks"]
-        checks.append({"context": METADATA_CHECK, "integration_id": 15368})
-        for enrolled in (True, False):
-            self.align(gh, enrolled)
-            self.assertEqual(gh.writes, [])
-
-    def test_does_not_enroll_while_applying_the_existing_gate_floor(self):
-        gh = ExpansionGH()
-        gh.rulesets[0]["rules"][0]["parameters"]["allowed_merge_methods"] = ["squash"]
-        self.align(gh)
-        self.assertEqual(len(gh.writes), 1)
-        self.assertNotIn(METADATA_CHECK, align.required_contexts(gh.writes[0][2]))
-        self.assertEqual(gh.censuses, 0)
-
-    def test_merge_queue_and_effective_context_collision_hold(self):
-        for rules in [
-            [{"type": "merge_queue"}],
-            [{"type": "required_status_checks", "parameters": {
-                "required_status_checks": [{"context": METADATA_CHECK, "integration_id": 500}]}}],
-        ]:
-            gh = ExpansionGH()
-            gh.effective = rules
-            self.align(gh)
-            self.assertEqual(gh.writes, [])
-
-    def test_invalid_enrollment_is_rejected(self):
-        for key, value in [
-            ("repos", ["unknown-owner/fixture"]), ("repos", [EXPANSION_REPO, EXPANSION_REPO]),
-            ("repos", "all"), ("context", "ci-success"), ("workflow", "../workflow.yml"),
-        ]:
-            std = self.standard()
-            std["required_check"]["expansion"][key] = value
-            with self.subTest(key=key, value=value), self.assertRaises(ValueError):
-                align.validate_standard(std)
-        std = self.standard()
-        std["required_check"]["integration_id"] = 500
-        with self.assertRaisesRegex(ValueError, "GitHub Actions integration"):
+        std["required_check"].pop("expansion", None)
+        std["required_check"]["metadata"] = {"context": META}
+        std["required_check"]["integration_id"] = 1
+        with self.assertRaises(ValueError):
             align.validate_standard(std)
+
+    def test_the_manual_expansion_mode_is_gone(self):
+        import subprocess
+        import sys
+        out = subprocess.run([sys.executable, os.path.join(HERE, "align-repo-settings.py"),
+                              "--expand-required-check-only", "--dry-run", "--repo", "rknightion/x"],
+                             capture_output=True, text=True, timeout=60, env={"PATH": os.environ.get("PATH", "")})
+        self.assertEqual(out.returncode, 2)
+        self.assertIn("unrecognized arguments: --expand-required-check-only", out.stderr)
 
 
 class LoopMd(unittest.TestCase):
