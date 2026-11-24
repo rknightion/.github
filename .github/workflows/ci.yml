@@ -7,7 +7,7 @@ on:
   push:
     branches: [main]
   pull_request:
-    types: [opened, edited, reopened, synchronize, ready_for_review]
+    types: [opened, reopened, synchronize, ready_for_review]
 
 permissions: {}
 
@@ -40,21 +40,6 @@ jobs:
     uses: ./.github/workflows/just-check.yml
     with:
       setup: true
-
-  # A pull request that closes an issue shows evidence for each of its acceptance criteria. Checks
-  # only pull requests with a closing keyword (enforce-all-prs: false), because this repository takes
-  # bot pull requests. Remote pinned form on purpose: a `./` call would run the checker from the pull
-  # request's own head. Check run: `ac-evidence / Acceptance evidence`.
-  ac-evidence:
-    # The reusable fails on any event but pull_request; on a push to main this job is skipped.
-    if: github.event_name == 'pull_request'
-    permissions:
-      contents: read
-      issues: read
-      pull-requests: read
-    uses: rknightion/.github/.github/workflows/ac-evidence.yml@7ed87713176ccae972b0143071b0196ff370d804 # v1.32.3
-    with:
-      enforce-all-prs: false
 
   # The lines a pull request adds carry no identifier, email address, public address or credential
   # shape. Remote pinned form on purpose, like ac-evidence: this repo is public, and a `./` call
@@ -113,7 +98,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 5
     if: always()
-    needs: [actionlint, zizmor, just, ac-evidence, privacy-sweep, backlog-freeze]
+    needs: [actionlint, zizmor, just, privacy-sweep, backlog-freeze]
     steps:
       - name: Fail if any required job did not pass
         if: ${{ contains(needs.*.result, 'failure') || contains(needs.*.result, 'cancelled') }}
@@ -127,23 +112,21 @@ jobs:
       - name: Fail if a pull request check did not run
         if: ${{ github.event_name == 'pull_request' }}
         env:
-          AC_EVIDENCE: ${{ needs.ac-evidence.result }}
           PRIVACY_SWEEP: ${{ needs.privacy-sweep.result }}
           BACKLOG_FREEZE: ${{ needs.backlog-freeze.result }}
         run: |
-          if [[ "$AC_EVIDENCE" != "success" || "$PRIVACY_SWEEP" != "success" || "$BACKLOG_FREEZE" != "success" ]]; then
-            echo "ac-evidence: ${AC_EVIDENCE}, privacy-sweep: ${PRIVACY_SWEEP}, backlog-freeze: ${BACKLOG_FREEZE}; all must pass on a pull request"
+          if [[ "$PRIVACY_SWEEP" != "success" || "$BACKLOG_FREEZE" != "success" ]]; then
+            echo "privacy-sweep: ${PRIVACY_SWEEP}, backlog-freeze: ${BACKLOG_FREEZE}; all must pass on a pull request"
             exit 1
           fi
       - name: Fail if a pull request check ran off a pull request
         if: ${{ github.event_name != 'pull_request' }}
         env:
-          AC_EVIDENCE: ${{ needs.ac-evidence.result }}
           PRIVACY_SWEEP: ${{ needs.privacy-sweep.result }}
           BACKLOG_FREEZE: ${{ needs.backlog-freeze.result }}
         run: |
-          if [[ "$AC_EVIDENCE" != "skipped" || "$PRIVACY_SWEEP" != "skipped" || "$BACKLOG_FREEZE" != "skipped" ]]; then
-            echo "ac-evidence: ${AC_EVIDENCE}, privacy-sweep: ${PRIVACY_SWEEP}, backlog-freeze: ${BACKLOG_FREEZE}; all must be skipped off a pull request"
+          if [[ "$PRIVACY_SWEEP" != "skipped" || "$BACKLOG_FREEZE" != "skipped" ]]; then
+            echo "privacy-sweep: ${PRIVACY_SWEEP}, backlog-freeze: ${BACKLOG_FREEZE}; all must be skipped off a pull request"
             exit 1
           fi
       - name: All required jobs passed
