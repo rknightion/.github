@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.32.4](https://github.com/rknightion/.github/compare/v1.32.3...v1.32.4) (2026-11-24)
+
+
+### Build & CI
+
+* **deps:** update github/codeql-action action to v4.39.5 ([#382](https://github.com/rknightion/.github/issues/382)) ([83c289b](https://github.com/rknightion/.github/commit/83c289b15474b6ea5f845682d8fab445fe7c5d9d))
+* **deps:** update sigstore/cosign-installer action to v4.1.4 ([#383](https://github.com/rknightion/.github/issues/383)) ([d312b85](https://github.com/rknightion/.github/commit/d312b85f8402a17000bff0cb6832f6fb67760908))
+
 ## [1.32.3](https://github.com/rknightion/.github/compare/v1.32.2...v1.32.3) (2026-11-24)
 
 
