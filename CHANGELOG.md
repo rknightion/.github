@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.32.3](https://github.com/rknightion/.github/compare/v1.32.2...v1.32.3) (2026-11-24)
+
+
+### Build & CI
+
+* **deps:** update zizmorcore/zizmor-action action to v0.9.2 ([#378](https://github.com/rknightion/.github/issues/378)) ([1ab0b24](https://github.com/rknightion/.github/commit/1ab0b2456a6abebf597251034d8e59f2a98fd772))
+
 ## [1.32.2](https://github.com/rknightion/.github/compare/v1.32.1...v1.32.2) (2026-11-24)
 
 
