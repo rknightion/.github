@@ -262,7 +262,7 @@ jobs:
 
       - name: Upload Trivy SARIF
         if: inputs.trivy && inputs.trivy-upload-sarif && hashFiles(format('trivy-{0}.sarif', env.PLATFORM_PAIR)) != ''
-        uses: github/codeql-action/upload-sarif@1bd86f2fdb4b86187fa4059f16f31a3202acc9ea # v4.39.4
+        uses: github/codeql-action/upload-sarif@915412ff23e8b7659517e607487dbeae018f2934 # v4.39.5
         with:
           sarif_file: trivy-${{ env.PLATFORM_PAIR }}.sarif
           category: trivy-image-${{ inputs.image-name && format('{0}-', inputs.image-name) || '' }}${{ env.PLATFORM_PAIR }}
