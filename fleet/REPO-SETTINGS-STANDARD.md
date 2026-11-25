@@ -90,9 +90,10 @@ Every run (scheduled, owner-wide or one repository) adds it to a `main` ruleset 
 window as `ci-success`: a recent default-branch commit or the head of a recently updated pull
 request. It is bound to the Actions app and treated as a floor like `ci-success`: never removed, and
 an existing entry bound to another app is rebound. A repository not gated on `ci-success` never
-gets it, and one where it has not reported gets nothing and no finding. Both checks are read in
-one GraphQL query per repository, and a gated ruleset that already requires the check needs no
-query.
+gets it, and one where it has not reported gets nothing and no finding. The metadata check is read in its own query: check suites from the GitHub Actions app on the
+heads of the most recently updated pull requests, because the workflow runs on pull requests only
+and a busy commit carries more suites from other apps than the `ci-success` query can read. A
+gated ruleset that already requires the check needs no query.
 
 A repository moves to it in one change: add the metadata workflow, and drop `edited` and the moved
 jobs from the heavy workflow. Until the next aligner run after the check first reports, the evidence
