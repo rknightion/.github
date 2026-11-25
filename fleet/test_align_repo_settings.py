@@ -264,7 +264,8 @@ def required(body):
 
 
 class ChecksGH(FakeGH):
-    """Answers the per-repo check query: ci and meta are the aliased check-run counts on one commit."""
+    """Answers the two check queries: ci on a default-branch commit or PR head (on), and meta, the
+    metadata check from the Actions app, on a pull request head."""
 
     def __init__(self, rulesets=None, ci=0, meta=0, on="branch"):
         super().__init__(rulesets)
@@ -272,7 +273,10 @@ class ChecksGH(FakeGH):
 
     def graphql(self, query, variables, write=False):
         self.queries.append((query, dict(variables)))
-        commit = {"checkSuites": {"nodes": [{"ci": {"totalCount": self.ci}, "meta": {"totalCount": self.meta}}]}}
+        if "$m" in query:
+            commit = {"checkSuites": {"nodes": [{"checkRuns": {"totalCount": self.meta}}]}}
+            return {"repository": {"pullRequests": {"nodes": [{"commits": {"nodes": [{"commit": commit}]}}]}}}
+        commit = {"checkSuites": {"nodes": [{"ci": {"totalCount": self.ci}}]}}
         history = [commit] if self.on == "branch" else []
         prs = [{"commits": {"nodes": [{"commit": commit}]}}] if self.on == "pr" else []
         return {"repository": {"defaultBranchRef": {"target": {"history": {"nodes": history}}},
@@ -360,21 +364,49 @@ class MetadataCheck(unittest.TestCase):
         [(_, _, body)] = self.puts(gh)
         self.assertIn(META_BOUND, required(body))
 
-    def test_one_query_names_both_checks_and_binds_metadata_to_actions(self):
+    def test_metadata_query_reads_actions_suites_on_pull_request_heads(self):
         for on in ("branch", "pr"):
             with self.subTest(on=on):
                 gh = ChecksGH(rulesets=[base_main()], ci=1, meta=1, on=on)
                 al, gate = self.run_rulesets(gh)
                 self.assertEqual(gate, "ci")
-                self.assertEqual(len(gh.queries), 1)
-                query, variables = gh.queries[0]
-                self.assertEqual((variables["c"], variables["m"], variables["a"]), ("ci-success", META, 15368))
+                self.assertEqual(len(gh.queries), 2)  # ci-success, then the metadata check
+                query, variables = gh.queries[1]
+                self.assertEqual((variables["m"], variables["a"]), (META, 15368))
                 flat = "".join(query.split())
-                self.assertIn("ci:checkRuns(first:1,filterBy:{checkName:$c})", flat)
-                self.assertIn("meta:checkRuns(first:1,filterBy:{checkName:$m,appId:$a})", flat)
+                self.assertIn("checkSuites(first:50,filterBy:{appId:$a})", flat)
+                self.assertIn("checkRuns(first:1,filterBy:{checkName:$m})", flat)
+                self.assertNotIn("defaultBranchRef", flat)  # the metadata workflow runs on pull requests only
                 [(_, _, body)] = self.puts(gh)
                 self.assertIn(META_BOUND, required(body))
                 self.assertIn("added required check pr-metadata-success", al.changes[0]["detail"])
+
+    def test_metadata_found_when_the_combined_query_hits_github_limits(self):
+        # Busy public repos exceed GraphQL resource limits on the full lookback, and the fallback
+        # reads ten check suites a commit. Their pull request heads carry more than ten suites from
+        # other apps, so the metadata check sat past the cut and was never seen (24 Nov 2026).
+        class Busy(FakeGH):
+            def __init__(self, rulesets):
+                super().__init__(rulesets)
+                self.queries = []
+
+            def graphql(self, query, variables, write=False):
+                self.queries.append((query, dict(variables)))
+                if variables.get("s") == 20:
+                    raise align.ApiError("POST", "/graphql#limits", 200, {"message": "Resource limits exceeded"})
+                if "appId:$a" in "".join(query.split()) and "checkSuites(first:50" in "".join(query.split()):
+                    commit = {"checkSuites": {"nodes": [{"checkRuns": {"totalCount": 1}}]}}
+                    return {"repository": {"pullRequests": {"nodes": [{"commits": {"nodes": [{"commit": commit}]}}]}}}
+                others = [{"ci": {"totalCount": 0}, "meta": {"totalCount": 0}} for _ in range(variables.get("s", 10))]
+                commit = {"checkSuites": {"nodes": others}}
+                return {"repository": {"defaultBranchRef": None,
+                                        "pullRequests": {"nodes": [{"commits": {"nodes": [{"commit": commit}]}}]}}}
+
+        gh = Busy(rulesets=[aligned_gate()])
+        al = align.Aligner(gh, STD, sweep=False)
+        al.align_rulesets(repo("rknightion/x"), STD["profiles"]["oss"])
+        self.assertIn(META_BOUND, required(self.puts(gh)[0][2]))
+        self.assertEqual(al.errors, [])
 
     def test_gated_ruleset_costs_one_query_only_when_the_check_is_missing(self):
         gh = ChecksGH(rulesets=[aligned_gate()], ci=1, meta=1)

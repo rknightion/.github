@@ -804,7 +804,6 @@ class Aligner:
     def __init__(self, gh: GitHub, std: dict, sweep: bool, blob_cache: dict | None = None):
         validate_standard(std)
         self.gh, self.std, self.sweep = gh, std, sweep
-        self._reported: dict[str, dict[str, bool]] = {}  # repo -> {"ci", "meta"}: one query per repo
         self.blob_cache = blob_cache if blob_cache is not None else {}  # blob sha -> uses (immutable)
         self._org_pinning: dict[str, bool] = {}
         self.changes, self.findings, self.errors = [], [], []
@@ -824,32 +823,29 @@ class Aligner:
             self.errors.append({"scope": scope, "area": area, "error": str(e)})
 
     # -- helpers
-    CI_QUERY = """query($o:String!,$n:String!,$c:String!,$k:Int!,$s:Int!META_VARS){repository(owner:$o,name:$n){
+    CI_QUERY = """query($o:String!,$n:String!,$c:String!,$k:Int!,$s:Int!){repository(owner:$o,name:$n){
       defaultBranchRef{target{... on Commit{history(first:$k){nodes{...runs}}}}}
       pullRequests(first:10,orderBy:{field:UPDATED_AT,direction:DESC}){nodes{commits(last:1){nodes{commit{...runs}}}}}}}
-      fragment runs on Commit{checkSuites(first:$s){nodes{ci:checkRuns(first:1,filterBy:{checkName:$c}){totalCount}META_RUNS}}}"""
-    META_VARS = ",$m:String!,$a:Int!"
-    META_RUNS = " meta:checkRuns(first:1,filterBy:{checkName:$m,appId:$a}){totalCount}"
+      fragment runs on Commit{checkSuites(first:$s){nodes{ci:checkRuns(first:1,filterBy:{checkName:$c}){totalCount}}}}"""
+    # The metadata workflow runs on pull requests only, so only pull request heads can carry its
+    # check. Suites are filtered to the GitHub Actions app: a busy public repo's heads carry more
+    # suites from other apps than the combined query above can read once it falls back to ten.
+    META_QUERY = """query($o:String!,$n:String!,$m:String!,$a:Int!){repository(owner:$o,name:$n){
+      pullRequests(first:10,orderBy:{field:UPDATED_AT,direction:DESC}){nodes{commits(last:1){nodes{commit{
+      checkSuites(first:50,filterBy:{appId:$a}){nodes{checkRuns(first:1,filterBy:{checkName:$m}){totalCount}}}}}}}}}}"""
 
-    def reported_checks(self, full: str) -> dict[str, bool]:
-        """Have the required check (ci) and the metadata check (meta) reported recently, on the default
-        branch or on a PR head? The metadata check counts only from the GitHub Actions app.
+    def ci_success_reported(self, full: str) -> bool:
+        """Has the required check reported recently, on the default branch or on a PR head?
 
         Many repos run their aggregator on pull_request only; a ruleset evaluates the PR head,
-        so a PR-only check is still a working gate. One GraphQL call per repo, both checks as aliases."""
-        if full in self._reported:
-            return self._reported[full]
+        so a PR-only check is still a working gate. One GraphQL call per repo."""
         owner, name = full.split("/")
         rc = self.std["required_check"]
-        meta = (rc.get("metadata") or {}).get("context")
-        query = self.CI_QUERY.replace("META_VARS", self.META_VARS if meta else "") \
-            .replace("META_RUNS", self.META_RUNS if meta else "")
-        extra = {"m": meta, "a": rc["integration_id"]} if meta else {}
         d = None
         for k, suites in ((rc["lookback_commits"], 20), (5, 10)):
             try:
-                d = self.gh.graphql(query, {"o": owner, "n": name, "c": rc["context"],
-                                            "k": k, "s": suites, **extra})["repository"]
+                d = self.gh.graphql(self.CI_QUERY, {"o": owner, "n": name, "c": rc["context"],
+                                                    "k": k, "s": suites})["repository"]
                 break
             except ApiError as e:
                 if not e.path.endswith("#limits") or suites == 10:
@@ -859,16 +855,20 @@ class Aligner:
         commits += (target.get("history") or {}).get("nodes") or []
         for pr in (d.get("pullRequests") or {}).get("nodes") or []:
             commits += [n["commit"] for n in pr["commits"]["nodes"]]
-        suites = [cs for c in commits for cs in c["checkSuites"]["nodes"]]
-        self._reported[full] = {"ci": any(cs["ci"]["totalCount"] for cs in suites),
-                                "meta": bool(meta) and any(cs["meta"]["totalCount"] for cs in suites)}
-        return self._reported[full]
-
-    def ci_success_reported(self, full: str) -> bool:
-        return self.reported_checks(full)["ci"]
+        return any(cs["ci"]["totalCount"] for c in commits for cs in c["checkSuites"]["nodes"])
 
     def metadata_reported(self, full: str) -> bool:
-        return self.reported_checks(full)["meta"]
+        """Has the metadata check reported from the GitHub Actions app on a recent PR head?"""
+        owner, name = full.split("/")
+        rc = self.std["required_check"]
+        meta = (rc.get("metadata") or {}).get("context")
+        if not meta:
+            return False
+        d = self.gh.graphql(self.META_QUERY, {"o": owner, "n": name, "m": meta,
+                                              "a": rc["integration_id"]})["repository"]
+        return any(cs["checkRuns"]["totalCount"]
+                   for pr in (d.get("pullRequests") or {}).get("nodes") or []
+                   for c in pr["commits"]["nodes"] for cs in c["commit"]["checkSuites"]["nodes"])
 
     def workflow_uses(self, full: str) -> set[str] | None:
         status, tree, _ = self.gh.call("GET", f"/repos/{full}/git/trees/HEAD?recursive=1")
