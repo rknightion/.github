@@ -7,6 +7,7 @@ import hashlib
 import io
 import json
 import os
+import shutil
 import sys
 import tempfile
 import unittest
@@ -157,9 +158,13 @@ class TestStructure(LintCase):
                                 ("both-apache-only-skill", "Apache-2.0 AND MIT", APACHE_TEXT)):
             with self.subTest(name=name):
                 d = self.add_skill(name, license=lic, license_text=text)
-                self.assertFinding(f"{name}/LICENSE:1: LICENSE text does not match")
-                (d / "LICENSE").write_text(LICENSE_TEXTS[lic])
-                self.assertEqual(self.lint()[0], 0, name)
+                try:
+                    self.assertFinding(f"{name}/LICENSE:1: LICENSE text does not match")
+                    (d / "LICENSE").write_text(LICENSE_TEXTS[lic])
+                    self.assertEqual(self.lint()[0], 0, name)
+                finally:
+                    # Remove the skill however the subtest ends: a failure must not leak into the next.
+                    shutil.rmtree(d, ignore_errors=True)
 
     def test_symlink_anywhere_in_skill_flagged(self) -> None:
         d = self.add_skill("link-skill")
@@ -329,14 +334,15 @@ class TestPortableNames(LintCase):
                 (d / bad).unlink()
         self.assertEqual(self.lint()[0], 0)
 
-    def test_device_name_skill_dir_and_lock_name_are_findings(self) -> None:
+    def test_device_name_skill_dir_is_a_finding(self) -> None:
         self.add_skill("con")
-        self.assertFinding("Windows device name")
+        self.assertFinding("skill dir name 'con' may not be a Windows device name")
+
+    def test_device_name_lock_name_is_a_finding(self) -> None:
+        # No device-named skill dir here: the finding must come from the lock name alone.
         (self.root / "upstream.lock.json").write_text(json.dumps({"schema": 1, "sources": {}, "skills": {
             "nul": {"source": "s", "path": "p", "vend": False, "files": {}}}}))
-        rc, out = self.lint()
-        self.assertIn("'nul'", out)
-        self.assertIn("Windows device name", out)
+        self.assertFinding("skill name 'nul' may not be a Windows device name")
 
     def test_case_colliding_names_are_a_finding(self) -> None:
         d = self.add_skill("case-skill")
