@@ -81,50 +81,22 @@ history, meraki-dashboard-ha's `validate-success`, or brewmdm-control-plane's el
 
 ### Adding the PR metadata check
 
-`required_check.expansion` defines the additional job name, workflow path and exact repository
-enrollment list. The published list is empty. Use a private copy of the standard with one
-approved enrollment and pass it through `--standard` with one matching `--repo`.
-Use `--expand-required-check-only --dry-run` to review the exact before and after ruleset.
-Removing `--dry-run` in that mode recomputes proof and can append only the additional check to
-one unambiguous existing active gate. This operation leaves the other repository settings and
-rulesets alone. The normal settings floor runs independently. Scheduled, owner-wide and
-multi-repository runs leave enrollment idle. Removing an enrollment leaves an already-required
-check in place.
+`required_check.metadata` names a second required check, `pr-metadata-success`. It is the aggregator
+job of a repository's separate `PR metadata` workflow, which carries the acceptance-evidence check,
+so editing a pull request body reruns that workflow and not the heavy CI.
 
-Stage the rollout in order.
+Every run (scheduled, owner-wide or one repository) adds it to a `main` ruleset gated on
+`ci-success` once a check run of that name from the GitHub Actions app has reported in the same
+window as `ci-success`: a recent default-branch commit or the head of a recently updated pull
+request. It is bound to the Actions app and treated as a floor like `ci-success`: never removed, and
+an existing entry bound to another app is rebound. A repository not gated on `ci-success` never
+gets it, and one where it has not reported gets nothing and no finding. Both checks are read in
+one GraphQL query per repository, and a gated ruleset that already requires the check needs no
+query.
 
-1. Land the separate workflow on the caller's default branch. The initial standard expects
-   `.github/workflows/pr-metadata.yml` with a unique `pr-metadata-success` job and
-   `run-name: PR ${{ github.event.pull_request.number }} metadata`. Listen for `opened`, `edited`,
-   `reopened`, `synchronize` and `ready_for_review` on `pull_request`. Use a separate concurrency
-   group so metadata reruns cannot cancel heavy jobs. Use the pinned acceptance-evidence reusable
-   with the caller's existing inputs and permissions. Make the metadata job fail when a required
-   dependency fails, is cancelled or is skipped. Leave the original workflow and ruleset intact
-   during expansion.
-2. Exercise the new workflow on a real PR and bring existing open PR heads onto the workflow.
-   Refresh forks or stale branches through their normal approval and update flow. Dry-run the
-   aligner with the private standard and single target. Expansion needs an active default-branch
-   PR ruleset already requiring the Actions-bound primary check and a successful metadata check,
-   from the named workflow and latest attempt, on **every open PR head** targeting that branch.
-   The workflow file must match the regular Git blob on the protected default branch at every
-   open PR head. Jobs from an active workflow that exists only on a PR branch do not qualify.
-   It checks both the job's rendered name and the linked check run's GitHub Actions integration.
-   With no open PRs, use a disposable draft for the proof. Shared heads, unreadable evidence,
-   skipped or red checks, merge queues, competing requirements and changing snapshots defer the
-   addition. When multiple runs on one head share the latest creation timestamp, all must have
-   successful current attempts with the expected check. An incomplete run listing also holds.
-   Confirm the job name is exclusive to
-   the metadata workflow and check any classic branch protection before applying.
-3. Review the dry-run report, then have the authorized maintainer apply the single-repo expansion.
-   Re-read the live ruleset and check both contexts and integration IDs. Wait for the new rule to
-   gate a real PR before contracting the heavy workflow. GitHub offers no atomic update across
-   PR state and rulesets, so recheck the open PRs and default branch immediately after applying.
-4. Once the new check gates, remove the moved metadata dependencies and `edited` trigger from
-   the heavy workflow in the caller's separate change. Keep the heavy required context. Exercise
-   a failing and passing edit on the same tree and record both run IDs and the heavy check's
-   state, plus wall time, job count and queue time. Confirm tracker closure still traces the
-   pinned acceptance-evidence check and its PR/head annotation. The metadata sentinel is a branch
-   gate and does not take the place of the tracker's evidence check.
+A repository moves to it in one change: add the metadata workflow, and drop `edited` and the moved
+jobs from the heavy workflow. Until the next aligner run after the check first reports, the evidence
+check runs on every pull request but is not yet required.
 
 **Tracker repos are the exception.** A repo whose `LOOP.md` on the default branch declares
 `tracker: github` lands its people's and agents' changes by pull request. The writers listed for it
