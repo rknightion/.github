@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.32.6](https://github.com/rknightion/.github/compare/v1.32.5...v1.32.6) (2026-11-25)
+
+
+### Miscellaneous
+
+* remove Bugbot config ([#392](https://github.com/rknightion/.github/issues/392)) ([ca68932](https://github.com/rknightion/.github/commit/ca6893254606e35cda692d8d10812e42421d827d))
+* remove the .cursor folder ([#393](https://github.com/rknightion/.github/issues/393)) ([9882fcc](https://github.com/rknightion/.github/commit/9882fcce5270cda0ea0de4c26c13637908d2d9e9))
+
 ## [1.32.5](https://github.com/rknightion/.github/compare/v1.32.4...v1.32.5) (2026-11-24)
 
 
