@@ -38,6 +38,10 @@ AGENTS_PATH = "AGENTS.md"
 # allow.txt are never written.
 PRIVACY_FILES = ("sweep", "identifier-patterns.txt")
 PRIVACY_DEST = ".github/privacy"
+# vended/grafana/Dockerfile becomes .grafana/Dockerfile, the Grafana Assistant sandbox image, in a
+# repository whose manifest entry sets grafana_sandbox. Opt-in: the rest of .grafana/ is the repository's.
+GRAFANA_FILES = ("Dockerfile",)
+GRAFANA_DEST = ".grafana"
 
 AGENTS_BEGIN = "<!-- BEGIN vended: rknightion/.github -->"
 AGENTS_END = "<!-- END vended: rknightion/.github -->"
@@ -48,7 +52,7 @@ REPO_RE = re.compile(r"^[A-Za-z0-9-]+/[A-Za-z0-9._-]+$")
 SKILL_RE = re.compile(r"^[a-z0-9][a-z0-9-]*$")
 SHA_RE = re.compile(r"^[0-9a-f]{40}$")
 REF_RE = re.compile(r"^[A-Za-z0-9._/-]+$")
-MANIFEST_KEYS = {"repo", "skills", "contributing", "agents_block", "privacy_sweep"}
+MANIFEST_KEYS = {"repo", "skills", "contributing", "agents_block", "privacy_sweep", "grafana_sandbox"}
 
 
 class UsageError(Exception):
@@ -351,7 +355,7 @@ def load_manifest(source: Path) -> dict:
             or not all(isinstance(s, str) and SKILL_RE.match(s) for s in entry["skills"])
         ):
             raise UsageError(f"{path}: {repo}: skills must be a list of skill names")
-        for key in ("contributing", "agents_block", "privacy_sweep"):
+        for key in ("contributing", "agents_block", "privacy_sweep", "grafana_sandbox"):
             if key in entry and not isinstance(entry[key], bool):
                 raise UsageError(f"{path}: {repo}: {key} must be true or false")
     return data
@@ -404,10 +408,12 @@ class UnsafePath(Exception):
 def recordable(rel: str) -> bool:
     """True for a path the engine can own, so a record key outside it is never deleted.
 
-    Skill files under .agents/skills/<name>/, the two vended privacy files, CONTRIBUTING.md and
-    AGENTS.md. The .claude/skills/ links are not recorded; they are found from the skill names.
+    Skill files under .agents/skills/<name>/, the two vended privacy files, .grafana/Dockerfile,
+    CONTRIBUTING.md and AGENTS.md. The .claude/skills/ links are not recorded; they are found from the skill names.
     """
     if rel in (CONTRIBUTING_PATH, AGENTS_PATH) or rel in {f"{PRIVACY_DEST}/{n}" for n in PRIVACY_FILES}:
+        return True
+    if rel in {f"{GRAFANA_DEST}/{n}" for n in GRAFANA_FILES}:
         return True
     parts = PurePosixPath(rel).parts
     return (
@@ -689,6 +695,15 @@ def build_plan(source: Path, target: Path, repo: str, force: bool) -> Plan:
                 if rel in recorded:
                     plan.record_files[rel] = recorded[rel]
                 continue
+            mode = stat.S_IMODE(src.stat().st_mode)
+            guarded(plan_whole_file, rel, target, rel, src.read_bytes(), mode, recorded, force, plan)
+
+    if entry.get("grafana_sandbox", False):
+        for name in GRAFANA_FILES:
+            src = source / "vended" / "grafana" / name
+            rel = f"{GRAFANA_DEST}/{name}"
+            if not src.is_file() or src.is_symlink():
+                raise UsageError(f"{repo}: grafana_sandbox is set but vended/grafana/{name} does not exist")
             mode = stat.S_IMODE(src.stat().st_mode)
             guarded(plan_whole_file, rel, target, rel, src.read_bytes(), mode, recorded, force, plan)
 

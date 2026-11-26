@@ -15,6 +15,7 @@ and `.github/workflows/vend-sync.yml` runs it on every push to `main` that chang
 | `AGENTS-block.md` | `AGENTS.md` | Only the text between `<!-- BEGIN vended: rknightion/.github -->` and `<!-- END vended: rknightion/.github -->` is managed. Without the markers the block goes after the first H1 and its first paragraph, or at the top when there is no H1. A missing `AGENTS.md` is created with the repository name as its H1. |
 | `privacy/sweep` | `.github/privacy/sweep` | Copied for local runs. CI runs the reusable `privacy-sweep.yml` instead. |
 | `privacy/identifier-patterns.txt` | `.github/privacy/identifier-patterns.txt` | Copied beside the sweep, which reads it as its default patterns. |
+| `grafana/Dockerfile` | `.grafana/Dockerfile` | Copied byte for byte, only where the manifest entry sets `"grafana_sandbox": true`. It is the Grafana Assistant sandbox image; the root `README.md` says how it is built. The rest of `.grafana/` belongs to the repository. |
 | (none) | `.vended.json` | The record of what was vended: source, ref, commit and a SHA-256 for each managed file. |
 
 The engine never writes `.github/privacy/patterns.txt` or `.github/privacy/allow.txt`; those
@@ -88,7 +89,8 @@ that cannot be read is a usage error (exit 2).
    ```
 
    Leave out `skills` to get the default set, or list skill names to choose them. A flag left out
-   counts as true.
+   counts as true, except `grafana_sandbox`, which counts as false: set it to `true` to receive
+   `.grafana/Dockerfile`.
 2. Add the repository to the `repositories` list of the OpenBao permission set for its owner,
    `vend-sync-rknightion`, `vend-sync-m7kni` or `vend-sync-brotek-solutions` (the owner, lowercased). Without it the token cannot reach the repository.
 3. Run the `vend-sync` workflow by hand (`workflow_dispatch`), giving the repository as `repo`.
@@ -120,14 +122,14 @@ record.
 Deleting is not an edit and not an opt-out. A deleted managed file is written again by the next
 sync, an `AGENTS.md` whose block (markers included) was removed gets the block inserted again, and
 a deleted `AGENTS.md` is recreated. To stop receiving a file, opt out in the repository's entry in
-`manifest.json` here: set `contributing`, `agents_block` or `privacy_sweep` to `false`, or list
-only the wanted skills in `skills`. The next sync then leaves `CONTRIBUTING.md` and `AGENTS.md`
-in place for the repository to own, and removes a dropped skill or the privacy files when they
-still match the record.
+`manifest.json` here: set `contributing`, `agents_block`, `privacy_sweep` or `grafana_sandbox` to
+`false`, or list only the wanted skills in `skills`. The next sync then leaves `CONTRIBUTING.md` and
+`AGENTS.md` in place for the repository to own, and removes a dropped skill, the privacy files or
+`.grafana/Dockerfile` when they still match the record.
 
 The record is trusted only for paths the engine can own: files under `.agents/skills/<name>/`,
-`.github/privacy/sweep`, `.github/privacy/identifier-patterns.txt`, `CONTRIBUTING.md` and
-`AGENTS.md`. A record naming any other path is a usage error (exit 2). `--force` then treats the
+`.github/privacy/sweep`, `.github/privacy/identifier-patterns.txt`, `.grafana/Dockerfile`,
+`CONTRIBUTING.md` and `AGENTS.md`. A record naming any other path is a usage error (exit 2). `--force` then treats the
 record as absent; it never deletes a path outside that set.
 
 ## Running it by hand

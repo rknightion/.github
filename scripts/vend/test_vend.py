@@ -313,6 +313,63 @@ class TestLocalEdits(VendCase):
             self.assertFalse(vend.recordable(bad), bad)
 
 
+class TestGrafanaSandbox(VendCase):
+    """vended/grafana/Dockerfile lands at .grafana/Dockerfile, only where the manifest opts in."""
+
+    DOCKERFILE = "ARG GRAFANA_BASE_IMAGE\nFROM ${GRAFANA_BASE_IMAGE}\n"
+
+    def setUp(self) -> None:
+        super().setUp()
+        (self.src / "vended" / "grafana").mkdir()
+        (self.src / "vended" / "grafana" / "Dockerfile").write_text(self.DOCKERFILE)
+
+    def test_not_vended_by_default(self) -> None:
+        self.assertEqual(self.run_vend()[0], 0)
+        self.assertFalse((self.tgt / ".grafana").exists())
+
+    def test_opt_in_vends_and_records_it(self) -> None:
+        self.set_manifest([{"repo": "owner/demo", "grafana_sandbox": True}])
+        rc, summary, _ = self.run_vend()
+        self.assertEqual(rc, 0)
+        self.assertEqual((self.tgt / ".grafana/Dockerfile").read_text(), self.DOCKERFILE)
+        self.assertIn(".grafana/Dockerfile", summary["changed"])
+        self.assertIn(".grafana/Dockerfile", json.loads((self.tgt / ".vended.json").read_text())["files"])
+
+    def test_source_change_updates_it(self) -> None:
+        self.set_manifest([{"repo": "owner/demo", "grafana_sandbox": True}])
+        self.run_vend()
+        (self.src / "vended/grafana/Dockerfile").write_text(self.DOCKERFILE + "RUN true\n")
+        rc, summary, _ = self.run_vend(sha=SHA2, ref="v1.1.0")
+        self.assertEqual(rc, 0)
+        self.assertEqual(summary["changed"], [".grafana/Dockerfile", ".vended.json"])
+
+    def test_opting_out_removes_an_untouched_copy_and_its_directory(self) -> None:
+        self.set_manifest([{"repo": "owner/demo", "grafana_sandbox": True}])
+        self.run_vend()
+        self.set_manifest([{"repo": "owner/demo", "grafana_sandbox": False}])
+        rc, summary, _ = self.run_vend()
+        self.assertEqual(rc, 0)
+        self.assertIn(".grafana/Dockerfile", summary["removed"])
+        self.assertFalse((self.tgt / ".grafana").exists())
+
+    def test_opting_out_keeps_repo_files_beside_it(self) -> None:
+        self.set_manifest([{"repo": "owner/demo", "grafana_sandbox": True}])
+        self.run_vend()
+        (self.tgt / ".grafana/.dockerignore").write_text("*\n")
+        self.set_manifest([{"repo": "owner/demo"}])
+        self.assertEqual(self.run_vend()[0], 0)
+        self.assertFalse((self.tgt / ".grafana/Dockerfile").exists())
+        self.assertEqual((self.tgt / ".grafana/.dockerignore").read_text(), "*\n")
+
+    def test_flag_must_be_bool(self) -> None:
+        self.set_manifest([{"repo": "owner/demo", "grafana_sandbox": "yes"}])
+        self.assertEqual(self.run_vend()[0], 2)
+
+    def test_recordable(self) -> None:
+        self.assertTrue(vend.recordable(".grafana/Dockerfile"))
+        for bad in (".grafana/setup.sh", ".grafana/.dockerignore", ".grafana"):
+            self.assertFalse(vend.recordable(bad), bad)
+
 class TestSymlinks(VendCase):
     def test_real_dir_clash_refused(self) -> None:
         own = self.tgt / ".claude/skills/alpha-skill"
