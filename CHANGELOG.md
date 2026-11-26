@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.34.1](https://github.com/rknightion/.github/compare/v1.34.0...v1.34.1) (2026-11-26)
+
+
+### Bug Fixes
+
+* **container-publish:** label the checked-out revision and a source licence ([#410](https://github.com/rknightion/.github/issues/410)) ([5d6d4d6](https://github.com/rknightion/.github/commit/5d6d4d60e033c92f35688b5f9b4602b4131946f8))
+
 ## [1.34.0](https://github.com/rknightion/.github/compare/v1.33.0...v1.34.0) (2026-11-26)
 
 
