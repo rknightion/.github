@@ -24,6 +24,10 @@ on:
         description: "Trusted caller-selected ref for checkout; use a commit SHA to pin the tree. Empty uses the release tag or event ref."
         type: string
         default: ""
+      image-licenses:
+        description: "OCI licences label: empty keeps the licence the GitHub API reports for the repository at run time; an SPDX expression sets that value; 'dockerfile' drops the API value so the checked-out Dockerfile's own org.opencontainers.image.licenses LABEL stands (declare it there)"
+        type: string
+        default: ""
       publish-branch-tags-on-prerelease:
         description: "Publish branch-derived tags on hyphenated release tags; set false to publish only version tags"
         type: boolean
@@ -165,6 +169,30 @@ jobs:
             echo "OCI_VERSION_LABEL=" >> "$GITHUB_ENV"
           fi
 
+      # metadata-action's default workflow context labels the triggering workflow's SHA and the
+      # licence the repository API reports today. Neither need match the tree checked out above
+      # (a release tag or caller-selected ref), so both labels are taken from that checkout.
+      - name: Compute source labels
+        env:
+          IMAGE_LICENSES: ${{ inputs.image-licenses }}
+        run: |
+          set -euo pipefail
+          revision="$(git rev-parse --verify 'HEAD^{commit}')"
+          echo "OCI_REVISION_LABEL=org.opencontainers.image.revision=${revision}" >> "$GITHUB_ENV"
+          # An SPDX expression only: metadata-action reads newlines as more labels and {{ }} as
+          # its own expressions, so anything outside this set fails closed.
+          spdx='^[A-Za-z0-9(][A-Za-z0-9.+:() -]*$'
+          case "${IMAGE_LICENSES}" in
+            ''|dockerfile)
+              echo "OCI_LICENSES_LABEL=" >> "$GITHUB_ENV" ;;
+            *)
+              if [[ ! "${IMAGE_LICENSES}" =~ $spdx ]]; then
+                echo "::error::image-licenses must be empty, 'dockerfile' or an SPDX expression" >&2
+                exit 1
+              fi
+              echo "OCI_LICENSES_LABEL=org.opencontainers.image.licenses=${IMAGE_LICENSES}" >> "$GITHUB_ENV" ;;
+          esac
+
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
         with:
@@ -183,7 +211,26 @@ jobs:
         uses: docker/metadata-action@dc802804100637a589fabce1cb79ff13a1411302 # v6.2.0
         with:
           images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
-          labels: ${{ env.OCI_VERSION_LABEL }}
+          labels: |
+            ${{ env.OCI_VERSION_LABEL }}
+            ${{ env.OCI_REVISION_LABEL }}
+            ${{ env.OCI_LICENSES_LABEL }}
+
+      # A --label always beats the Dockerfile's LABEL, so the API licence is removed rather than
+      # blanked when the caller declares its licence in the Dockerfile.
+      - name: Drop the repository API licence label
+        id: labels
+        if: inputs.image-licenses == 'dockerfile'
+        env:
+          META_LABELS: ${{ steps.meta.outputs.labels }}
+        run: |
+          set -euo pipefail
+          delimiter="labels_$(od -An -N16 -tx1 /dev/urandom | tr -d ' \n')"
+          {
+            echo "labels<<${delimiter}"
+            grep -v '^org\.opencontainers\.image\.licenses=' <<< "${META_LABELS}" || [ "$?" -eq 1 ]
+            echo "${delimiter}"
+          } >> "$GITHUB_OUTPUT"
 
       - name: Log in to Docker Hub (base-image pulls)
         if: inputs.dockerhub-login
@@ -207,7 +254,7 @@ jobs:
           context: ${{ inputs.context }}
           file: ${{ inputs.context }}/${{ inputs.dockerfile }}
           platforms: ${{ matrix.platform }}
-          labels: ${{ steps.meta.outputs.labels }}
+          labels: ${{ inputs.image-licenses == 'dockerfile' && steps.labels.outputs.labels || steps.meta.outputs.labels }}
           outputs: type=oci,dest=${{ runner.temp }}/image-${{ env.PLATFORM_PAIR }},tar=false
           # Registry cache, not the Actions cache: mode=max layers blew through every repo's 10 GB
           # Actions cache. One moving tag per image and platform; only main/release builds write it,
@@ -219,6 +266,38 @@ jobs:
           build-args: |
             ${{ inputs.build-args }}
             VERSION=${{ env.COMPUTED_VERSION }}
+
+      # Read the labels back from the built image config before anything reaches GHCR, so a
+      # revision that is not the checked-out commit stops the publish on each platform.
+      - name: Verify source labels
+        env:
+          LAYOUT: ${{ runner.temp }}/image-${{ env.PLATFORM_PAIR }}
+          BUILD_DIGEST: ${{ steps.build.outputs.digest }}
+          IMAGE_LICENSES: ${{ inputs.image-licenses }}
+        run: |
+          set -euo pipefail
+          fail() { echo "::error::$*" >&2; exit 1; }
+          blob() {
+            [[ "$1" =~ ^sha256:[0-9a-f]{64}$ ]] || fail "not a sha256 digest: $1"
+            printf '%s/blobs/sha256/%s' "${LAYOUT}" "${1#sha256:}"
+          }
+          manifest="$(blob "${BUILD_DIGEST}")"
+          if jq -e 'has("manifests")' "${manifest}" >/dev/null; then
+            manifest="$(blob "$(jq -er '[.manifests[] | select(.mediaType == "application/vnd.oci.image.manifest.v1+json")]
+              | if length == 1 then .[0].digest else error("expected one image manifest") end' "${manifest}")")"
+          fi
+          config="$(blob "$(jq -er '.config.digest' "${manifest}")")"
+          label() { jq -r --arg key "$1" '.config.Labels[$key] // ""' "${config}"; }
+          revision="$(label org.opencontainers.image.revision)"
+          licenses="$(label org.opencontainers.image.licenses)"
+          expected="$(git rev-parse --verify 'HEAD^{commit}')"
+          [ "${revision}" = "${expected}" ] || fail "image revision '${revision}' is not the checked-out commit ${expected}"
+          case "${IMAGE_LICENSES}" in
+            '') ;;
+            dockerfile) [ -n "${licenses}" ] || fail "image-licenses is 'dockerfile' but the image has no licences label" ;;
+            *) [ "${licenses}" = "${IMAGE_LICENSES}" ] || fail "image licences '${licenses}' is not '${IMAGE_LICENSES}'" ;;
+          esac
+          echo "OCI revision ${revision}; licences ${licenses:-<none>}"
 
       - name: Install verified Trivy release
         if: inputs.trivy
