@@ -3,6 +3,7 @@
 Execute the workflow's actual version shell, then check the metadata/build/signing
 connections. This does not replace Actions CI or a two-platform OCI readback.
 """
+import hashlib
 import json
 import os
 from pathlib import Path
@@ -159,21 +160,26 @@ class ContainerPublish(unittest.TestCase):
                 # Empty *input*, not an empty version-label assignment: defaults survive.
                 self.assertEqual(values.get("OCI_VERSION_LABEL"), "")
 
-    def test_only_version_is_overridden_and_labels_reach_both_platforms(self):
+    def test_only_version_revision_and_licences_are_overridden_on_both_platforms(self):
         metadata = step(self.build, "Extract Docker metadata (labels)")
         self.assertIn(f"uses: {METADATA_ACTION} #", metadata)
         self.assertIn("        id: meta\n", metadata)
-        # No context override or revision/source label: retain workflow SHA and repo URL.
-        self.assertEqual(mapping(metadata, "with"), {
-            "images": "${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}",
-            "labels": "${{ env.OCI_VERSION_LABEL }}",
-        })
+        # Workflow context stays (it is what the tags job uses); the revision and the licences are
+        # overridden from the checkout instead, and the repository URL is left to the action.
+        self.assertEqual(metadata.split("        with:\n", 1)[1].split("\n\n", 1)[0] + "\n", (
+            "          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}\n"
+            "          labels: |\n"
+            "            ${{ env.OCI_VERSION_LABEL }}\n"
+            "            ${{ env.OCI_REVISION_LABEL }}\n"
+            "            ${{ env.OCI_LICENSES_LABEL }}\n"))
         self.assertNotIn("        env:", metadata)
         self.assertNotIn("DOCKER_METADATA_PR_HEAD_SHA", self.workflow)
-        self.assertNotIn("org.opencontainers.image.revision=", self.workflow)
+        self.assertEqual(self.workflow.count("org.opencontainers.image.revision="), 1)
+        self.assertIn("org.opencontainers.image.revision=", step(self.build, "Compute source labels"))
         self.assertNotIn("org.opencontainers.image.source=", self.workflow)
         build = step(self.build, "Build OCI layout")
-        self.assertIn("          labels: ${{ steps.meta.outputs.labels }}\n", build)
+        self.assertIn("          labels: ${{ inputs.image-licenses == 'dockerfile' && steps.labels.outputs.labels"
+                      " || steps.meta.outputs.labels }}\n", build)
         self.assertIn("          platforms: ${{ matrix.platform }}\n", build)
         self.assertIn("            VERSION=${{ env.COMPUTED_VERSION }}\n", build)
         self.assertIn("          - platform: linux/amd64\n", self.build)
@@ -308,6 +314,170 @@ class ContainerPublish(unittest.TestCase):
                                                 "--certificate-github-workflow-ref", branch,
                                                 "--certificate-github-workflow-sha", revision, target])
 
+    def run_step(self, job_text, name, env, cwd=ROOT):
+        body = step(job_text, name)
+        self.assertIn("        run: |\n", body)
+        script = textwrap.dedent(body.split("        run: |\n", 1)[1])
+        # Actions runs a bare run: block as bash -e {0}.
+        return subprocess.run(["bash", "-e", "-c", script], cwd=cwd,
+                              env={"PATH": os.environ["PATH"], **env},
+                              capture_output=True, text=True, timeout=20)
+
+    def git_checkout(self, tmp):
+        """A repository whose checked-out commit is older than the branch tip."""
+        repo = Path(tmp) / "src"
+        repo.mkdir()
+
+        def git(*args):
+            return subprocess.run(
+                ["git", "-C", str(repo), "-c", "user.name=t", "-c", "user.email=t@example.com", *args],
+                check=True, capture_output=True, text=True, timeout=10).stdout.strip()
+
+        git("init", "-q")
+        (repo / "f").write_text("one\n")
+        git("add", "f")
+        git("commit", "-qm", "release")
+        checked_out = git("rev-parse", "HEAD")
+        git("tag", "v1.2.3-rc.1")
+        (repo / "f").write_text("two\n")
+        git("commit", "-qam", "later")
+        tip = git("rev-parse", "HEAD")
+        git("checkout", "-q", "--detach", "v1.2.3-rc.1")
+        return repo, checked_out, tip
+
+    def source_labels(self, licenses, cwd=ROOT, sha="f" * 40):
+        with tempfile.TemporaryDirectory() as tmp:
+            output = Path(tmp) / "github-env"
+            # GITHUB_SHA stands in for the triggering workflow's commit; it must not leak in.
+            result = self.run_step(self.build, "Compute source labels",
+                                   {"IMAGE_LICENSES": licenses, "GITHUB_ENV": str(output), "GITHUB_SHA": sha}, cwd)
+            values = dict(line.split("=", 1) for line in output.read_text().splitlines()) if output.exists() else {}
+            return result, values
+
+    def test_image_licenses_input_defaults_to_the_existing_behaviour(self):
+        declaration = re.search(r"^      image-licenses:\n((?:^        .*\n)+)", self.workflow, re.M)
+        self.assertIsNotNone(declaration, "missing workflow_call input")
+        self.assertRegex(declaration.group(1), r"(?m)^        type: string$")
+        self.assertRegex(declaration.group(1), r'(?m)^        default: ""$')
+
+    def test_revision_label_is_the_checked_out_commit_not_the_workflow_sha(self):
+        # Order: both checkouts, then the label, then metadata, then the build that uses it.
+        names = re.findall(r"(?m)^      - name: (.+)$", self.build)
+        for before, after in (("Checkout repository", "Compute source labels"),
+                              ("Checkout caller-selected revision", "Compute source labels"),
+                              ("Compute source labels", "Extract Docker metadata (labels)"),
+                              ("Extract Docker metadata (labels)", "Drop the repository API licence label"),
+                              ("Drop the repository API licence label", "Build OCI layout"),
+                              ("Build OCI layout", "Verify source labels"),
+                              ("Verify source labels", "Publish scanned digest")):
+            self.assertLess(names.index(before), names.index(after), (before, after))
+        with tempfile.TemporaryDirectory() as tmp:
+            repo, checked_out, tip = self.git_checkout(tmp)
+            for licenses in ("", "dockerfile", "Apache-2.0"):
+                with self.subTest(licenses=licenses):
+                    result, values = self.source_labels(licenses, cwd=repo, sha=tip)
+                    self.assertEqual(result.returncode, 0, result.stderr)
+                    self.assertEqual(values["OCI_REVISION_LABEL"], f"org.opencontainers.image.revision={checked_out}")
+                    self.assertNotIn(tip, values["OCI_REVISION_LABEL"])
+
+    def test_image_licenses_values(self):
+        for licenses, label in (("", ""), ("dockerfile", ""),
+                                ("Apache-2.0", "org.opencontainers.image.licenses=Apache-2.0"),
+                                ("AGPL-3.0-only", "org.opencontainers.image.licenses=AGPL-3.0-only"),
+                                ("(MIT OR Apache-2.0) AND LicenseRef-Vendor+",
+                                 "org.opencontainers.image.licenses=(MIT OR Apache-2.0) AND LicenseRef-Vendor+")):
+            with self.subTest(licenses=licenses):
+                result, values = self.source_labels(licenses)
+                self.assertEqual(result.returncode, 0, result.stderr)
+                self.assertEqual(values["OCI_LICENSES_LABEL"], label)
+        # Each would add a label or a metadata-action expression of the caller's choosing.
+        for licenses in ("Apache-2.0\norg.opencontainers.image.revision=" + "0" * 40, "MIT\r", "{{sha}}",
+                         "MIT,org.x=y", "a=b", '"MIT"', " MIT", "-MIT", "MIT # x"):
+            with self.subTest(rejected=licenses):
+                result, values = self.source_labels(licenses)
+                self.assertNotEqual(result.returncode, 0)
+                self.assertIn("::error::image-licenses", result.stderr)
+                self.assertNotIn("OCI_LICENSES_LABEL", values)
+
+    def test_dockerfile_mode_drops_only_the_api_licence(self):
+        drop = step(self.build, "Drop the repository API licence label")
+        self.assertIn("        id: labels\n", drop)
+        self.assertIn("        if: inputs.image-licenses == 'dockerfile'\n", drop)
+        self.assertEqual(mapping(drop, "env"), {"META_LABELS": "${{ steps.meta.outputs.labels }}"})
+        labels = ["org.opencontainers.image.created=2026-01-01T00:00:00.000Z",
+                  "org.opencontainers.image.description=licenses= in a description stays",
+                  "org.opencontainers.image.licenses=Apache-2.0",
+                  "org.opencontainers.image.revision=" + "c" * 40,
+                  "org.opencontainers.image.source=https://github.com/example/product"]
+        for meta, kept in (("\n".join(labels), [label for label in labels if "licenses=Apache" not in label]),
+                           ("org.opencontainers.image.licenses=Apache-2.0", [])):
+            with self.subTest(kept=kept), tempfile.TemporaryDirectory() as tmp:
+                output = Path(tmp) / "github-output"
+                result = self.run_step(self.build, "Drop the repository API licence label",
+                                       {"META_LABELS": meta, "GITHUB_OUTPUT": str(output)})
+                self.assertEqual(result.returncode, 0, result.stderr)
+                lines = output.read_text().splitlines()
+                match = re.fullmatch(r"labels<<(labels_[0-9a-f]{32})", lines[0])
+                self.assertIsNotNone(match, lines[0])
+                self.assertEqual(lines[-1], match.group(1))
+                self.assertEqual(lines[1:-1], kept)
+
+    def oci_layout(self, tmp, labels, index=False, manifests=1):
+        layout = Path(tmp) / "layout"
+        (layout / "blobs/sha256").mkdir(parents=True)
+
+        def put(document):
+            data = json.dumps(document).encode()
+            digest = "sha256:" + hashlib.sha256(data).hexdigest()
+            (layout / "blobs/sha256" / digest.split(":")[1]).write_bytes(data)
+            return digest
+
+        config = put({"architecture": "amd64", "os": "linux", "config": {"Labels": labels}})
+        manifest = put({"schemaVersion": 2, "mediaType": "application/vnd.oci.image.manifest.v1+json",
+                        "config": {"mediaType": "application/vnd.oci.image.config.v1+json", "digest": config},
+                        "layers": []})
+        if index:
+            entry = {"mediaType": "application/vnd.oci.image.manifest.v1+json", "digest": manifest}
+            manifest = put({"schemaVersion": 2, "mediaType": "application/vnd.oci.image.index.v1+json",
+                            "manifests": [entry] * manifests})
+        return layout, manifest
+
+    def test_verify_source_labels_reads_the_built_image_config(self):
+        verify = step(self.build, "Verify source labels")
+        self.assertEqual(mapping(verify, "env"), {
+            "LAYOUT": "${{ runner.temp }}/image-${{ env.PLATFORM_PAIR }}",
+            "BUILD_DIGEST": "${{ steps.build.outputs.digest }}",
+            "IMAGE_LICENSES": "${{ inputs.image-licenses }}",
+        })
+        self.assertNotIn("        if:", verify)
+        with tempfile.TemporaryDirectory() as tmp:
+            repo, checked_out, tip = self.git_checkout(tmp)
+            licences = "org.opencontainers.image.licenses"
+            revision = "org.opencontainers.image.revision"
+            cases = (
+                ("checked-out revision", {revision: checked_out, licences: "Apache-2.0"}, "", {}, 0),
+                ("workflow revision", {revision: tip, licences: "Apache-2.0"}, "", {}, 1),
+                ("no revision", {licences: "Apache-2.0"}, "", {}, 1),
+                ("single-platform index", {revision: checked_out}, "", {"index": True}, 0),
+                ("ambiguous index", {revision: checked_out}, "", {"index": True, "manifests": 2}, 1),
+                ("explicit licence", {revision: checked_out, licences: "AGPL-3.0-only"}, "AGPL-3.0-only", {}, 0),
+                ("wrong explicit licence", {revision: checked_out, licences: "Apache-2.0"}, "AGPL-3.0-only", {}, 1),
+                ("dockerfile licence", {revision: checked_out, licences: "AGPL-3.0-only"}, "dockerfile", {}, 0),
+                ("dockerfile without licence", {revision: checked_out}, "dockerfile", {}, 1),
+                ("malformed digest", {revision: checked_out}, "", {"digest": "latest"}, 1),
+            )
+            for label, labels, mode, shape, expected in cases:
+                with self.subTest(label=label), tempfile.TemporaryDirectory() as image:
+                    layout, digest = self.oci_layout(image, labels, shape.get("index", False),
+                                                     shape.get("manifests", 1))
+                    result = self.run_step(self.build, "Verify source labels",
+                                           {"LAYOUT": str(layout), "BUILD_DIGEST": shape.get("digest", digest),
+                                            "IMAGE_LICENSES": mode}, cwd=repo)
+                    self.assertEqual(result.returncode, expected, result.stdout + result.stderr)
+                    if expected:
+                        self.assertIn("::error::", result.stderr)
+                    else:
+                        self.assertIn(f"OCI revision {checked_out}", result.stdout)
 
 if __name__ == "__main__":
     unittest.main()

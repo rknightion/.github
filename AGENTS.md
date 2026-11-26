@@ -55,6 +55,14 @@ the reusable because its checkout belongs to the consumer. Keep both native runn
 covered, reject ambiguous or missing checksums, and retain the scanner action's enforced gate with
 its own installer disabled. Tests execute the embedded installation shell with synthetic assets.
 
+The publisher's build job labels `org.opencontainers.image.revision` with `git rev-parse HEAD` of its
+own checkout and reads the label back from the built image config before any push. metadata-action
+stays on its default workflow context, which reports the triggering workflow's SHA: its git context
+infers a ref from a detached HEAD and can throw on the SHA checkouts `checkout-ref` exists for, and
+it would change the version label. The licences label comes from the repository API at run time
+unless the caller passes `image-licenses` (an SPDX expression, or `dockerfile` to keep the
+checked-out Dockerfile's own `LABEL`).
+
 The publisher retries `oras cp` of the scanned digest and `helm push` of the chart, with a bounded
 backoff and a warning per retry: GHCR can answer 404 for a manifest it has just accepted, and
 `oras cp` reads the pushed manifest back. Both pushes are content-addressed, so a repeat is
