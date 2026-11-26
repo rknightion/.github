@@ -34,6 +34,10 @@ class RealKitCase(unittest.TestCase):
         self.src, self.tgt = base / "src", base / "tgt"
         self.tgt.mkdir()
         shutil.copytree(REAL_VENDED, self.src / "vended")
+        # the hub's full pull request template, which a repository with no template receives
+        (self.src / "docs" / "ac-evidence").mkdir(parents=True)
+        shutil.copy(REAL_VENDED.parent / "docs" / "ac-evidence" / "pull_request_template.md",
+                    self.src / "docs" / "ac-evidence" / "pull_request_template.md")
         (self.src / "vended" / "manifest.json").write_text(
             json.dumps({"schema": 1, "repos": [{"repo": "owner/demo"}]}))
 

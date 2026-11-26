@@ -34,6 +34,15 @@ SKILLS_DIR = ".agents/skills"
 CLAUDE_SKILLS_DIR = ".claude/skills"
 CONTRIBUTING_PATH = "CONTRIBUTING.md"
 AGENTS_PATH = "AGENTS.md"
+# The pull request template block is vended/pull-request-block.md, inside the managed region of the
+# repository's own template. A repository with no template gets the hub's full template, which is the
+# same block with the sections above it (PR_TEMPLATE_FULL). GitHub reads a single template from .github/,
+# the repository root or docs/, and matches the file name without regard to case.
+PR_TEMPLATE_NAME = "pull_request_template.md"
+PR_TEMPLATE_DIRS = (".github", "", "docs")
+PR_TEMPLATE_DEFAULT = f".github/{PR_TEMPLATE_NAME}"
+PR_BLOCK_SRC = "pull-request-block.md"
+PR_TEMPLATE_FULL = "docs/ac-evidence/pull_request_template.md"
 # Files copied from vended/privacy/ into .github/privacy/. The per-repo patterns.txt and
 # allow.txt are never written.
 PRIVACY_FILES = ("sweep", "identifier-patterns.txt")
@@ -52,7 +61,7 @@ REPO_RE = re.compile(r"^[A-Za-z0-9-]+/[A-Za-z0-9._-]+$")
 SKILL_RE = re.compile(r"^[a-z0-9][a-z0-9-]*$")
 SHA_RE = re.compile(r"^[0-9a-f]{40}$")
 REF_RE = re.compile(r"^[A-Za-z0-9._/-]+$")
-MANIFEST_KEYS = {"repo", "skills", "contributing", "agents_block", "privacy_sweep", "grafana_sandbox"}
+MANIFEST_KEYS = {"repo", "skills", "contributing", "agents_block", "privacy_sweep", "grafana_sandbox", "pr_template"}
 
 
 class UsageError(Exception):
@@ -355,7 +364,7 @@ def load_manifest(source: Path) -> dict:
             or not all(isinstance(s, str) and SKILL_RE.match(s) for s in entry["skills"])
         ):
             raise UsageError(f"{path}: {repo}: skills must be a list of skill names")
-        for key in ("contributing", "agents_block", "privacy_sweep", "grafana_sandbox"):
+        for key in ("contributing", "agents_block", "privacy_sweep", "grafana_sandbox", "pr_template"):
             if key in entry and not isinstance(entry[key], bool):
                 raise UsageError(f"{path}: {repo}: {key} must be true or false")
     return data
@@ -409,9 +418,11 @@ def recordable(rel: str) -> bool:
     """True for a path the engine can own, so a record key outside it is never deleted.
 
     Skill files under .agents/skills/<name>/, the two vended privacy files, .grafana/Dockerfile,
-    CONTRIBUTING.md and AGENTS.md. The .claude/skills/ links are not recorded; they are found from the skill names.
+    CONTRIBUTING.md, AGENTS.md and a pull request template. The .claude/skills/ links are not recorded; they are found from the skill names.
     """
     if rel in (CONTRIBUTING_PATH, AGENTS_PATH) or rel in {f"{PRIVACY_DEST}/{n}" for n in PRIVACY_FILES}:
+        return True
+    if is_pr_template_path(rel):
         return True
     if rel in {f"{GRAFANA_DEST}/{n}" for n in GRAFANA_FILES}:
         return True
@@ -423,6 +434,28 @@ def recordable(rel: str) -> bool:
         and "\\" not in rel
         and ".." not in parts
     )
+
+
+def is_pr_template_path(rel: str) -> bool:
+    """True for a place GitHub reads a single pull request template from, in any letter case."""
+    if "\\" in rel:
+        return False
+    parts = PurePosixPath(rel).parts
+    if not parts or parts[-1].lower() != PR_TEMPLATE_NAME:
+        return False
+    return len(parts) == 1 or (len(parts) == 2 and parts[0] in (".github", "docs"))
+
+
+def find_pr_template(target: Path) -> str:
+    """The template file already in the repository (.github/, then root, then docs/), else the default path."""
+    for d in PR_TEMPLATE_DIRS:
+        folder = target / d if d else target
+        if not folder.is_dir() or folder.is_symlink():
+            continue
+        for entry in sorted(os.listdir(folder)):
+            if entry.lower() == PR_TEMPLATE_NAME and (folder / entry).is_file():
+                return f"{d}/{entry}" if d else entry
+    return PR_TEMPLATE_DEFAULT
 
 
 def safe_target(target: Path, rel: str) -> Path:
@@ -593,6 +626,89 @@ def plan_agents(target: Path, repo: str, body: str, recorded: dict, force: bool,
         plan.writes[rel] = (data, None)
 
 
+def legacy_tail_start(lf_text: str) -> int | None:
+    """Offset of a trailing "## Issue" section followed only by "## Acceptance evidence", or None.
+
+    This is the tail the older templates carry. It is replaced only when nothing in it but comments,
+    blank lines and the evidence table would be lost.
+    """
+    heads: list[tuple[int, str]] = []
+    fence = None
+    off = 0
+    for line in lf_text.splitlines(keepends=True):
+        s = line.lstrip()
+        fm = re.match(r"^(`{3,}|~{3,})", s)
+        if fm:
+            mark = fm.group(1)
+            if fence is None:
+                fence = mark[0] * len(mark)
+            elif s.startswith(fence):
+                fence = None
+        elif fence is None:
+            m = re.match(r"^ {0,3}(#{1,2})[ \t]+(.*?)[ \t]*#*[ \t]*$", line.rstrip("\n"))
+            if m:
+                heads.append((off, m.group(2).strip().lower() if len(m.group(1)) == 2 else "#"))
+        off += len(line)
+    if len(heads) < 2 or [h[1] for h in heads[-2:]] != ["issue", "acceptance evidence"]:
+        return None
+    start = heads[-2][0]
+    rest = re.sub(r"<!--.*?-->", "", lf_text[start:], flags=re.DOTALL)
+    body = [ln for ln in rest.splitlines()[1:] if ln.strip()]
+    heading_count = sum(1 for ln in body if re.match(r"^ {0,3}#{1,6}[ \t]+", ln))
+    if heading_count != 1 or any(not (ln.lstrip().startswith("|") or re.match(r"^ {0,3}#{1,6}[ \t]+", ln)) for ln in body):
+        return None
+    return start
+
+
+def plan_pr_template(target: Path, body: str, full: str, recorded: dict, force: bool, plan: Plan) -> None:
+    """Manage the block between the vended markers in the repository's pull request template.
+
+    A template without markers gets the block in place of its legacy Issue and Acceptance evidence tail,
+    or at the end when it has any other shape; a repository with no template gets the hub's full one.
+    """
+    rel = find_pr_template(target)
+    block = render_agents_block(to_lf(body))
+    want_inner = block[len(AGENTS_BEGIN) : -len(AGENTS_END)]
+    plan.record_files[rel] = sha256(want_inner.encode())
+    current = read_target(target, rel)
+    if current is None:
+        try:
+            span = find_region(to_lf(full), AGENTS_BEGIN, AGENTS_END, PR_TEMPLATE_FULL)
+        except RegionError as exc:
+            raise UsageError(str(exc)) from exc
+        if span is None:
+            raise UsageError(f"{PR_TEMPLATE_FULL} has no vended block markers")
+        lf_full = to_lf(full)
+        plan.writes[rel] = ((lf_full[: span[0]] + block + lf_full[span[1] :]).encode("utf-8"), None)
+        return
+    text = current.decode("utf-8")
+    crlf = uses_crlf(text)
+    lf = to_lf(text)
+    try:
+        span = find_region(lf, AGENTS_BEGIN, AGENTS_END, rel)
+    except RegionError as exc:
+        plan.refuse(rel, str(exc))
+        return
+    if span is None:
+        tail = legacy_tail_start(lf)
+        if tail is not None:
+            new_lf = lf[:tail] + block + "\n"
+        elif not lf.strip():
+            new_lf = block + "\n"
+        else:
+            new_lf = lf.rstrip("\n") + "\n\n" + block + "\n"
+    else:
+        rec = recorded.get(rel)
+        have = sha256(lf[span[0] + len(AGENTS_BEGIN) : span[1] - len(AGENTS_END)].encode())
+        if rec is not None and have not in (rec, plan.record_files[rel]) and not force:
+            plan.refuse(rel, "the vended block was edited since the last sync; pass --force")
+            return
+        new_lf = lf[: span[0]] + block + lf[span[1] :]
+    data = from_lf(new_lf, crlf).encode("utf-8")
+    if data != current:
+        plan.writes[rel] = (data, None)
+
+
 def plan_link(target: Path, name: str, plan: Plan) -> None:
     rel = f"{CLAUDE_SKILLS_DIR}/{name}"
     want = f"../../{SKILLS_DIR}/{name}"
@@ -686,6 +802,17 @@ def build_plan(source: Path, target: Path, repo: str, force: bool) -> Plan:
     elif AGENTS_PATH in recorded:
         plan.notes.append(f"{AGENTS_PATH}: block no longer vended; left in place")
 
+    if entry.get("pr_template", True):
+        block_src = source / "vended" / PR_BLOCK_SRC
+        full_src = source / PR_TEMPLATE_FULL
+        for p in (block_src, full_src):
+            if not p.is_file() or p.is_symlink():
+                raise UsageError(f"pr_template is on but {p.relative_to(source).as_posix()} does not exist in the source")
+        guarded(plan_pr_template, find_pr_template(target), target, block_src.read_text(encoding="utf-8"),
+                full_src.read_text(encoding="utf-8"), recorded, force, plan)
+    elif any(is_pr_template_path(r) for r in recorded):
+        plan.notes.append("pull request template: block no longer vended; left in place")
+
     if entry.get("privacy_sweep", True):
         for name in PRIVACY_FILES:
             src = source / "vended" / "privacy" / name
@@ -711,7 +838,7 @@ def build_plan(source: Path, target: Path, repo: str, force: bool) -> Plan:
     keep_as_is = {CONTRIBUTING_PATH, AGENTS_PATH}
     dropped_skills = set()
     for rel, rec_hash in sorted(recorded.items()):
-        if rel in plan.record_files or rel in keep_as_is:
+        if rel in plan.record_files or rel in keep_as_is or is_pr_template_path(rel):
             continue
         try:
             current = read_target(target, rel)
