@@ -10,8 +10,8 @@ import unittest
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-import vend  # noqa: E402
-from test_vend import PR_BEGIN, PR_BLOCK, PR_END, PR_FULL, VendCase  # noqa: E402
+import vend
+from test_vend import PR_BEGIN, PR_BLOCK, PR_END, PR_FULL, VendCase
 
 HERE = Path(__file__).resolve().parent
 REPO = HERE.parent.parent
@@ -157,7 +157,7 @@ class TestResync(PrTemplateCase):
         self.seed(G2O)
         self.run_vend()
         (self.src / "vended/pull-request-block.md").write_text(PR_BLOCK + "\nMore.\n")
-        rc, summary, _ = self.run_vend(sha="b" * 40)
+        rc, _summary, _ = self.run_vend(sha="b" * 40)
         self.assertEqual(rc, 0)
         text = self.tpl().read_text()
         self.assertTrue(text.startswith(G2O_REPO_PART))
@@ -186,7 +186,7 @@ class TestResync(PrTemplateCase):
     def test_deleting_the_file_is_not_an_opt_out(self) -> None:
         self.run_vend()
         self.tpl().unlink()
-        rc, summary, _ = self.run_vend()
+        rc, _summary, _ = self.run_vend()
         self.assertEqual(rc, 0)
         self.assertEqual(self.tpl().read_text(), PR_FULL)
 
@@ -195,7 +195,7 @@ class TestFlag(PrTemplateCase):
     def test_flag_false_leaves_the_template_alone(self) -> None:
         self.set_manifest([{"repo": "owner/demo", "pr_template": False}])
         self.seed(G2O)
-        rc, summary, _ = self.run_vend()
+        rc, _summary, _ = self.run_vend()
         self.assertEqual(rc, 0)
         self.assertEqual(self.tpl().read_text(), G2O)
         self.assertNotIn(REL, self.record())
@@ -238,7 +238,7 @@ class TestHubSources(unittest.TestCase):
 
     def test_block_follows_the_prose_rules_of_the_other_vended_text(self) -> None:
         block = (REPO / "vended" / "pull-request-block.md").read_text()
-        prose = re.sub(r"^\| ?[-| ]+\|$", "", re.sub(r"<!--|-->", "", block), flags=re.M)
+        prose = re.sub(r"^\| ?[-| ]+\|$", "", re.sub(r"<!--|-->", "", block), flags=re.MULTILINE)
         self.assertNotIn(chr(0x2013), prose)
         self.assertNotIn(chr(0x2014), prose)
         self.assertNotIn("--", prose)

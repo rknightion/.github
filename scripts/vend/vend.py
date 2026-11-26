@@ -652,7 +652,7 @@ def legacy_tail_start(lf_text: str) -> int | None:
     if len(heads) < 2 or [h[1] for h in heads[-2:]] != ["issue", "acceptance evidence"]:
         return None
     start = heads[-2][0]
-    rest = re.sub(r"<!--.*?-->", "", lf_text[start:], flags=re.S)
+    rest = re.sub(r"<!--.*?-->", "", lf_text[start:], flags=re.DOTALL)
     body = [ln for ln in rest.splitlines()[1:] if ln.strip()]
     heading_count = sum(1 for ln in body if re.match(r"^ {0,3}#{1,6}[ \t]+", ln))
     if heading_count != 1 or any(not (ln.lstrip().startswith("|") or re.match(r"^ {0,3}#{1,6}[ \t]+", ln)) for ln in body):
