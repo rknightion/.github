@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.32.9](https://github.com/rknightion/.github/compare/v1.32.8...v1.32.9) (2026-11-26)
+
+
+### Bug Fixes
+
+* **container-publish:** retry the digest copy and chart push on a registry 404 ([#400](https://github.com/rknightion/.github/issues/400)) ([b7a46c5](https://github.com/rknightion/.github/commit/b7a46c51d336d9ac3ac7f0e3d15bf53a2e854b60))
+
 ## [1.32.8](https://github.com/rknightion/.github/compare/v1.32.7...v1.32.8) (2026-11-26)
 
 
