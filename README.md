@@ -49,7 +49,9 @@ to every enrolled repository. It extends Grafana's base image and copies in the 
 `.github/workflows/sandbox-image.yml`, linux/arm64), so the pinned Go, Python, Helm, OpenTofu,
 Terraform, TFLint, kubectl and actionlint do not depend on what Alpine packages. Node, pnpm, just and
 shellcheck come from Alpine. Each repository's own gate tools are installed by its `justfile` on
-first use.
+first use. This repository carries its own copy at `.grafana/Dockerfile`, which
+`tests/test_grafana_dockerfile.py` keeps identical to the vended one, and a repository receives the
+vended one when its `vended/manifest.json` entry sets `"grafana_sandbox": true`.
 
 A toolchain bump is a Renovate pull request against `sandbox/Dockerfile`. Merging it publishes a new
 image; Renovate then bumps the digest in `vended/grafana/Dockerfile`, and vend-sync carries that to
