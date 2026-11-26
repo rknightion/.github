@@ -20,6 +20,10 @@ on:
         description: "Release tag (vX.Y.Z) when invoked by release-please; empty for edge builds"
         type: string
         default: ""
+      checkout-ref:
+        description: "Trusted caller-selected ref for checkout; use a commit SHA to pin the tree. Empty uses the release tag or event ref."
+        type: string
+        default: ""
       publish-branch-tags-on-prerelease:
         description: "Publish branch-derived tags on hyphenated release tags; set false to publish only version tags"
         type: boolean
@@ -134,9 +138,17 @@ jobs:
         run: echo "PLATFORM_PAIR=${PLATFORM//\//-}" >> "$GITHUB_ENV"
 
       - name: Checkout repository
+        if: ${{ inputs.checkout-ref == '' }}
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: ${{ inputs.release-tag || github.ref }}
+          persist-credentials: false
+
+      - name: Checkout caller-selected revision
+        if: ${{ inputs.checkout-ref != '' }}
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ inputs.checkout-ref }}
           persist-credentials: false
 
       - name: Compute VERSION build-arg
@@ -493,9 +505,17 @@ jobs:
           egress-policy: audit
 
       - name: Checkout repository
+        if: ${{ inputs.checkout-ref == '' }}
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: ${{ inputs.release-tag || github.ref }}
+          persist-credentials: false
+
+      - name: Checkout caller-selected revision
+        if: ${{ inputs.checkout-ref != '' }}
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ inputs.checkout-ref }}
           persist-credentials: false
 
       - name: Set up Helm
