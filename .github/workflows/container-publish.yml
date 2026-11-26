@@ -298,10 +298,28 @@ jobs:
           PLATFORM_PAIR: ${{ env.PLATFORM_PAIR }}
           REGISTRY: ${{ env.REGISTRY }}
           IMAGE_NAME: ${{ env.IMAGE_NAME }}
+        # oras cp reads the manifest back from GHCR straight after pushing it (its
+        # non-TTY progress handler lists the manifest's successors), and GHCR can
+        # answer 404 for a manifest it has just accepted. The run then fails with
+        # "Error response from registry: <digest>: not found" although the digest
+        # is published. The copy is content-addressed, so repeating it is
+        # idempotent: retry with a short backoff and warn on every retry.
         run: |
-          oras cp --from-oci-layout \
-            "${RUNNER_TEMP}/image-${PLATFORM_PAIR}@${BUILD_DIGEST}" \
-            "${REGISTRY}/${IMAGE_NAME}@${BUILD_DIGEST}"
+          set -euo pipefail
+          src="${RUNNER_TEMP}/image-${PLATFORM_PAIR}@${BUILD_DIGEST}"
+          dst="${REGISTRY}/${IMAGE_NAME}@${BUILD_DIGEST}"
+          delays=(5 15 30)
+          attempt=1
+          until oras cp --from-oci-layout "${src}" "${dst}"; do
+            if [ "${attempt}" -gt "${#delays[@]}" ]; then
+              echo "::error::oras cp of ${BUILD_DIGEST} failed after ${attempt} attempts"
+              exit 1
+            fi
+            delay="${delays[attempt-1]}"
+            echo "::warning::oras cp of ${BUILD_DIGEST} failed (attempt ${attempt}); retrying in ${delay}s"
+            sleep "${delay}"
+            attempt=$((attempt + 1))
+          done
 
       - name: Export digest
         if: github.event_name != 'merge_group'
@@ -576,7 +594,22 @@ jobs:
           pkg=$(ls /tmp/helm/*.tgz)
           echo "pkg=${pkg}" >> "$GITHUB_OUTPUT"
           echo "version=${version}" >> "$GITHUB_OUTPUT"
-          push_out=$(helm push "${pkg}" "oci://${repo}" 2>&1)
+          # Print helm's output on failure too (a bare command substitution under
+          # bash -e exits before the echo), and retry: the package is built once
+          # above, so a repeat pushes the same version and digest.
+          delays=(5 15 30)
+          attempt=1
+          until push_out=$(helm push "${pkg}" "oci://${repo}" 2>&1); do
+            echo "${push_out}"
+            if [ "${attempt}" -gt "${#delays[@]}" ]; then
+              echo "::error::helm push of ${version} failed after ${attempt} attempts"
+              exit 1
+            fi
+            delay="${delays[attempt-1]}"
+            echo "::warning::helm push of ${version} failed (attempt ${attempt}); retrying in ${delay}s"
+            sleep "${delay}"
+            attempt=$((attempt + 1))
+          done
           echo "${push_out}"
           digest=$(echo "${push_out}" | awk '/Digest:/ {print $2}')
           echo "chart_digest=${digest}" >> "$GITHUB_OUTPUT"

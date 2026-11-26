@@ -55,6 +55,11 @@ the reusable because its checkout belongs to the consumer. Keep both native runn
 covered, reject ambiguous or missing checksums, and retain the scanner action's enforced gate with
 its own installer disabled. Tests execute the embedded installation shell with synthetic assets.
 
+The publisher retries `oras cp` of the scanned digest and `helm push` of the chart, with a bounded
+backoff and a warning per retry: GHCR can answer 404 for a manifest it has just accepted, and
+`oras cp` reads the pushed manifest back. Both pushes are content-addressed, so a repeat is
+idempotent. `tests/test_registry_retry.py` runs both step shells against failing fakes.
+
 ## Task interface
 
 This repo's task surface is a `justfile`. Discover it, don't guess it:
