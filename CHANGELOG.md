@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.33.0](https://github.com/rknightion/.github/compare/v1.32.9...v1.33.0) (2026-11-26)
+
+
+### Features
+
+* **sandbox:** publish a shared Grafana Assistant sandbox toolchain image ([#402](https://github.com/rknightion/.github/issues/402)) ([bcd310b](https://github.com/rknightion/.github/commit/bcd310b60f917bc204897edf8adf076e8299f389))
+
 ## [1.32.9](https://github.com/rknightion/.github/compare/v1.32.8...v1.32.9) (2026-11-26)
 
 
