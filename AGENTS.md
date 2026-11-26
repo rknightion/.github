@@ -105,7 +105,9 @@ there, never add or change one (`ci.yml` job `backlog-freeze`).
   `| Issue | AC | AC text | Evidence class | Proof |`, one row for each acceptance criterion of that
   issue, is still accepted in its place), `Refs #N` when it only relates to one, or
   `Task: none, <reason>`. There is no pull request template here on purpose: in this repository it
-  would become the default for every `rknightion` repository.
+  would become the default for every `rknightion` repository. The template that enrolled repositories receive is
+  `docs/ac-evidence/pull_request_template.md`, and the block between its `BEGIN vended` and `END vended` markers must
+  equal `vended/pull-request-block.md` (`scripts/vend/test_pr_template.py` enforces it).
 - A pull request that changes `.github/workflows/` or `.github/actions/` carries no closing keyword:
   write `Task: none, <reason>`, with `Refs #N` beside it if you like.
 - Work is tracked in issues and labels only; no Project is read or written. The queue is the open

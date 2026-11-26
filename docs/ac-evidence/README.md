@@ -152,8 +152,8 @@ Require the check run by its full name (`ac-evidence / Acceptance evidence` for 
 
 ## Pull request template
 
-Copy `docs/ac-evidence/pull_request_template.md` to the caller's `.github/pull_request_template.md`.
-Its example row fails the check until it is replaced, and the template's own guidance comment is not read
+Enrolled repositories receive it from the vend sync (`vended/README.md`, "Pull request template"); to copy it by hand, copy `docs/ac-evidence/pull_request_template.md` to the caller's `.github/pull_request_template.md`.
+The block between its `BEGIN vended` and `END vended` markers is the same text as `vended/pull-request-block.md`, and a test keeps them identical. Its example row fails the check until it is replaced, and the template's own guidance comment is not read
 as a closing keyword. `docs/ac-evidence/acceptance-evidence.instructions.md` is an optional reviewer
 instruction file (`.github/instructions/`) that asks a review agent to judge each proof.
 

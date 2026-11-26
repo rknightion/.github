@@ -479,6 +479,29 @@ test("the pull request template carries an evidence table the checker reads, and
   assert.ok(result.errors.length > 0);
 });
 
+// The vended block (vended/pull-request-block.md) lands in every enrolled repository's template, so an author who
+// leaves it untouched must satisfy nothing: no closing target, no Evidence line, no Task: none line outside a comment.
+test("the vended pull request block, left untouched, closes nothing and is not evidence", async () => {
+  const block = repoFile("vended/pull-request-block.md");
+  assert.deepEqual(parseClosesTargets(block, "example-org/app"), []);
+  assert.equal(parseEvidenceLine(block), false);
+  assert.equal(parseTaskNone(block), false);
+  // The comment offers the Evidence line, and the table is still there as the longer form.
+  assert.match(block, /Evidence: <command and result>/);
+  assert.ok(block.indexOf("Evidence: <command") < block.indexOf("| Issue |"), "the Evidence line is offered before the table");
+  const parsed = parseEvidenceTable(block);
+  assert.deepEqual(parsed.errors, []);
+  assert.equal(parsed.rows.length, 1);
+  // Closing an issue with the block untouched fails; with an Evidence line added it passes.
+  const untouched = await checkEvidence({ ...base, body: `${block}\nCloses #101\n` });
+  assert.ok(untouched.errors.length > 0);
+  const withLine = await checkEvidence({ ...base, body: `${block}\nCloses #101\nEvidence: just check exit 0\n` });
+  assert.deepEqual(withLine.errors, []);
+  // And an untouched block alone does not satisfy the enforce-all rule for a change that closes nothing.
+  const none = await checkEvidence({ ...base, body: block, enforceAll: true });
+  assert.ok(none.errors.length > 0);
+});
+
 // A criterion the parser cannot read is an error, never a silent drop: with AC1 valid, a lost AC2 would let a pull
 // request pass with one row for a two-criterion issue.
 test("a malformed numbered AC checkbox or a second Acceptance criteria section is an error, not a dropped criterion", () => {

@@ -24,6 +24,13 @@ TEMPLATE = (
     "## Tail\n\nTail text.\n"
 )
 BLOCK = "## Contributor rules (vended)\n\nRule one.\n"
+PR_BLOCK = (
+    "## Issue\n\n<!-- Closes #<number> -->\n\n## Acceptance evidence\n\n<!-- Evidence: <command and result> -->\n\n"
+    "| Issue | AC | AC text | Evidence class | Proof |\n| --- | --- | --- | --- | --- |\n| #N | AC1 | text | code | proof |\n"
+)
+PR_BEGIN = "<!-- BEGIN vended: rknightion/.github -->"
+PR_END = "<!-- END vended: rknightion/.github -->"
+PR_FULL = f"## What changed\n\nWords.\n\n{PR_BEGIN}\n{PR_BLOCK}{PR_END}\n"
 
 
 def skill_md(name: str, opt_in: bool = False) -> str:
@@ -53,6 +60,9 @@ class VendCase(unittest.TestCase):
         os.chmod(refs / "tool.sh", 0o755)
         (v / "CONTRIBUTING.md").write_text(TEMPLATE)
         (v / "AGENTS-block.md").write_text(BLOCK)
+        (v / "pull-request-block.md").write_text(PR_BLOCK)
+        (self.src / "docs" / "ac-evidence").mkdir(parents=True)
+        (self.src / "docs" / "ac-evidence" / "pull_request_template.md").write_text(PR_FULL)
         (v / "privacy").mkdir()
         (v / "privacy" / "sweep").write_text("#!/usr/bin/env python3\nprint('sweep')\n")
         os.chmod(v / "privacy" / "sweep", 0o755)
@@ -305,11 +315,13 @@ class TestLocalEdits(VendCase):
     def test_recordable_paths(self) -> None:
         for good in (".agents/skills/alpha-skill/SKILL.md", ".agents/skills/x/references/a.sh",
                      ".github/privacy/sweep", ".github/privacy/identifier-patterns.txt",
-                     "CONTRIBUTING.md", "AGENTS.md"):
+                     "CONTRIBUTING.md", "AGENTS.md", ".github/pull_request_template.md",
+                     ".github/PULL_REQUEST_TEMPLATE.md", "pull_request_template.md", "docs/Pull_Request_Template.md"):
             self.assertTrue(vend.recordable(good), good)
         for bad in ("README.md", ".github/workflows/ci.yml", ".git/config", ".github/privacy/patterns.txt",
                     ".github/privacy/allow.txt", ".agents/skills/x", ".agents/skills/Bad_Name/SKILL.md",
-                    ".agents/other/x", ".claude/skills/x"):
+                    ".agents/other/x", ".claude/skills/x", ".github/other/pull_request_template.md",
+                    ".github/pull_request_template.txt", "src/pull_request_template.md"):
             self.assertFalse(vend.recordable(bad), bad)
 
 

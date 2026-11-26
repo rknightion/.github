@@ -13,6 +13,7 @@ and `.github/workflows/vend-sync.yml` runs it on every push to `main` that chang
 | (none) | `.claude/skills/<name>` | A relative symlink to `../../.agents/skills/<name>`, because Claude Code reads only `.claude/skills/`. |
 | `CONTRIBUTING.md` | `CONTRIBUTING.md` | The template, with the repository's own text kept between `<!-- vended:repo-facts:begin -->` and `<!-- vended:repo-facts:end -->`. |
 | `AGENTS-block.md` | `AGENTS.md` | Only the text between `<!-- BEGIN vended: rknightion/.github -->` and `<!-- END vended: rknightion/.github -->` is managed. Without the markers the block goes after the first H1 and its first paragraph, or at the top when there is no H1. A missing `AGENTS.md` is created with the repository name as its H1. |
+| `pull-request-block.md` | `.github/pull_request_template.md` | Only the text between the same `<!-- BEGIN vended: rknightion/.github -->` and `<!-- END vended: rknightion/.github -->` markers is managed: the `## Issue` and `## Acceptance evidence` sections, offering the one `Evidence:` line first and the table as the longer form. See Pull request template. |
 | `privacy/sweep` | `.github/privacy/sweep` | Copied for local runs. CI runs the reusable `privacy-sweep.yml` instead. |
 | `privacy/identifier-patterns.txt` | `.github/privacy/identifier-patterns.txt` | Copied beside the sweep, which reads it as its default patterns. |
 | `grafana/Dockerfile` | `.grafana/Dockerfile` | Copied byte for byte, only where the manifest entry sets `"grafana_sandbox": true`. It is the Grafana Assistant sandbox image; the root `README.md` says how it is built. The rest of `.grafana/` belongs to the repository. |
@@ -23,6 +24,17 @@ belong to the repository. Line endings of an existing `CONTRIBUTING.md` or `AGEN
 
 Nothing under `.github/workflows/` is vended. The sync token has no `workflows` permission, and a
 repository's callers of the reusable workflows here are written by hand when it migrates.
+
+## Pull request template
+
+Many enrolled repositories carry a template whose Issue and Acceptance evidence sections offer only the long table, so agents open pull requests the evidence check then fails. The block fixes those two sections and leaves the rest of the repository's template (checklists, "Verified" wording) alone.
+
+- **Where.** GitHub reads a single template from `.github/`, the repository root or `docs/`, matching the file name without regard to letter case. The sync manages the file already there, trying `.github/`, then the root, then `docs/`, and creates `.github/pull_request_template.md` only when none exists. A `PULL_REQUEST_TEMPLATE/` directory of several templates is the repository's own and is never touched; a repository with only that gets a default template beside it. A `.txt` template is not recognised.
+- **First sync, no markers.** A template that ends in a `## Issue` section followed only by a `## Acceptance evidence` section, holding nothing but comments and the table, has that tail replaced by the block. Any other shape (prose in those sections, other sections after them) gets the block appended at the end and nothing else changes. No text is ever deleted beyond that legacy tail.
+- **No template.** The new file is the hub's full template, `docs/ac-evidence/pull_request_template.md`, with the block in it. That file holds the block verbatim between the markers, and `scripts/vend/test_pr_template.py` fails when it and `pull-request-block.md` differ. Edit the block in `vended/pull-request-block.md`, paste it between the markers in the docs template, and the test says whether they match.
+- **Later syncs.** The record holds the hash of the managed block only, at the path the file has. A block edited since the last sync is refused without `--force`, like the `AGENTS.md` block; text outside the markers is the repository's and is never compared. Deleting the file or the block is not an opt-out.
+- **Opt out** with `"pr_template": false`. The file is then left in place and its record is dropped.
+- **Nothing in the block counts as evidence on its own.** Every `Evidence:`, `Task: none` and closing-keyword mention is inside an HTML comment, and `scripts/ac-evidence/ac-evidence-check.test.mjs` runs the block through the checker's parse functions to prove it.
 
 ## Skills
 
@@ -85,7 +97,7 @@ that cannot be read is a usage error (exit 2).
 1. Add an entry to `manifest.json`:
 
    ```json
-   {"repo": "rknightion/example", "contributing": true, "agents_block": true, "privacy_sweep": true}
+   {"repo": "rknightion/example", "contributing": true, "agents_block": true, "privacy_sweep": true, "pr_template": true}
    ```
 
    Leave out `skills` to get the default set, or list skill names to choose them. A flag left out
@@ -112,7 +124,7 @@ the rest.
 ## Local edits are protected
 
 `.vended.json` records the hash of every file the engine manages. For `CONTRIBUTING.md` the hash
-covers everything outside the repo-facts region, and for `AGENTS.md` only the managed block. When
+covers everything outside the repo-facts region, and for `AGENTS.md` and the pull request template only the managed block. When
 a managed file in the target still exists but no longer matches its recorded hash, the sync
 refuses, names the file and writes nothing, so an edit to a managed file is never overwritten
 without `--force`. Upstream the fix here, or pass `--force` when the local change should be thrown
@@ -122,14 +134,14 @@ record.
 Deleting is not an edit and not an opt-out. A deleted managed file is written again by the next
 sync, an `AGENTS.md` whose block (markers included) was removed gets the block inserted again, and
 a deleted `AGENTS.md` is recreated. To stop receiving a file, opt out in the repository's entry in
-`manifest.json` here: set `contributing`, `agents_block`, `privacy_sweep` or `grafana_sandbox` to
+`manifest.json` here: set `contributing`, `agents_block`, `privacy_sweep`, `pr_template` or `grafana_sandbox` to
 `false`, or list only the wanted skills in `skills`. The next sync then leaves `CONTRIBUTING.md` and
 `AGENTS.md` in place for the repository to own, and removes a dropped skill, the privacy files or
 `.grafana/Dockerfile` when they still match the record.
 
 The record is trusted only for paths the engine can own: files under `.agents/skills/<name>/`,
 `.github/privacy/sweep`, `.github/privacy/identifier-patterns.txt`, `.grafana/Dockerfile`,
-`CONTRIBUTING.md` and `AGENTS.md`. A record naming any other path is a usage error (exit 2). `--force` then treats the
+`CONTRIBUTING.md`, `AGENTS.md` and a pull request template in `.github/`, the root or `docs/`. A record naming any other path is a usage error (exit 2). `--force` then treats the
 record as absent; it never deletes a path outside that set.
 
 ## Running it by hand
