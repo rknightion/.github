@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.32.8](https://github.com/rknightion/.github/compare/v1.32.7...v1.32.8) (2026-11-26)
+
+
+### Miscellaneous
+
+* remove the Cursor Cloud base image ([#398](https://github.com/rknightion/.github/issues/398)) ([a291d58](https://github.com/rknightion/.github/commit/a291d5855aa7a592941be1a3c990e8270285eb6d))
+
 ## [1.32.7](https://github.com/rknightion/.github/compare/v1.32.6...v1.32.7) (2026-11-26)
 
 
