@@ -39,6 +39,22 @@ The script installs pinned versions of `actionlint` and `zizmor` under
 phase, verifies each tool, and can be safely run again when rebuilding an environment.
 It retrieves packages only through PyPI and the Go module proxy.
 
+## Grafana Assistant sandbox image
+
+[Grafana Assistant](https://grafana.com/docs/grafana-cloud/platform/grafana-assistant/configure/custom-sandbox-images/)
+builds a coding sandbox image for each connected repository from that repository's
+`.grafana/Dockerfile`. One Dockerfile serves the whole fleet: `vended/grafana/Dockerfile`, vended
+to every enrolled repository. It extends Grafana's base image and copies in the toolchains from
+`ghcr.io/rknightion/assistant-sandbox-tools` (built from `sandbox/Dockerfile` by
+`.github/workflows/sandbox-image.yml`, linux/arm64), so the pinned Go, Python, Helm, OpenTofu,
+Terraform, TFLint, kubectl and actionlint do not depend on what Alpine packages. Node, pnpm, just and
+shellcheck come from Alpine. Each repository's own gate tools are installed by its `justfile` on
+first use.
+
+A toolchain bump is a Renovate pull request against `sandbox/Dockerfile`. Merging it publishes a new
+image; Renovate then bumps the digest in `vended/grafana/Dockerfile`, and vend-sync carries that to
+every repository, where Grafana rebuilds on its daily check.
+
 ## Reusable workflows (`.github/workflows/`)
 
 Each repo calls these instead of copying full workflow bodies, so security/CI

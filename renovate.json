@@ -34,6 +34,14 @@
         "# renovate: datasource=(?<datasource>\\S+) depName=(?<depName>\\S+)\\s+\\w+ := \"(?<currentValue>[^\"]+)\""
       ],
       "extractVersionTemplate": "^v?(?<version>.+)$"
+    },
+    {
+      "customType": "regex",
+      "description": "Track the toolchain versions pinned as ARG defaults in the sandbox toolchain image.",
+      "managerFilePatterns": ["/^sandbox/Dockerfile$/"],
+      "matchStrings": [
+        "# renovate: datasource=(?<datasource>\\S+) depName=(?<depName>\\S+)\\s+ARG \\w+=(?<currentValue>\\S+)"
+      ]
     }
   ]
 }
