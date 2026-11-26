@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.35.0](https://github.com/rknightion/.github/compare/v1.34.1...v1.35.0) (2026-11-26)
+
+
+### Features
+
+* **vend:** vend the pull request template Issue and evidence block ([#413](https://github.com/rknightion/.github/issues/413)) ([5efb687](https://github.com/rknightion/.github/commit/5efb68717b03719e109eaa2a2769646ff87ce7bd))
+
 ## [1.34.1](https://github.com/rknightion/.github/compare/v1.34.0...v1.34.1) (2026-11-26)
 
 
