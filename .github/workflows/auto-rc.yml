@@ -206,7 +206,7 @@ jobs:
       - name: Compute the next release-candidate tag
         id: rc
         if: steps.decide.outputs.should_release == 'true'
-        uses: rknightion/.github/.github/actions/next-rc-tag@b31fba795a67b1a413ec1e11a7cd4ac9c2447f15 # v1.32.7
+        uses: rknightion/.github/.github/actions/next-rc-tag@47976d7e85fddb1c3c329cc870612b59ac433849 # v1.32.8
         with:
           version: ${{ steps.decide.outputs.version }}
           tags: ${{ steps.decide.outputs.tags }}
