@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.34.0](https://github.com/rknightion/.github/compare/v1.33.0...v1.34.0) (2026-11-26)
+
+
+### Features
+
+* **vend:** vend the Grafana Assistant sandbox Dockerfile ([#404](https://github.com/rknightion/.github/issues/404)) ([b767c33](https://github.com/rknightion/.github/commit/b767c331ae0743b3322984ac41a1ed0c86f94974))
+
 ## [1.33.0](https://github.com/rknightion/.github/compare/v1.32.9...v1.33.0) (2026-11-26)
 
 
