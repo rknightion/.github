@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.32.7](https://github.com/rknightion/.github/compare/v1.32.6...v1.32.7) (2026-11-26)
+
+
+### Bug Fixes
+
+* let callers pin the container publisher checkout ([#395](https://github.com/rknightion/.github/issues/395)) ([1fd00df](https://github.com/rknightion/.github/commit/1fd00dfa9fd2ad9d2501d88b242b1de4ab9f797d))
+
 ## [1.32.6](https://github.com/rknightion/.github/compare/v1.32.5...v1.32.6) (2026-11-25)
 
 
