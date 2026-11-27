@@ -199,6 +199,28 @@ Current entries:
 | `m7kni/rkps-awsinfra` | admin role (RepositoryRole 5), flagged in `tracker_bypass_allow_admin` | the owner keeps pushing straight to `main` |
 | `m7kni/rkps-awsinfra` | `rknightion-renovate` (Integration 3107245) | Renovate branch automerge |
 | `m7kni/rkps-awsinfra` | `rknightion-token-broker` (Integration 4520356) | the updatecli pipelines push through a broker-minted token |
+| `m7kni/rob-knight-com-site` | admin role (RepositoryRole 5), flagged in `tracker_bypass_allow_admin` | direct-to-main repo (below) |
+| `m7kni/m7kni-net-site` | admin role (RepositoryRole 5), flagged in `tracker_bypass_allow_admin` | direct-to-main repo (below) |
+| `m7kni/m7kni-com-site` | admin role (RepositoryRole 5), flagged in `tracker_bypass_allow_admin` | direct-to-main repo (below) |
+| `m7kni/trustheader-website` | admin role (RepositoryRole 5), flagged in `tracker_bypass_allow_admin` | direct-to-main repo (below) |
+| `m7kni/dmarc-reporties-docs` | admin role (RepositoryRole 5), flagged in `tracker_bypass_allow_admin` | direct-to-main repo (below) |
+| `m7kni/brewmdm-docs` | admin role (RepositoryRole 5), flagged in `tracker_bypass_allow_admin` | direct-to-main repo (below) |
+| `m7kni/renovate-config` | admin role (RepositoryRole 5), flagged in `tracker_bypass_allow_admin` | direct-to-main repo (below) |
+| `m7kni/notesbackup` | admin role (RepositoryRole 5), flagged in `tracker_bypass_allow_admin` | direct-to-main repo (below) |
+| `m7kni/cloud-dev-environment` | admin role (RepositoryRole 5), flagged in `tracker_bypass_allow_admin` | direct-to-main repo (below) |
+| `m7kni/ci-fleet` | admin role (RepositoryRole 5), flagged in `tracker_bypass_allow_admin` | direct-to-main repo (below) |
+| `rknightion/fleet-review` | admin role (RepositoryRole 5), flagged in `tracker_bypass_allow_admin` | direct-to-main repo (below) |
+| `rknightion/avatars` | admin role (RepositoryRole 5), flagged in `tracker_bypass_allow_admin` | direct-to-main repo (below) |
+| `rknightion/write-as-rob` | admin role (RepositoryRole 5), flagged in `tracker_bypass_allow_admin` | direct-to-main repo (below) |
+| `rknightion/teamsdemo-scripts` | admin role (RepositoryRole 5), flagged in `tracker_bypass_allow_admin` | direct-to-main repo (below) |
+
+**`tracker_bypass_allow_admin` is the fleet's direct-to-main list.** Rob and agents working for him
+commit interactive work in these repos straight to `main` instead of opening a pull request, because
+their pull request CI adds little (a site or docs build, or none at all). Each one says so in its own
+`AGENTS.md`, and the agent rules point here for the list. A loop there still lands by pull request.
+A repo that is not yet `tracker: github` is listed in advance: until then the standard admin bypass
+(`always`) already lets the admin push, and the entry keeps that working after the cutover. Adding a
+repo means an entry in both keys and a line in that repo's `AGENTS.md`.
 
 **Migration window.** Moving a repo to `tracker: github` is two steps: the migration removes the
 admin bypass (or adds a no-bypass pull-request ruleset), then `LOOP.md` declares `tracker: github`.

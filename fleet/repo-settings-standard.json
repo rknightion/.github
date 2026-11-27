@@ -346,10 +346,122 @@
           "actor_id": 4520356,
           "bypass_mode": "always"
         }
+      ],
+      "m7kni/rob-knight-com-site": [
+        {
+          "actor_type": "RepositoryRole",
+          "actor_id": 5,
+          "bypass_mode": "always"
+        }
+      ],
+      "m7kni/m7kni-net-site": [
+        {
+          "actor_type": "RepositoryRole",
+          "actor_id": 5,
+          "bypass_mode": "always"
+        }
+      ],
+      "m7kni/m7kni-com-site": [
+        {
+          "actor_type": "RepositoryRole",
+          "actor_id": 5,
+          "bypass_mode": "always"
+        }
+      ],
+      "m7kni/trustheader-website": [
+        {
+          "actor_type": "RepositoryRole",
+          "actor_id": 5,
+          "bypass_mode": "always"
+        }
+      ],
+      "m7kni/dmarc-reporties-docs": [
+        {
+          "actor_type": "RepositoryRole",
+          "actor_id": 5,
+          "bypass_mode": "always"
+        }
+      ],
+      "m7kni/brewmdm-docs": [
+        {
+          "actor_type": "RepositoryRole",
+          "actor_id": 5,
+          "bypass_mode": "always"
+        }
+      ],
+      "m7kni/renovate-config": [
+        {
+          "actor_type": "RepositoryRole",
+          "actor_id": 5,
+          "bypass_mode": "always"
+        }
+      ],
+      "m7kni/notesbackup": [
+        {
+          "actor_type": "RepositoryRole",
+          "actor_id": 5,
+          "bypass_mode": "always"
+        }
+      ],
+      "m7kni/cloud-dev-environment": [
+        {
+          "actor_type": "RepositoryRole",
+          "actor_id": 5,
+          "bypass_mode": "always"
+        }
+      ],
+      "m7kni/ci-fleet": [
+        {
+          "actor_type": "RepositoryRole",
+          "actor_id": 5,
+          "bypass_mode": "always"
+        }
+      ],
+      "rknightion/fleet-review": [
+        {
+          "actor_type": "RepositoryRole",
+          "actor_id": 5,
+          "bypass_mode": "always"
+        }
+      ],
+      "rknightion/avatars": [
+        {
+          "actor_type": "RepositoryRole",
+          "actor_id": 5,
+          "bypass_mode": "always"
+        }
+      ],
+      "rknightion/write-as-rob": [
+        {
+          "actor_type": "RepositoryRole",
+          "actor_id": 5,
+          "bypass_mode": "always"
+        }
+      ],
+      "rknightion/teamsdemo-scripts": [
+        {
+          "actor_type": "RepositoryRole",
+          "actor_id": 5,
+          "bypass_mode": "always"
+        }
       ]
     },
     "tracker_bypass_allow_admin": [
-      "m7kni/rkps-awsinfra"
+      "m7kni/brewmdm-docs",
+      "m7kni/ci-fleet",
+      "m7kni/cloud-dev-environment",
+      "m7kni/dmarc-reporties-docs",
+      "m7kni/m7kni-com-site",
+      "m7kni/m7kni-net-site",
+      "m7kni/notesbackup",
+      "m7kni/renovate-config",
+      "m7kni/rkps-awsinfra",
+      "m7kni/rob-knight-com-site",
+      "m7kni/trustheader-website",
+      "rknightion/avatars",
+      "rknightion/fleet-review",
+      "rknightion/teamsdemo-scripts",
+      "rknightion/write-as-rob"
     ],
     "release_tags": {
       "name": "release-tags",

@@ -795,7 +795,12 @@ class TrackerBypassAllow(WithoutTrackerPrBypass):
         self.assertEqual(actor_keys(allow[LISTED]), actor_keys([BROKER, GITSYNC]))
         self.assertEqual(actor_keys(allow[FACTORY]), actor_keys([ENGINE]))
         self.assertEqual(actor_keys(allow[AWSINFRA]), actor_keys([ADMIN, RENOVATE, BROKER]))
-        self.assertEqual(STD["rulesets"]["tracker_bypass_allow_admin"], [AWSINFRA])
+        direct = STD["rulesets"]["tracker_bypass_allow_admin"]
+        self.assertIn(AWSINFRA, direct)
+        self.assertEqual(direct, sorted(set(direct)))
+        self.assertIn("m7kni/rob-knight-com-site", direct)  # the direct-to-main list
+        for full in direct:  # each direct-to-main repo keeps its owner's admin push
+            self.assertIn(actor_keys([ADMIN])[0], actor_keys(allow[full]), full)
         self.assertNotEqual(STD["rulesets"]["history_name"], STD["rulesets"]["main_name"])
         for full, actors in allow.items():
             self.assertIn(full.split("/")[0], STD["owners"], full)
