@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.36.1](https://github.com/rknightion/.github/compare/v1.36.0...v1.36.1) (2026-11-28)
+
+
+### Miscellaneous
+
+* **deps:** update ghcr.io/rknightion/assistant-sandbox-tools:main docker digest to ae7ead1 ([#431](https://github.com/rknightion/.github/issues/431)) ([41b04fd](https://github.com/rknightion/.github/commit/41b04fdac45c953c177ab916779a04c65c820d2f))
+
 ## [1.36.0](https://github.com/rknightion/.github/compare/v1.35.4...v1.36.0) (2026-11-28)
 
 
