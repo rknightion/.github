@@ -63,7 +63,9 @@ cp "$ASSETS/${url##*/}" "$out"
             pathfile = root / 'path'
             outputfile = root / 'output'
             outputfile.touch()
-            env = dict(os.environ, PATH=str(fake) if fallback else str(fake) + os.pathsep + os.environ['PATH'],
+            # A just already on the machine's PATH at the pinned version would (rightly) skip the download.
+            clean = os.pathsep.join(d for d in os.environ['PATH'].split(os.pathsep) if not (Path(d) / 'just').exists())
+            env = dict(os.environ, PATH=str(fake) if fallback else str(fake) + os.pathsep + clean,
                        RUNNER_TEMP=str(root), RUNNER_OS=runner_os, RUNNER_ARCH=arch,
                        GITHUB_PATH=str(pathfile), GITHUB_OUTPUT=str(outputfile), ASSETS=str(assets), JUST_VERSION='1.59.0', GITHUB_TOKEN='fixture', BROKEN=broken or '', SHASUM_ARGS=str(root / 'shasum-args'))
             try:
@@ -71,21 +73,14 @@ cp "$ASSETS/${url##*/}" "$out"
             except ValueError:
                 self.fail('verified installation step is missing')
             action = (Path(__file__).resolve().parents[1] / '.github/actions/setup-just/action.yml').read_text()
-            self.assertIn('    - name: Add just to PATH', action)
-            js = action.split('    - name: Add just to PATH\n', 1)[1].split('      script: |\n', 1)[1].splitlines()[0].strip()
+            self.assertNotIn('actions/github-script', action)
             def run_action():
                 result = subprocess.run(['/bin/bash', '--noprofile', '--norc', '-eo', 'pipefail', '-c', script],
                                         env=env, capture_output=True, text=True, timeout=20)
                 if result.returncode == 0:
                     values = outputfile.read_text().splitlines()
                     self.assertTrue(values[-1].startswith('path='))
-                    toolkit_env = dict(env, JUST_INSTALL_DIR=values[-1][5:])
-                    harness = r"""const fs = require('fs'), cp = require('child_process');
-const core = {addPath(p) {fs.appendFileSync(process.env.GITHUB_PATH, p + '\n'); process.env.PATH = p + ':' + process.env.PATH}};
-eval(process.argv[1]);
-if (cp.execFileSync('just', ['--version'], {encoding:'utf8'}) !== 'just 1.59.0\n') process.exit(1);
-"""
-                    subprocess.run([shutil.which('node'), '-e', harness, js], env=toolkit_env, check=True, timeout=5)
+                    self.assertEqual(pathfile.read_text().splitlines()[-1], values[-1][5:])
                 return result
             result = run_action()
             if result.returncode == 0:
@@ -120,6 +115,35 @@ if (cp.execFileSync('just', ['--version'], {encoding:'utf8'}) !== 'just 1.59.0\n
                     self.assertIn('just 1.59.0\n', result.stdout)
                     self.assertEqual(version.returncode, 0)
                     self.assertEqual(version.stdout, 'just 1.59.0\n')
+
+    def test_pinned_just_already_on_path_skips_the_download(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            for version, expect_skip in (('1.59.0', True), ('1.58.0', False)):
+                with self.subTest(version=version):
+                    bin_dir = root / version
+                    bin_dir.mkdir()
+                    just = bin_dir / 'just'
+                    just.write_text(f'#!/bin/sh\necho just {version}\n')
+                    just.chmod(0o755)
+                    curl = bin_dir / 'curl'
+                    curl.write_text('#!/bin/sh\necho CURL-CALLED\nexit 22\n')
+                    curl.chmod(0o755)
+                    pathfile = root / f'path-{version}'
+                    out = root / f'out-{version}'
+                    env = dict(os.environ, PATH=str(bin_dir) + os.pathsep + os.environ['PATH'], RUNNER_TEMP=str(root),
+                               RUNNER_OS='Linux', RUNNER_ARCH='X64', GITHUB_PATH=str(pathfile), GITHUB_OUTPUT=str(out), JUST_VERSION='1.59.0')
+                    script = step_script('setup-just', '    - name: Install verified just release')
+                    result = subprocess.run(['/bin/bash', '--noprofile', '--norc', '-eo', 'pipefail', '-c', script],
+                                            env=env, capture_output=True, text=True, timeout=20)
+                    if expect_skip:
+                        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+                        self.assertIn('already on PATH', result.stdout)
+                        self.assertNotIn('CURL-CALLED', result.stdout)
+                        self.assertFalse(pathfile.exists())
+                    else:
+                        self.assertNotEqual(result.returncode, 0)
+                        self.assertIn('CURL-CALLED', result.stdout)
 
     def test_shasum_fallback(self):
         result, paths, version = self.install(fallback=True)

@@ -95,7 +95,7 @@ heads of the most recently updated pull requests, because the workflow runs on p
 and a busy commit carries more suites from other apps than the `ci-success` query can read. A
 gated ruleset that already requires the check needs no query.
 
-A repository moves to it in one change: add the metadata workflow, and drop `edited` and the moved
+A repository moves to it in one change: add the metadata workflow (without an `edited` trigger), and drop `edited` and the moved
 jobs from the heavy workflow. Until the next aligner run after the check first reports, the evidence
 check runs on every pull request but is not yet required.
 

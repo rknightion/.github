@@ -89,7 +89,7 @@ name: acceptance-evidence
 
 on:
   pull_request:
-    types: [opened, edited, reopened, synchronize, ready_for_review]
+    types: [opened, reopened, synchronize, ready_for_review]
 
 permissions: {}
 
@@ -105,12 +105,12 @@ jobs:
     # with:
     #   enforce-all-prs: false         # default; a private repo with no outside contributors sets true
     #   release-please-author: ''      # see below
-    #   runs-on: ubuntu-latest         # a private m7kni caller passes arc-arm64 and harden: false
-    #   harden: true
+    #   runs-on: ubuntu-latest         # a private m7kni caller passes a self-hosted label
 ```
 
-Triggering on `edited` re-runs the check when the pull request body changes, which is the usual path;
-without it a body edit needs a manual re-run. A pull request from a fork runs the same check: the caller
+The example leaves out `edited`: it fires on every title, body or base-branch change and, with
+`cancel-in-progress`, cancels the run a push just started. The checker reads the live body, so after
+fixing the body re-run the check (`gh run rerun`) or push. A pull request from a fork runs the same check: the caller
 repository serves the fork's head commit through `refs/pull/N/head`, so the checkout by SHA and the
 cited-path checks both work, and the job needs no secret.
 
@@ -132,8 +132,11 @@ with no log.
 | `enforce-all-prs` | `false` | Every pull request needs a Closes target with evidence, or `Task: none, <reason>`. `false` checks only pull requests that close an issue. |
 | `release-please-author` | empty | Login of the release-please account (for example `github-actions[bot]`). When release-please replaces an oversized release body with its one-sentence overflow notice, that body counts as `Task: none` only from this account on the `release-please--branches--main` branch. Empty never accepts it. |
 | `runs-on` | `ubuntu-latest` | Runner label. |
-| `harden` | `true` | Run `step-security/harden-runner`. Must be `false` on a self-hosted runner. |
-| `node-version` | pinned in the workflow | Node used for the checker. |
+| `harden` | `false` | Deprecated, no effect: harden-runner is no longer run. Still accepted so callers that pass it keep starting. |
+| `node-version` | seeded in the fleet image | Node for the checker, installed only when no Node 22 or newer is on `PATH`. |
+
+When `enforce-all-prs` is `false` and the live pull request body has no closing keyword, the job passes
+after reading the body, before any checkout or Node setup. The check and job names do not change.
 
 A release pull request carries its `Task: none` line through release-please's footer. In
 `release-please-config.json`:

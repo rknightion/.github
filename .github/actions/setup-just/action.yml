@@ -47,7 +47,14 @@ runs:
       shell: bash
       env:
         JUST_VERSION: ${{ inputs.just-version }}
-      run: |
+      # GITHUB_PATH receives only the mktemp directory made under RUNNER_TEMP above, never caller input.
+      run: | # zizmor: ignore[github-env]
+        # The fleet runner image ships the pinned just: reuse it rather than download. Any other version
+        # on PATH is ignored and the pinned release is installed ahead of it.
+        if existing=$(command -v just 2>/dev/null) && [[ "$("$existing" --version 2>/dev/null || true)" == "just $JUST_VERSION" ]]; then
+          echo "just $JUST_VERSION already on PATH ($existing); skipping the download"
+          exit 0
+        fi
         case "$RUNNER_OS" in
           Linux) platform=unknown-linux-musl ;;
           macOS) platform=apple-darwin ;;
@@ -99,13 +106,5 @@ runs:
         echo "$installed_version"
         rm -f -- "$asset" SHA256SUMS selected.sha256
         printf 'path=%s\n' "$install_dir" >> "$GITHUB_OUTPUT"
+        printf '%s\n' "$install_dir" >> "$GITHUB_PATH"
         trap - EXIT
-    - name: Add just to PATH
-      uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9
-      env:
-        JUST_INSTALL_DIR: ${{ steps.install.outputs.path }}
-      with:
-        # github-script requires a nonempty token even when no API is called.
-        github-token: unused
-        script: |
-          core.addPath(process.env.JUST_INSTALL_DIR)

@@ -98,7 +98,7 @@ This repo's task surface is a `justfile`. Discover it, don't guess it:
 
 Work is tracked in this repository's GitHub issues; they are the only queue. Do not add a checklist
 file beside them. The `backlog/` board is retired and frozen: a pull request may delete or move files
-there, never add or change one (`ci.yml` job `backlog-freeze`).
+there, never add or change one (`ci.yml`, the "Refuse additions and changes under backlog/" step of `ci-success`).
 
 - A pull request body says how it relates to an issue, on a line of its own: `Closes #N` with a line
   `Evidence: <command and result>` (an `Acceptance evidence` table, header exactly
