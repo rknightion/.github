@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.35.1](https://github.com/rknightion/.github/compare/v1.35.0...v1.35.1) (2026-11-28)
+
+
+### Build & CI
+
+* drop harden-runner, trim ac-evidence and setup-just, fold backlog freeze, stop pr-metadata on edited ([#419](https://github.com/rknightion/.github/issues/419)) ([5a2f910](https://github.com/rknightion/.github/commit/5a2f91088b44716f1c7e56f98e7fe254950c46be))
+
 ## [1.35.0](https://github.com/rknightion/.github/compare/v1.34.1...v1.35.0) (2026-11-26)
 
 
