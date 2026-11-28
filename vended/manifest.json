@@ -43,5 +43,16 @@
   {"repo": "rknightion/polylens2otel", "grafana_sandbox": true},
   {"repo": "rknightion/sagemcom-f3896-py", "grafana_sandbox": true},
   {"repo": "rknightion/mq-exporter-dist", "grafana_sandbox": true},
-  {"repo": "rknightion/synthkit-terraform", "privacy_sweep": false}
+  {"repo": "rknightion/synthkit-terraform", "privacy_sweep": false},
+  {"repo": "rknightion/finstore", "grafana_sandbox": true},
+  {"repo": "rknightion/loop-pi", "grafana_sandbox": true},
+  {"repo": "rknightion/agent-workflows", "grafana_sandbox": true},
+  {"repo": "rknightion/otel-instrumentation-skills", "grafana_sandbox": true},
+  {"repo": "rknightion/agent-history", "grafana_sandbox": true},
+  {"repo": "rknightion/fleet-review", "grafana_sandbox": true},
+  {"repo": "rknightion/renovate-repair", "grafana_sandbox": true},
+  {"repo": "m7kni/gate-runner"},
+  {"repo": "m7kni/ci-tools"},
+  {"repo": "m7kni/brewmdm-agent-core"},
+  {"repo": "m7kni/design-system"}
 ]}
