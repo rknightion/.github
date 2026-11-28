@@ -24,17 +24,49 @@ jobs:
       contents: read
       pull-requests: write
     steps:
-      - name: Harden the runner (audit egress)
-        uses: step-security/harden-runner@aebdcf6156ab6691adf63218240e476564a1ed4c # v2.23.0
-        with:
-          egress-policy: audit
+      # Scope: on a pull request, read the PR file list through the API (no checkout) and skip the
+      # heavy steps when no dependency manifest or lockfile changed. The job still runs and reports, so a
+      # required check stays satisfied. Fails closed: no gh, an API error, or a list that is
+      # truncated (the API caps it at 3000 files) or does not match changed_files all run the full
+      # check. push, schedule and dispatch runs are always complete.
+      - name: Scope (skip when no dependency manifest or lockfile changed)
+        id: scope
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          EVENT: ${{ github.event_name }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          CHANGED_FILES: ${{ github.event.pull_request.changed_files }}
+          RELEVANT: '(^|/)(package(-lock)?\.json|npm-shrinkwrap\.json|yarn\.lock|pnpm-lock\.yaml|bun\.lockb?|requirements[^/]*\.(txt|in)|constraints\.txt|Pipfile(\.lock)?|poetry\.lock|pyproject\.toml|uv\.lock|pdm\.lock|setup\.(py|cfg)|environment\.ya?ml|go\.(mod|sum|work)|Cargo\.(toml|lock)|pom\.xml|build\.gradle(\.kts)?|settings\.gradle(\.kts)?|gradle\.lockfile|libs\.versions\.toml|build\.sbt|Gemfile(\.lock)?|[^/]*\.gemspec|composer\.(json|lock)|[^/]*\.(csproj|fsproj|vbproj|sln|nuspec)|packages\.(config|lock\.json)|Directory\.(Packages|Build)\.(props|targets)|paket\.(dependencies|lock)|Package(\.resolved|\.swift)|Podfile(\.lock)?|Cartfile(\.resolved)?|pubspec\.(ya?ml|lock)|mix\.(exs|lock)|rebar\.config|project\.clj|deps\.edn|vcpkg\.json|conanfile\.(txt|py)|Dockerfile[^/]*|[^/]*\.dockerfile|docker-compose[^/]*\.ya?ml|compose[^/]*\.ya?ml|[^/]*\.tf|\.terraform\.lock\.hcl|action\.ya?ml)$|^\.github/(workflows|actions)/|^\.github/dependabot\.ya?ml$'
+        run: |
+          set -uo pipefail
+          full() { echo "Running the full check: $1"; echo "run=true" >> "$GITHUB_OUTPUT"; exit 0; }
+          [ "$EVENT" = pull_request ] || full "not a pull_request run"
+          command -v gh >/dev/null 2>&1 || full "gh is not available"
+          [[ "$PR_NUMBER" =~ ^[0-9]+$ && "$CHANGED_FILES" =~ ^[0-9]+$ ]] || full "pull request metadata is missing"
+          [ "$CHANGED_FILES" -lt 3000 ] || full "the file list is capped at 3000 files"
+          listing=$(gh api --paginate "repos/$GH_REPO/pulls/$PR_NUMBER/files?per_page=100" \
+            --jq '.[] | "\(.filename)\t\(.previous_filename // "")"') || full "the file list could not be read"
+          count=$(printf '%s' "$listing" | grep -c '' || true)
+          [ "$count" -eq "$CHANGED_FILES" ] || full "listed $count files, expected $CHANGED_FILES"
+          # Not a pipe into grep -q: it exits on the first match, and under pipefail the SIGPIPE
+          # that printf or tr then gets would read as "no relevant file" and skip the check.
+          paths=$(printf '%s\n' "$listing" | tr '\t' '\n')
+          if grep -Eq "$RELEVANT" <<<"$paths"; then
+            full "a relevant file changed"
+          fi
+          echo "No dependency manifest or lockfile changed in this pull request: skipping the check."
+          echo "run=false" >> "$GITHUB_OUTPUT"
 
       - name: Checkout repository
+        if: ${{ steps.scope.outputs.run == 'true' }}
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
 
       - name: Dependency review
+        if: ${{ steps.scope.outputs.run == 'true' }}
         uses: actions/dependency-review-action@bbc44d14a204704ccc493733616cd1e93a0321ec # v5.0.1
         with:
           # Posting a PR comment needs pull-requests: write, which fork PRs don't

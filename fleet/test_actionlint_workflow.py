@@ -17,7 +17,8 @@ class SharedActionlintTests(unittest.TestCase):
         actionlint = shutil.which("actionlint")
         self.assertIsNotNone(actionlint, "the gate requires the pinned actionlint tool")
         workflow = (ROOT / ".github/workflows/actionlint.yml").read_text()
-        script = textwrap.dedent(workflow.split("        run: |\n", 1)[1])
+        step = workflow.split("      - name: Run actionlint\n", 1)[1]
+        script = textwrap.dedent(step.split("        run: |\n", 1)[1])
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
             subprocess.run(["git", "init", "-q", str(root)], check=True, timeout=10)
