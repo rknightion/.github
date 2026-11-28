@@ -68,6 +68,29 @@ backoff and a warning per retry: GHCR can answer 404 for a manifest it has just 
 `oras cp` reads the pushed manifest back. Both pushes are content-addressed, so a repeat is
 idempotent. `tests/test_registry_retry.py` runs both step shells against failing fakes.
 
+## Releases
+
+The hub releases itself: release-please keeps the release PR and `self-arm-automerge.yml` arms it for
+auto-merge. A release whose notes hold a feature, a fix or a breaking change is armed at once. One
+holding only chore-class changes (chore, ci, deps, docs and the like) waits for the 06:00 UTC run,
+which arms it only if a release PR is open. A `workflow_dispatch` of `self-arm-automerge`, or the
+`release: ready` label, releases at once. Chores still release, once a day; do not hide them in
+`release-please-config.json`. The arming job reads the notes' `### Features` and `### Bug Fixes`
+headings, so a renamed section must change it too (`tests/test_release_cadence.py` checks).
+
+A merge made with `GITHUB_TOKEN` starts no push workflow, so release-please never sees the release
+commit. `self-arm-automerge` dispatches release-please for a merged release PR still labelled
+`autorelease: pending`, which is what tags it: its `arm` job after arming, and its `tag` job when
+`ci` passes on an armed release PR (it follows `ci` by that `name:`).
+
+For product repositories, `auto-rc` cuts no candidate when everything since the last tag is under
+`.github/` or the Renovate config, and none within `rc-min-interval-minutes` (default 360) of the
+last candidate for the same pending version unless a feat, fix or breaking commit landed since. A
+`workflow_dispatch` run skips both rules. `container-publish` gives release candidates (`-rc.` tags)
+and edge builds a light Trivy scope: linux/amd64 only, gating on fixable findings, with the SARIF
+still carrying the unfixed ones. Stable releases, pull requests and merge-queue builds keep the full
+scan on both platforms.
+
 ## Task interface
 
 This repo's task surface is a `justfile`. Discover it, don't guess it:
