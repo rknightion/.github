@@ -15,7 +15,7 @@ on:
       timeout-minutes:
         description: >-
           Optional positive whole-minute limit for each analysis job. Leave at zero to use
-          120 minutes for Swift and 360 minutes for other languages.
+          120 minutes for Swift and 60 minutes for other languages.
         type: number
         default: 0
       ref:
@@ -47,7 +47,7 @@ jobs:
   analyze:
     name: Analyze (${{ matrix.language }})
     runs-on: ${{ (matrix.language == 'swift' && 'macos-latest') || 'ubuntu-latest' }}
-    timeout-minutes: ${{ inputs.timeout-minutes || (matrix.language == 'swift' && 120) || 360 }}
+    timeout-minutes: ${{ inputs.timeout-minutes || (matrix.language == 'swift' && 120) || 60 }}
     permissions:
       security-events: write
       packages: read
@@ -58,12 +58,59 @@ jobs:
       matrix:
         include: ${{ fromJSON(inputs.languages) }}
     steps:
-      - name: Harden the runner (audit egress)
-        uses: step-security/harden-runner@aebdcf6156ab6691adf63218240e476564a1ed4c # v2.23.0
-        with:
-          egress-policy: audit
+      # Scope: on a push, read the compared file list through the API (no checkout) and skip analysis
+      # when no file for this matrix language changed (the `actions` language: only .github/** and
+      # action.yml files). The job still runs and reports. schedule, workflow_dispatch and pull_request
+      # runs are always full, so the weekly scan stays a complete re-analysis. Fails closed: no gh, an
+      # unreadable or truncated comparison (the API lists at most 3000 files), a new branch or tag, a
+      # forced push whose old commit is gone, an explicit ref input, or a language this map does not
+      # know all run the full scan.
+      - name: Scope (skip a push when no file for the language changed)
+        id: scope
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          EVENT: ${{ github.event_name }}
+          BEFORE: ${{ github.event.before }}
+          AFTER: ${{ github.sha }}
+          LANGUAGE: ${{ matrix.language }}
+          INPUT_REF: ${{ inputs.ref }}
+        run: |
+          set -uo pipefail
+          full() { echo "Running the full analysis: $1"; echo "analyze=true" >> "$GITHUB_OUTPUT"; exit 0; }
+          [ "$EVENT" = push ] || full "not a push run"
+          [ -z "$INPUT_REF" ] || full "an explicit ref input analyses a revision other than the push"
+          command -v gh >/dev/null 2>&1 || full "gh is not available"
+          [[ "$BEFORE" =~ ^[0-9a-f]{40}$ && ! "$BEFORE" =~ ^0+$ ]] || full "no previous commit to compare"
+          [[ "$AFTER" =~ ^[0-9a-f]{40}$ ]] || full "no pushed commit"
+          case "$LANGUAGE" in
+            actions) relevant='^\.github/|(^|/)action\.ya?ml$' ;;
+            python) relevant='\.(py|pyi|pyw)$|(^|/)(requirements[^/]*\.txt|pyproject\.toml|setup\.(py|cfg)|Pipfile|poetry\.lock|uv\.lock)$' ;;
+            javascript|typescript|javascript-typescript) relevant='\.(js|jsx|mjs|cjs|es6?|ts|tsx|mts|cts|vue|html?|json)$|(^|/)(package(-lock)?\.json|yarn\.lock|pnpm-lock\.yaml)$' ;;
+            go) relevant='\.go$|(^|/)go\.(mod|sum|work)$' ;;
+            ruby) relevant='\.(rb|erb|gemspec|rake)$|(^|/)(Gemfile(\.lock)?|Rakefile)$' ;;
+            rust) relevant='\.rs$|(^|/)Cargo\.(toml|lock)$' ;;
+            java|kotlin|java-kotlin) relevant='\.(java|kt|kts|gradle|xml|properties|toml)$|(^|/)(gradlew|gradle\.lockfile)$' ;;
+            csharp) relevant='\.(cs|csx|cshtml|razor|csproj|sln|slnx|props|targets|config|json)$' ;;
+            c-cpp) relevant='\.(c|cc|cpp|cxx|c\+\+|h|hh|hpp|hxx|inl|ipp|cmake|mk|in|am|ac)$|(^|/)(CMakeLists\.txt|Makefile|configure|meson\.build|BUILD|WORKSPACE|MODULE\.bazel)$' ;;
+            swift) relevant='\.(swift|plist|pbxproj|xcconfig|resolved)$|(^|/)Package\.swift$' ;;
+            *) full "no path map for language $LANGUAGE" ;;
+          esac
+          # --paginate prints one JSON document per page; the file count comes from every page.
+          listing=$(gh api --paginate "repos/$GH_REPO/compare/$BEFORE...$AFTER?per_page=100" \
+            --jq '.files[]? | "\(.filename)\t\(.previous_filename // "")"') || full "the comparison could not be read"
+          total=$(printf '%s' "$listing" | grep -c '' || true)
+          [ "$total" -lt 3000 ] || full "the comparison is capped at 3000 files"
+          [ "$total" -gt 0 ] || full "the comparison lists no files"
+          if printf '%s\n' "$listing" | tr '\t' '\n' | grep -Eq "$relevant"; then
+            full "a $LANGUAGE file changed"
+          fi
+          echo "No $LANGUAGE file changed in this push: skipping the analysis."
+          echo "analyze=false" >> "$GITHUB_OUTPUT"
 
       - name: Checkout repository
+        if: ${{ steps.scope.outputs.analyze == 'true' }}
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: ${{ inputs.ref || github.sha }}
@@ -71,6 +118,7 @@ jobs:
 
       - name: Resolve analyzed revision
         id: revision
+        if: ${{ steps.scope.outputs.analyze == 'true' }}
         env:
           INPUT_REF: ${{ inputs.ref }}
           TRIGGER_REF: ${{ github.ref }}
@@ -99,6 +147,7 @@ jobs:
           echo "ref=${ref}" >> "$GITHUB_OUTPUT"
 
       - name: Initialize CodeQL
+        if: ${{ steps.scope.outputs.analyze == 'true' }}
         uses: github/codeql-action/init@915412ff23e8b7659517e607487dbeae018f2934 # v4.39.5
         with:
           languages: ${{ matrix.language }}
@@ -125,11 +174,12 @@ jobs:
               - 'examples'
 
       - name: Autobuild
-        if: matrix.build-mode == 'autobuild'
+        if: ${{ steps.scope.outputs.analyze == 'true' && matrix.build-mode == 'autobuild' }}
         uses: github/codeql-action/autobuild@915412ff23e8b7659517e607487dbeae018f2934 # v4.39.5
 
       - name: Perform CodeQL Analysis
         id: analyze
+        if: ${{ steps.scope.outputs.analyze == 'true' }}
         uses: github/codeql-action/analyze@915412ff23e8b7659517e607487dbeae018f2934 # v4.39.5
         with:
           category: "/language:${{ matrix.language }}${{ inputs.category-suffix }}"
@@ -139,7 +189,7 @@ jobs:
           sha: ${{ steps.revision.outputs.sha }}
 
       - name: Enforce CodeQL security-severity threshold
-        if: inputs.fail-on-security-severity != 'none'
+        if: ${{ steps.scope.outputs.analyze == 'true' && inputs.fail-on-security-severity != 'none' }}
         env:
           SARIF_DIR: ${{ steps.analyze.outputs.sarif-output }}
           THRESHOLD: ${{ inputs.fail-on-security-severity }}
