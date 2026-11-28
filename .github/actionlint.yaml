@@ -3,6 +3,12 @@
 # privacy-sweep.yml and pr-metadata.yml use it to run checkers from the caller's pinned commit.
 # github.job_workflow_sha is not populated on runners (actions/runner#2417). Remove these exemptions
 # once the pinned actionlint knows the property.
+# actionlint 1.7.12 does not know the GitHub-hosted ubuntu-26.04 labels yet (upstream rhysd/actionlint#682).
+# Declaring them as runner labels lets the hub's own lint accept them; remove once actionlint ships them.
+self-hosted-runner:
+  labels:
+    - ubuntu-26.04
+    - ubuntu-26.04-arm
 paths:
   .github/workflows/ac-evidence.yml:
     ignore:
