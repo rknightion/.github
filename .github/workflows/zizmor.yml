@@ -18,14 +18,14 @@ on:
         type: boolean
         default: true
       runs-on:
-        description: "Runner label. Self-hosted callers must also set harden to false."
+        description: "Runner label. Any runner label."
         required: false
         type: string
         default: "ubuntu-latest"
       harden:
         description: >-
-          Run step-security/harden-runner. MUST be false on a self-hosted runner:
-          it is Enterprise-tier there and needs an agent on the runner host.
+          Deprecated, no effect. harden-runner was removed from this workflow; the input stays so
+          callers that still pass it keep starting.
         required: false
         type: boolean
         default: true
@@ -52,13 +52,43 @@ jobs:
       ZIZMOR_VERSION: '1.31.1'
       ZIZMOR_DIAGNOSTIC_MODE: ${{ !(inputs.enforce && github.event_name == 'pull_request') && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository) }}
     steps:
-      - name: Harden the runner (audit egress)
-        if: ${{ inputs.harden }}
-        uses: step-security/harden-runner@aebdcf6156ab6691adf63218240e476564a1ed4c # v2.23.0
-        with:
-          egress-policy: audit
+      # Scope: on a pull request, read the PR file list through the API (no checkout) and skip the
+      # heavy steps when no workflow, action or zizmor-config file changed. The job still runs and reports, so a
+      # required check stays satisfied. Fails closed: no gh, an API error, or a list that is
+      # truncated (the API caps it at 3000 files) or does not match changed_files all run the full
+      # check. push, schedule and dispatch runs are always complete.
+      - name: Scope (skip when no workflow, action or zizmor-config file changed)
+        id: scope
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          EVENT: ${{ github.event_name }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          CHANGED_FILES: ${{ github.event.pull_request.changed_files }}
+          RELEVANT: '^\.github/(workflows|actions)/|^\.github/(zizmor|dependabot)\.ya?ml$|(^|/)action\.ya?ml$'
+          SARIF_UPLOAD: ${{ inputs.upload-sarif }}
+          DIAGNOSTIC: ${{ env.ZIZMOR_DIAGNOSTIC_MODE }}
+        run: |
+          set -uo pipefail
+          full() { echo "Running the full check: $1"; echo "run=true" >> "$GITHUB_OUTPUT"; exit 0; }
+          if [ "${SARIF_UPLOAD:-}" = true ] && [ "${DIAGNOSTIC:-}" = true ]; then full "this run uploads SARIF"; fi
+          [ "$EVENT" = pull_request ] || full "not a pull_request run"
+          command -v gh >/dev/null 2>&1 || full "gh is not available"
+          [[ "$PR_NUMBER" =~ ^[0-9]+$ && "$CHANGED_FILES" =~ ^[0-9]+$ ]] || full "pull request metadata is missing"
+          [ "$CHANGED_FILES" -lt 3000 ] || full "the file list is capped at 3000 files"
+          listing=$(gh api --paginate "repos/$GH_REPO/pulls/$PR_NUMBER/files?per_page=100" \
+            --jq '.[] | "\(.filename)\t\(.previous_filename // "")"') || full "the file list could not be read"
+          count=$(printf '%s' "$listing" | grep -c '' || true)
+          [ "$count" -eq "$CHANGED_FILES" ] || full "listed $count files, expected $CHANGED_FILES"
+          if printf '%s\n' "$listing" | tr '\t' '\n' | grep -Eq "$RELEVANT"; then
+            full "a relevant file changed"
+          fi
+          echo "No workflow, action or zizmor-config file changed in this pull request: skipping the check."
+          echo "run=false" >> "$GITHUB_OUTPUT"
 
       - name: Checkout repository
+        if: ${{ steps.scope.outputs.run == 'true' }}
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
@@ -76,6 +106,7 @@ jobs:
       # failure. `./` for a job-level reusable call already resolves at the
       # caller's commit. Re-enable once the pinned actionlint parses `$/`.
       - name: Write zizmor policy
+        if: ${{ steps.scope.outputs.run == 'true' }}
         run: |
           if [ ! -e .github/zizmor.yml ]; then
             mkdir -p .github
@@ -91,7 +122,7 @@ jobs:
           fi
 
       - name: Run zizmor
-        if: ${{ inputs.upload-sarif || env.ZIZMOR_DIAGNOSTIC_MODE != 'true' }}
+        if: ${{ steps.scope.outputs.run == 'true' && (inputs.upload-sarif || env.ZIZMOR_DIAGNOSTIC_MODE != 'true') }}
         uses: zizmorcore/zizmor-action@1b4550e929643b8b26a62303c6bd64814271a4f1 # v0.9.2
         with:
           version: ${{ env.ZIZMOR_VERSION }}
@@ -100,7 +131,7 @@ jobs:
           annotations: ${{ github.event_name == 'pull_request' && (inputs.enforce || github.event.pull_request.head.repo.full_name != github.repository) }}
 
       - name: Run zizmor without uploading SARIF
-        if: ${{ !inputs.upload-sarif && env.ZIZMOR_DIAGNOSTIC_MODE == 'true' }}
+        if: ${{ steps.scope.outputs.run == 'true' && !inputs.upload-sarif && env.ZIZMOR_DIAGNOSTIC_MODE == 'true' }}
         env:
           GH_TOKEN: ${{ github.token }}
         shell: bash
