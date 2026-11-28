@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.35.2](https://github.com/rknightion/.github/compare/v1.35.1...v1.35.2) (2026-11-28)
+
+
+### Build & CI
+
+* skip lint-class reusables and CodeQL pushes when nothing relevant changed ([#420](https://github.com/rknightion/.github/issues/420)) ([d09c2bf](https://github.com/rknightion/.github/commit/d09c2bf95afe3755272a5d6f93c988c8efe94598))
+
 ## [1.35.1](https://github.com/rknightion/.github/compare/v1.35.0...v1.35.1) (2026-11-28)
 
 
