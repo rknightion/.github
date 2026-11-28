@@ -1,11 +1,28 @@
-# This hub releases itself. No label, no human step.
+# This hub releases itself. No label, no human step, but not on every commit.
 #
 # A release here only moves a version number: consumers pin the reusables by SHA
-# and pick a new one up through a Renovate bump, which runs their own CI. So
-# there is nothing to approve -- gating it just left the release PR sitting.
+# and pick a new one up through a Renovate bump, which runs their own CI. Every
+# release becomes one bump pull request in each of about 47 callers, so releases
+# are batched by what they carry:
+#
+#   * a feat, fix or breaking change: the release PR is armed at once, on the
+#     pull_request event that release-please's push to its branch fires;
+#   * only chore-class changes (chore, ci, deps, docs, refactor, perf, build):
+#     the release PR waits for the daily run at 06:00 UTC, which arms it only
+#     if one is open;
+#   * workflow_dispatch, or the `release: ready` label, arms it at once.
+#
+# The release-notes headings decide, so they must match the feat and fix
+# sections in release-please-config.json (tests/test_release_cadence.py checks
+# it). Notes this job cannot read arm at once, as every release did before.
+#
+# A merge made with GITHUB_TOKEN starts no push workflow, so release-please never
+# sees the release commit and the tag waits for the next push to main. After
+# arming, this job dispatches release-please for any merged release PR still
+# labelled `autorelease: pending` (a GITHUB_TOKEN dispatch does start a run).
 #
 # It cannot live at .github/workflows/arm-automerge.yml -- that path IS the
-# reusable it calls. Hence the distinct filename.
+# reusable callers use. Hence the distinct filename.
 #
 # The hub publishes no artefacts, so it gets no auto-rc channel and no ghcr-cleanup.
 name: self-arm-automerge
@@ -13,18 +30,102 @@ name: self-arm-automerge
 on:
   pull_request:
     types: [opened, synchronize, reopened, labeled]
+  schedule:
+    - cron: "0 6 * * *"
+  workflow_dispatch: {}
 
 permissions:
   contents: read
 
 jobs:
   arm:
+    name: arm auto-merge
+    # Same guards as the arm-automerge reusable: a release-please branch in this
+    # repository only. Scheduled and dispatched runs find the PR themselves.
+    if: >-
+      github.repository_owner == 'rknightion' &&
+      (github.event_name != 'pull_request' || (
+        startsWith(github.event.pull_request.head.ref, 'release-please--') &&
+        github.event.pull_request.head.repo.full_name == github.repository))
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
     permissions:
       contents: write      # enabling auto-merge writes the merge ref
       pull-requests: write # gh pr merge --auto operates on the PR
-    # `./` so it always tests the current ref, matching how ci.yml calls the
-    # other reusables here. The reusable's own guards (release branch prefix,
-    # same-repo head) are what keep this off ordinary PRs.
-    uses: ./.github/workflows/arm-automerge.yml
-    with:
-      require-label: false
+      actions: write       # dispatch release-please to tag a release merged here
+    steps:
+      - name: Arm the release PR when its release is due
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          EVENT_NAME: ${{ github.event_name }}
+          PR: ${{ github.event.pull_request.number }}
+          LABEL: ${{ github.event.label.name }}
+        run: |
+          set -euo pipefail
+          prefix='release-please--'
+
+          # Immediate when the notes carry a breaking change, a feature or a fix,
+          # or are not release notes at all. Deferred only for readable notes
+          # without those sections.
+          classify() {
+            if grep -qE '^### (.*BREAKING CHANGES|Features|Bug Fixes)[[:space:]]*$' <<< "$1"; then
+              echo immediate
+            elif grep -qE '^## \[?[0-9]+\.[0-9]+\.[0-9]+' <<< "$1"; then
+              echo deferred
+            else
+              echo immediate
+            fi
+          }
+
+          number=""
+          reason=""
+          case "${EVENT_NAME}" in
+            pull_request)
+              number="${PR}"
+              if [ "${LABEL}" = "release: ready" ]; then
+                reason="labelled release: ready"
+              else
+                # Read the body now, not from the event: release-please rewrites it.
+                body="$(gh pr view "${number}" --repo "${REPO}" --json body --jq .body)" || body=""
+                if [ "$(classify "${body}")" = immediate ]; then
+                  reason="the release carries a feature, a fix or a breaking change"
+                fi
+              fi
+              ;;
+            schedule|workflow_dispatch)
+              open="$(gh pr list --repo "${REPO}" --state open --base main --limit 100 \
+                --json number,headRefName,isCrossRepository \
+                --jq "[.[] | select((.headRefName | startswith(\"${prefix}\")) and (.isCrossRepository | not)) | .number]")"
+              count="$(jq -r 'length' <<< "${open}")"
+              if [ "${count}" = 0 ]; then
+                echo "No release is pending."
+              elif [ "${count}" = 1 ]; then
+                number="$(jq -r '.[0]' <<< "${open}")"
+                reason="${EVENT_NAME//_/ } release"
+              else
+                echo "::error::${count} open release PRs; expected one"
+                exit 1
+              fi
+              ;;
+            *)
+              echo "::error::unexpected event ${EVENT_NAME}"
+              exit 1
+              ;;
+          esac
+
+          if [ -n "${reason}" ]; then
+            echo "Arming #${number}: ${reason}"
+            # gh merges at once when the PR is already mergeable (CLEAN).
+            gh pr merge "${number}" --repo "${REPO}" --auto --squash
+          elif [ -n "${number}" ]; then
+            echo "#${number} holds only chore-class changes; the 06:00 UTC run releases it."
+          fi
+
+          # Tag a release merged by GITHUB_TOKEN, which started no push run.
+          untagged="$(gh pr list --repo "${REPO}" --state merged --base main \
+            --label 'autorelease: pending' --limit 20 --json number --jq 'length')"
+          if [ "${untagged}" != 0 ]; then
+            echo "${untagged} merged release PR(s) await a tag; dispatching release-please"
+            gh workflow run release-please.yml --repo "${REPO}" --ref main
+          fi

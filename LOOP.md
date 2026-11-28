@@ -45,8 +45,10 @@ The tracker working model is `~/repos/agent-docs/docs/github-tracker.md` (mainta
 - A sweep states its denominator: files inspected, vulnerable, and the clean ones by name.
 - Prerelease identifiers must be alphanumeric by construction; an all-digit identifier with a leading
   zero breaks `helm package`.
-- `chore` commits cut patch releases here on purpose; do not re-hide them. `Closes #N` in a commit
-  pushed to main does not reliably auto-close.
+- `chore`, `ci` and `deps` commits still cut patch releases here; do not re-hide them. They wait for one
+  daily release: `self-arm-automerge` arms the release PR at once only for a feature, fix or breaking
+  change, and otherwise at 06:00 UTC when a release is pending, or on a manual dispatch.
+  `Closes #N` in a commit pushed to main does not reliably auto-close.
 - Repo settings and rulesets leave no git trace: record before and after values in the task and verify
   by re-reading the API.
 - Never restore a mutable cross-repository `config-file: ...@main` reference for CodeQL.
