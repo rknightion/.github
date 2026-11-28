@@ -6,9 +6,13 @@ name: PR metadata
 # the hub reusables key their own concurrency groups on github.workflow.
 run-name: PR ${{ github.event.pull_request.number }} metadata
 
+# No `edited` type, on purpose: work lands by pushing branches, and an `edited` event (a title or body
+# change, or a retarget) fired a second run that cancelled the first. The checker reads the live body, so
+# after fixing a body, re-run the job (`gh run rerun`) or push.
+
 on:
   pull_request:
-    types: [opened, edited, reopened, synchronize, ready_for_review]
+    types: [opened, reopened, synchronize, ready_for_review]
 
 permissions:
   contents: read

@@ -10,9 +10,10 @@ on:
         required: true
         type: string
       harden:
-        description: Audit runner egress with Harden Runner. Set false on self-hosted runners without its Enterprise agent.
-        required: true
+        description: "Deprecated, no effect: step-security/harden-runner is no longer run. Still accepted so callers that pass it keep starting."
+        required: false
         type: boolean
+        default: false
       check-backlog:
         description: Prevent additions and changes under the retired backlog/ path.
         type: boolean
@@ -48,7 +49,7 @@ on:
       node-version:
         description: Exact Node version for the acceptance checker.
         type: string
-        default: "24.22.1"
+        default: "24.22.3"
       strict-addresses:
         description: Include RFC 1918, link-local and CGNAT IPv4 addresses in the privacy sweep.
         type: boolean
@@ -74,12 +75,6 @@ jobs:
       issues: read
       pull-requests: read
     steps:
-      - name: Harden the runner (audit egress)
-        if: ${{ inputs.harden }}
-        uses: step-security/harden-runner@aebdcf6156ab6691adf63218240e476564a1ed4c # v2.23.0
-        with:
-          egress-policy: audit
-
       - name: Validate the pull request and reusable commits
         id: validate
         env:

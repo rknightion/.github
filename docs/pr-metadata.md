@@ -12,11 +12,10 @@ pr-metadata:
   uses: rknightion/.github/.github/workflows/pr-metadata.yml@<release-sha>
   with:
     runs-on: ubuntu-latest
-    harden: true
     skip-docs-only-lint: true
 ```
 
-Call this once per workflow and pin the release SHA. Include `opened`, `edited`, `reopened` and `synchronize` in the caller's pull request triggers when checking the PR body. A repository that moves these checks out of its heavy workflow and drops `edited` there should know that GitHub also reports a base-branch change as `edited`: after a retarget the heavy workflow does not restart, so its required check stays missing (where the workflow filters on the base branch) or reflects the old base, until a push or `gh pr update-branch`. The job reads the live body through the existing acceptance checker. It runs pinned checker sources from a separate checkout and neither executes a script from the PR tree nor needs a write token. Use a runner with Python 3.12 or newer for the privacy sweep. On a self-hosted runner without the Harden Runner Enterprise agent, set `harden: false`.
+Call this once per workflow and pin the release SHA. Trigger the caller on `opened`, `reopened`, `synchronize` and `ready_for_review`, not `edited`: an `edited` event fires on every title, body or base-branch change and, with the reusable's `cancel-in-progress` group, cancels the run a push just started. After fixing a PR body, re-run the job or push. A retarget does not restart the check either, so push or run `gh pr update-branch` after one. The job reads the live body through the existing acceptance checker. It runs pinned checker sources from a separate checkout and neither executes a script from the PR tree nor needs a write token. Use a runner with Python 3.12 or newer for the privacy sweep. The `harden` input is deprecated and has no effect; harden-runner is no longer run.
 
 `check-backlog`, `check-privacy`, `check-actionlint` and `check-zizmor` default to true. `strict-addresses` defaults to false. Actionlint uses the PR merge tree and runs on docs-only changes because a workflow can source a Markdown path. Zizmor uses `.github/zizmor.yml` from that tree when present, with a pinned default policy otherwise. Set `zizmor-config` to choose a different relative path. A custom policy selects Zizmor even when its files have Markdown names.
 

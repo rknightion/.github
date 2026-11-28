@@ -28,8 +28,7 @@ jobs:
       contents: read
     uses: rknightion/.github/.github/workflows/privacy-sweep.yml@<release SHA> # vX.Y.Z
     # with:
-    #   runs-on: ubuntu-latest      # GitHub-hosted; a self-hosted runner also needs harden: false
-    #   harden: true
+    #   runs-on: ubuntu-latest      # GitHub-hosted or self-hosted
     #   strict-addresses: false     # true also reports RFC 1918, link-local and CGNAT addresses
 ```
 
@@ -44,7 +43,7 @@ The called job is named `Privacy sweep`, so with the caller above the check run 
 | Input | Default | Meaning |
 | --- | --- | --- |
 | `runs-on` | `ubuntu-latest` | Runner label. |
-| `harden` | `true` | Run `step-security/harden-runner`. Must be `false` on a self-hosted runner. |
+| `harden` | `false` | Deprecated, no effect: harden-runner is no longer run. Still accepted so callers that pass it keep starting. |
 | `strict-addresses` | `false` | Also report private addresses (RFC 1918, link-local, CGNAT). |
 
 ## What binds the sweep

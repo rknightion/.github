@@ -89,9 +89,9 @@ class JudgeLayout:
         # A skipped job reports success to a required check, so the job must run and fail instead.
         self.assertFalse([line for line in job_header(self.workflow) if re.match(r'^    if:', line)])
 
-    def test_guard_is_the_first_step_after_hardening(self):
+    def test_guard_is_the_first_step(self):
         names = [name for name, _ in steps(self.workflow)]
-        self.assertEqual(names.index(self.guard_step), 1, names)
+        self.assertEqual(names.index(self.guard_step), 0, names)
 
     def test_non_pull_request_event_fails(self):
         for event in ('push', 'pull_request_target', 'workflow_dispatch', 'merge_group'):

@@ -41,22 +41,22 @@ on:
         type: string
         default: ""
       runs-on:
-        description: "Runner label. Self-hosted callers must also set harden to false."
+        description: "Runner label."
         required: false
         type: string
         default: "ubuntu-latest"
       harden:
-        description: >-
-          Run step-security/harden-runner. MUST be false on a self-hosted runner: it is Enterprise-tier
-          there and needs an agent on the runner host.
+        description: "Deprecated, no effect: step-security/harden-runner is no longer run. Still accepted so callers that pass it keep starting."
         required: false
         type: boolean
-        default: true
+        default: false
       node-version:
-        description: "Exact Node version for the checker."
+        description: >-
+          Node for the checker, installed only when no Node 22 or newer is already on PATH (GitHub-hosted
+          images ship one). The default is a version the fleet runner image already carries in its tool cache.
         required: false
         type: string
-        default: "24.22.1"
+        default: "24.22.3"
 
 permissions: {}
 
@@ -75,12 +75,6 @@ jobs:
       issues: read
       pull-requests: read
     steps:
-      - name: Harden the runner (audit egress)
-        if: ${{ inputs.harden }}
-        uses: step-security/harden-runner@aebdcf6156ab6691adf63218240e476564a1ed4c # v2.23.0
-        with:
-          egress-policy: audit
-
       - name: Refuse anything but a pull request
         env:
           EVENT_NAME: ${{ github.event_name }}
@@ -103,7 +97,31 @@ jobs:
           fi
           echo "::notice title=Acceptance evidence binding::pr=${PR_NUMBER} head=${PR_HEAD_SHA}"
 
+      # Enforcement off and no closing keyword anywhere in the live body: the checker would print "not
+      # applicable" and pass, so stop before the two checkouts and the Node setup. The match is deliberately
+      # wider than the checker's (any close/fix/resolve word, comments and prose included), so it only ever
+      # skips a body the checker would also pass. Any failure to read the body runs the full check. The body
+      # is untrusted: it goes to grep on stdin and is never echoed or put into a command.
+      - name: Skip when nothing is enforced
+        id: scope
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          ENFORCE_ALL: ${{ inputs.enforce-all-prs }}
+        run: |
+          skip=false
+          if [[ "$ENFORCE_ALL" == "false" ]] && gh api "repos/${REPO}/pulls/${PR_NUMBER}" --jq '.body // ""' > "${RUNNER_TEMP}/pr-body.txt"; then
+            if ! grep -Eiq '\b(close[sd]?|fix(e[sd])?|resolve[sd]?)\b' "${RUNNER_TEMP}/pr-body.txt"; then
+              skip=true
+              echo "Acceptance evidence not applicable: no closing keyword in the pull request body and enforcement for every pull request is off."
+            fi
+          fi
+          rm -f "${RUNNER_TEMP}/pr-body.txt"
+          echo "skip=${skip}" >> "$GITHUB_OUTPUT"
+
       - name: Checkout the pull request head
+        if: ${{ steps.scope.outputs.skip != 'true' }}
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: ${{ github.event.pull_request.head.sha }}
@@ -111,6 +129,7 @@ jobs:
           persist-credentials: false
 
       - name: Refuse to run without the pinned reusable commit
+        if: ${{ steps.scope.outputs.skip != 'true' }}
         env:
           JOB_WORKFLOW_SHA: ${{ job.workflow_sha }}
         run: |
@@ -122,6 +141,7 @@ jobs:
       # The checker comes from the commit of this reusable workflow the caller named, never from the caller's tree,
       # and sits beside the pull request tree (head/), not inside it.
       - name: Checkout the checker at the pinned reusable commit
+        if: ${{ steps.scope.outputs.skip != 'true' }}
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           repository: rknightion/.github
@@ -131,13 +151,25 @@ jobs:
           sparse-checkout: scripts/ac-evidence/ac-evidence-check.mjs
           sparse-checkout-cone-mode: false
 
+      - name: Find a usable Node
+        id: pathnode
+        if: ${{ steps.scope.outputs.skip != 'true' }}
+        run: |
+          major="$(node --version 2>/dev/null | sed -n 's/^v\([0-9][0-9]*\)\..*/\1/p')"
+          if [[ -n "$major" && "$major" -ge 22 ]]; then
+            echo "Using Node $(node --version) from PATH"
+            echo "reuse=true" >> "$GITHUB_OUTPUT"
+          fi
+
       - name: Set up Node
+        if: ${{ steps.scope.outputs.skip != 'true' && steps.pathnode.outputs.reuse != 'true' }}
         uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: ${{ inputs.node-version }}
           package-manager-cache: false
 
       - name: Check the acceptance evidence
+        if: ${{ steps.scope.outputs.skip != 'true' }}
         env:
           GH_TOKEN: ${{ github.token }}
           PR_NUMBER: ${{ github.event.pull_request.number }}
