@@ -85,7 +85,7 @@ jobs:
   # token, so it needs no broker token, and it opens no pull requests.
   pin-drift:
     name: report hub pin drift
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     timeout-minutes: 10
     permissions:
       contents: read

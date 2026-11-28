@@ -55,7 +55,7 @@ jobs:
       (github.event_name != 'pull_request' || (
         startsWith(github.event.pull_request.head.ref, 'release-please--') &&
         github.event.pull_request.head.repo.full_name == github.repository))
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     timeout-minutes: 5
     permissions:
       contents: write      # enabling auto-merge writes the merge ref
@@ -147,7 +147,7 @@ jobs:
       github.event.workflow_run.event == 'pull_request' &&
       github.event.workflow_run.head_repository.full_name == github.repository &&
       startsWith(github.event.workflow_run.head_branch, 'release-please--')
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     timeout-minutes: 10
     permissions:
       pull-requests: read # read the release PR's state, auto-merge and labels
