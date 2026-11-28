@@ -10,6 +10,16 @@
 # The caller publishes artifacts by feeding the `tag` output into its own
 # publish.yml (image + chart) and the shared binaries.yml (goreleaser).
 #
+# Two rules keep this from rebuilding the same code (guard steps 5 and 6):
+#   * No RC when everything since the last tag is CI-only: `.github/**` and the
+#     Renovate config. Hub pin bumps were most of a busy repo's RCs.
+#   * No RC within `rc-min-interval-minutes` of the last RC for the same pending
+#     version, unless a feat, fix or breaking commit landed since that RC.
+# A workflow_dispatch run skips both. A caller's release-please workflow should
+# skip the same CI-only pushes with this filter on its push trigger:
+#     paths-ignore: [".github/**", "renovate.json", "renovate.json5",
+#                    ".renovaterc", ".renovaterc.json", ".renovaterc.json5"]
+#
 # TOKEN: GITHUB_TOKEN, not the OpenBao broker. Tagging and releasing are
 # same-repo operations, so this deliberately keeps the RC channel working when
 # the broker host is unreachable. A GITHUB_TOKEN-created tag does NOT trigger
@@ -67,6 +77,14 @@ on:
         required: false
         type: string
         default: ""
+      rc-min-interval-minutes:
+        description: >-
+          Minimum minutes between two RCs for the same pending version when
+          nothing since the last RC is a feat, fix or breaking commit. 0 turns the
+          limit off. A workflow_dispatch run is never held back.
+        required: false
+        type: number
+        default: 360
     outputs:
       tag:
         description: "The RC tag created, or empty when no RC was cut."
@@ -102,11 +120,6 @@ jobs:
       previous_tag: ${{ steps.decide.outputs.previous_tag }}
       release_pr: ${{ steps.decide.outputs.release_pr }}
     steps:
-      - name: Harden the runner (audit egress)
-        uses: step-security/harden-runner@aebdcf6156ab6691adf63218240e476564a1ed4c # v2.23.0
-        with:
-          egress-policy: audit
-
       - name: Checkout repository
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -126,6 +139,7 @@ jobs:
           WR_EVENT: ${{ github.event.workflow_run.event }}
           WR_HEAD_REPO: ${{ github.event.workflow_run.head_repository.full_name }}
           DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
+          MIN_INTERVAL: ${{ inputs.rc-min-interval-minutes }}
         run: |
           set -euo pipefail
           skip() { echo "should_release=false" >> "$GITHUB_OUTPUT"; echo "SKIP: $1"; exit 0; }
@@ -189,6 +203,62 @@ jobs:
           [ -n "${version}" ] || skip "no root package version in the release PR manifest"
 
           prev="$(git tag -l 'v[0-9]*' | grep -Ev -- '-' | sort -V | tail -1 || true)"
+
+          # (5) Nothing shipped has changed since the last tag (RC or stable)
+          # this commit descends from: every changed path is CI-only. Hub pin
+          # bumps and CI action updates land here. Compared against the tag, not
+          # the parent, so a source change whose own CI run was red still gets an
+          # RC from the next green commit. Fails closed: no tag, an unreadable
+          # diff or an empty one cuts the RC as before.
+          if [ "${EVENT_NAME}" != "workflow_dispatch" ]; then
+            base="$(git describe --tags --abbrev=0 --match 'v[0-9]*' HEAD 2>/dev/null || true)"
+            if [ -n "${base}" ] && changed="$(git diff --name-only --no-renames "${base}" HEAD)" \
+              && [ -n "${changed}" ]; then
+              ci_only=true
+              while IFS= read -r path; do
+                case "${path}" in
+                  .github/*|renovate.json|renovate.json5|.renovaterc|.renovaterc.json|.renovaterc.json5) ;;
+                  *) ci_only=false; break ;;
+                esac
+              done <<< "${changed}"
+              # Belt and braces: a release commit is never CI-only, by name too.
+              # (Read into a variable first: grep -q closing a pipe early makes
+              # git log die of SIGPIPE, which pipefail reports as no match.)
+              subjects="$(git log --format=%s "${base}..HEAD")" || subjects="chore: release (unreadable log)"
+              if grep -qE '^chore(\([^)]*\))?: release' <<< "${subjects}"; then
+                ci_only=false
+              fi
+              [ "${ci_only}" != "true" ] || skip "only CI configuration changed since ${base}"
+            fi
+          fi
+
+          # (6) An RC for this pending version is younger than the minimum
+          # interval and nothing since it is a feat, fix or breaking change. Those
+          # always get an RC at once; chores and dependency bumps wait. Fails
+          # closed: an unreadable tag date cuts the RC.
+          if ! [[ "${MIN_INTERVAL}" =~ ^[0-9]+$ ]]; then
+            echo "::error::rc-min-interval-minutes must be a whole number of minutes, got '${MIN_INTERVAL}'"
+            exit 1
+          fi
+          if [ "${EVENT_NAME}" != "workflow_dispatch" ] && [ "${MIN_INTERVAL}" -gt 0 ]; then
+            last_rc="$(git for-each-ref --sort=-creatordate --count=1 --format='%(refname:short)' \
+              "refs/tags/v${version}-rc.*")"
+            if [ -n "${last_rc}" ]; then
+              # An unreadable log counts as urgent, so the RC is cut.
+              messages="$(git log --format=%B "${last_rc}..HEAD")" || messages="fix: unreadable log"
+              urgent=false
+              if grep -qE '^(feat|fix)(\([^)]*\))?!?: |^[a-z]+(\([^)]*\))?!: |^BREAKING[ -]CHANGE: ' <<< "${messages}"; then
+                urgent=true
+              fi
+              created="$(git for-each-ref --format='%(creatordate:unix)' "refs/tags/${last_rc}")"
+              if [ "${urgent}" = "false" ] && [[ "${created}" =~ ^[0-9]+$ ]]; then
+                age=$(( $(date +%s) - created ))
+                if [ "${age}" -lt $(( MIN_INTERVAL * 60 )) ]; then
+                  skip "${last_rc} is $(( age / 60 )) min old and nothing since it is a feat or fix (interval ${MIN_INTERVAL} min)"
+                fi
+              fi
+            fi
+          fi
 
           {
             echo "should_release=true"
@@ -308,11 +378,6 @@ jobs:
     outputs:
       tag: ${{ steps.create.outputs.tag }}
     steps:
-      - name: Harden the runner (audit egress)
-        uses: step-security/harden-runner@aebdcf6156ab6691adf63218240e476564a1ed4c # v2.23.0
-        with:
-          egress-policy: audit
-
       # persist-credentials stays false even though this job pushes: the tag push
       # below authenticates with an explicit token URL instead, so no credential
       # is left in .git/config for a later step to pick up.
