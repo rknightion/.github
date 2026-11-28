@@ -222,6 +222,13 @@ class CodeqlScope(ScopeCase):
         self.assertEqual(self.push("cobol", docs)[0], "analyze=true")
         self.assertEqual(self.push("python", files(*[f"d/{i}.md" for i in range(3000)]))[0], "analyze=true")
 
+    def test_compare_list_at_the_300_file_cap_fails_closed(self):
+        # The compare API returns at most 300 files, so 300 entries may be a truncated list.
+        out, stdout, _ = self.push("python", files(*[f"d/{i}.md" for i in range(300)]))
+        self.assertEqual(out, "analyze=true")
+        self.assertIn("300 or more", stdout)
+        self.assertEqual(self.push("python", files(*[f"d/{i}.md" for i in range(299)]))[0], "analyze=false")
+
     def test_default_timeout_is_sixty_minutes_and_stays_an_input(self):
         text = (WORKFLOWS / "codeql.yml").read_text()
         self.assertIn("|| (matrix.language == 'swift' && 120) || 60 }}", text)

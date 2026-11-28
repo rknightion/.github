@@ -62,7 +62,7 @@ jobs:
       # when no file for this matrix language changed (the `actions` language: only .github/** and
       # action.yml files). The job still runs and reports. schedule, workflow_dispatch and pull_request
       # runs are always full, so the weekly scan stays a complete re-analysis. Fails closed: no gh, an
-      # unreadable or truncated comparison (the API lists at most 3000 files), a new branch or tag, a
+      # unreadable or truncated comparison (the API lists at most 300 files), a new branch or tag, a
       # forced push whose old commit is gone, an explicit ref input, or a language this map does not
       # know all run the full scan.
       - name: Scope (skip a push when no file for the language changed)
@@ -97,11 +97,13 @@ jobs:
             swift) relevant='\.(swift|plist|pbxproj|xcconfig|resolved)$|(^|/)Package\.swift$' ;;
             *) full "no path map for language $LANGUAGE" ;;
           esac
-          # --paginate prints one JSON document per page; the file count comes from every page.
+          # The compare API returns `files` only on the first page and at most 300 files for the whole
+          # comparison, so --paginate adds none. A count of 300 or more may be truncated: run in full.
+          # https://docs.github.com/en/rest/commits/commits#compare-two-commits
           listing=$(gh api --paginate "repos/$GH_REPO/compare/$BEFORE...$AFTER?per_page=100" \
             --jq '.files[]? | "\(.filename)\t\(.previous_filename // "")"') || full "the comparison could not be read"
           total=$(printf '%s' "$listing" | grep -c '' || true)
-          [ "$total" -lt 3000 ] || full "the comparison is capped at 3000 files"
+          [ "$total" -lt 300 ] || full "the comparison lists 300 or more files, the API cap, so it may be truncated"
           [ "$total" -gt 0 ] || full "the comparison lists no files"
           if printf '%s\n' "$listing" | tr '\t' '\n' | grep -Eq "$relevant"; then
             full "a $LANGUAGE file changed"
