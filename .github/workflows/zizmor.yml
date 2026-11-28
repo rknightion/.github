@@ -81,7 +81,10 @@ jobs:
             --jq '.[] | "\(.filename)\t\(.previous_filename // "")"') || full "the file list could not be read"
           count=$(printf '%s' "$listing" | grep -c '' || true)
           [ "$count" -eq "$CHANGED_FILES" ] || full "listed $count files, expected $CHANGED_FILES"
-          if printf '%s\n' "$listing" | tr '\t' '\n' | grep -Eq "$RELEVANT"; then
+          # Not a pipe into grep -q: it exits on the first match, and under pipefail the SIGPIPE
+          # that printf or tr then gets would read as "no relevant file" and skip the check.
+          paths=$(printf '%s\n' "$listing" | tr '\t' '\n')
+          if grep -Eq "$RELEVANT" <<<"$paths"; then
             full "a relevant file changed"
           fi
           echo "No workflow, action or zizmor-config file changed in this pull request: skipping the check."

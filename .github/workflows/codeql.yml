@@ -39,9 +39,12 @@ permissions: {}
 # Cancel a superseded scan on the same ref (rapid pushes / PR updates) to free runners.
 # Unique group prefix per reusable so a caller invoking several reusables doesn't put
 # them in one group where they'd cancel each other.
+# A push never cancels a running push scan: the scope step skips a docs-only push, so a newer
+# docs-only push that cancelled a scan of a source change would leave that change unanalysed until
+# the weekly run. Other events still cancel the superseded run.
 concurrency:
   group: codeql-${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: ${{ github.event_name != 'push' }}
 
 jobs:
   analyze:
@@ -105,7 +108,10 @@ jobs:
           total=$(printf '%s' "$listing" | grep -c '' || true)
           [ "$total" -lt 300 ] || full "the comparison lists 300 or more files, the API cap, so it may be truncated"
           [ "$total" -gt 0 ] || full "the comparison lists no files"
-          if printf '%s\n' "$listing" | tr '\t' '\n' | grep -Eq "$relevant"; then
+          # Not a pipe into grep -q: it exits on the first match, and under pipefail the SIGPIPE
+          # that printf or tr then gets would read as "no relevant file" and skip the check.
+          paths=$(printf '%s\n' "$listing" | tr '\t' '\n')
+          if grep -Eq "$relevant" <<<"$paths"; then
             full "a $LANGUAGE file changed"
           fi
           echo "No $LANGUAGE file changed in this push: skipping the analysis."

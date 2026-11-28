@@ -123,6 +123,12 @@ class PullRequestScope:
         out, _, _ = self.pr(files(*self.skip_files), changed=len(self.skip_files) + 5)
         self.assertEqual(out, f"{self.output}=true")
 
+    def test_large_list_with_a_relevant_file_first_is_not_skipped(self):
+        # grep -q exits on the first match; piping into it under pipefail let SIGPIPE read as "no match".
+        padding = [f"docs/{'d' * 80}/{i}.md" for i in range(2900)]
+        out, _, _ = self.pr(files(self.run_files[0], *padding))
+        self.assertEqual(out, f"{self.output}=true")
+
     def test_push_and_schedule_stay_complete(self):
         for event in ("push", "schedule", "workflow_dispatch"):
             with self.subTest(event=event):
@@ -227,6 +233,15 @@ class CodeqlScope(ScopeCase):
         self.assertEqual(out, "analyze=true")
         self.assertIn("300 or more", stdout)
         self.assertEqual(self.push("python", files(*[f"d/{i}.md" for i in range(299)]))[0], "analyze=false")
+
+    def test_large_list_with_a_relevant_file_first_is_not_skipped(self):
+        padding = [f"docs/{'d' * 400}/{i}.md" for i in range(298)]
+        out, _, _ = self.push("python", files("pkg/mod.py", *padding))
+        self.assertEqual(out, "analyze=true")
+
+    def test_a_newer_push_never_cancels_a_running_push_scan(self):
+        text = (WORKFLOWS / "codeql.yml").read_text()
+        self.assertIn("cancel-in-progress: ${{ github.event_name != 'push' }}", text)
 
     def test_default_timeout_is_sixty_minutes_and_stays_an_input(self):
         text = (WORKFLOWS / "codeql.yml").read_text()
