@@ -7,12 +7,11 @@ version. Each case reads should_release from the step's GITHUB_OUTPUT.
 import base64
 import json
 import os
-from pathlib import Path
 import subprocess
 import tempfile
-import textwrap
 import time
 import unittest
+from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 WORKFLOW = ROOT / ".github/workflows/auto-rc.yml"
@@ -111,7 +110,7 @@ class AutoRcGuard(unittest.TestCase):
                    REPO="owner/product", PR_PREFIX="release-please--branches--main", EVENT_NAME=event,
                    WR_EVENT="", WR_HEAD_REPO="", DEFAULT_BRANCH="main", MIN_INTERVAL=interval,
                    GITHUB_OUTPUT=str(output), FAKE_PRS=prs, FAKE_MANIFEST_B64=manifest)
-        result = subprocess.run(["bash", "-e", "-c", decide_script()], cwd=self.repo.path, env=env,
+        result = subprocess.run(["bash", "-e", "-c", decide_script()], check=False, cwd=self.repo.path, env=env,
                                 capture_output=True, text=True, timeout=30)
         values = {}
         for line in output.read_text().splitlines():

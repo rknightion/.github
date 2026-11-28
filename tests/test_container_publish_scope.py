@@ -5,9 +5,9 @@ Release candidates and edge builds scan linux/amd64 only and gate only on fixabl
 while their SARIF keeps the unfixed ones. The step conditions are read from the workflow and
 evaluated, so an edit to an `if:` is what these tests observe.
 """
-from pathlib import Path
 import re
 import unittest
+from pathlib import Path
 
 from gh_expr import evaluate
 
@@ -16,7 +16,7 @@ WORKFLOW = (ROOT / ".github/workflows/container-publish.yml").read_text()
 
 
 def job(name):
-    match = re.search(rf"^  {re.escape(name)}:\n(.*?)(?=^  \w[\w-]*:\n|\Z)", WORKFLOW, re.M | re.S)
+    match = re.search(rf"^  {re.escape(name)}:\n(.*?)(?=^  \w[\w-]*:\n|\Z)", WORKFLOW, re.MULTILINE | re.DOTALL)
     if not match:
         raise AssertionError(f"missing job {name}")
     return match.group(1)
@@ -26,18 +26,18 @@ BUILD = job("build")
 
 
 def step(name):
-    match = re.search(rf"^      - name: {re.escape(name)}\n(.*?)(?=^      (?:- name:|#)|\Z)", BUILD, re.M | re.S)
+    match = re.search(rf"^      - name: {re.escape(name)}\n(.*?)(?=^      (?:- name:|#)|\Z)", BUILD, re.MULTILINE | re.DOTALL)
     if not match:
         raise AssertionError(f"missing step {name}")
     return match.group(1)
 
 
 def field(text, key, indent=8):
-    match = re.search(rf"^{' ' * indent}{re.escape(key)}: (.+)$", text, re.M)
+    match = re.search(rf"^{' ' * indent}{re.escape(key)}: (.+)$", text, re.MULTILINE)
     return match.group(1).strip() if match else None
 
 
-SCOPE = re.search(r"^      IMAGE_SCAN_SCOPE: (.+)$", BUILD, re.M).group(1)
+SCOPE = re.search(r"^      IMAGE_SCAN_SCOPE: (.+)$", BUILD, re.MULTILINE).group(1)
 INSTALL = step("Install verified Trivy release")
 SCAN = step("Run Trivy vulnerability scanner")
 LIGHT = step("Gate a release candidate or edge build on fixable findings")
@@ -140,7 +140,7 @@ class Scope(unittest.TestCase):
 
     def test_scope_variable_is_not_read_by_trivy(self):
         # Trivy maps every TRIVY_* variable to a flag; the job-level scope must not be one.
-        job_env = re.search(r"^    env:\n((?:^      .*\n)+)", BUILD, re.M).group(1)
+        job_env = re.search(r"^    env:\n((?:^      .*\n)+)", BUILD, re.MULTILINE).group(1)
         self.assertNotRegex(job_env, r"(?m)^      TRIVY_")
 
 

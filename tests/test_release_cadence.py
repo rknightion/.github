@@ -7,11 +7,12 @@ records what it was asked to do.
 """
 import json
 import os
-from pathlib import Path
 import re
 import subprocess
 import tempfile
 import unittest
+from pathlib import Path
+from typing import ClassVar
 
 ROOT = Path(__file__).resolve().parents[1]
 WORKFLOW = ROOT / ".github/workflows/self-arm-automerge.yml"
@@ -83,7 +84,7 @@ class Cadence(unittest.TestCase):
             if view_fail:
                 env["FAKE_VIEW_FAIL"] = "1"
             # Actions runs a bare run: block as bash -e {0}.
-            result = subprocess.run(["bash", "-e", "-c", script()], env=env, capture_output=True,
+            result = subprocess.run(["bash", "-e", "-c", script()], check=False, env=env, capture_output=True,
                                     text=True, timeout=20)
             return result, calls.read_text().splitlines()
 
@@ -194,10 +195,10 @@ esac
 class TagAfterAutoMerge(unittest.TestCase):
     SHA = "a" * 40
     LIST = json.dumps([{"number": 41, "headRefOid": "b" * 40}, {"number": 42, "headRefOid": "a" * 40}])
-    ARMED = {"state": "OPEN", "autoMergeRequest": {"mergeMethod": "SQUASH"}, "labels": [{"name": "autorelease: pending"}]}
-    WAITING = {"state": "OPEN", "autoMergeRequest": None, "labels": [{"name": "autorelease: pending"}]}
-    MERGED = {"state": "MERGED", "autoMergeRequest": None, "labels": [{"name": "autorelease: pending"}]}
-    TAGGED = {"state": "MERGED", "autoMergeRequest": None, "labels": [{"name": "autorelease: tagged"}]}
+    ARMED: ClassVar[dict] = {"state": "OPEN", "autoMergeRequest": {"mergeMethod": "SQUASH"}, "labels": [{"name": "autorelease: pending"}]}
+    WAITING: ClassVar[dict] = {"state": "OPEN", "autoMergeRequest": None, "labels": [{"name": "autorelease: pending"}]}
+    MERGED: ClassVar[dict] = {"state": "MERGED", "autoMergeRequest": None, "labels": [{"name": "autorelease: pending"}]}
+    TAGGED: ClassVar[dict] = {"state": "MERGED", "autoMergeRequest": None, "labels": [{"name": "autorelease: tagged"}]}
 
     def run_step(self, views, listing=LIST):
         with tempfile.TemporaryDirectory() as tmp:
@@ -211,7 +212,7 @@ class TagAfterAutoMerge(unittest.TestCase):
             env = dict(os.environ, PATH=f"{root}{os.pathsep}{os.environ['PATH']}", CALLS=str(calls), GH_TOKEN="x",
                        REPO="example/hub", BRANCH="release-please--branches--main", SHA=self.SHA,
                        FAKE_LIST=listing, FAKE_VIEWS=json.dumps(views))
-            result = subprocess.run(["bash", "-e", "-c", script(TAG_STEP)], env=env, capture_output=True,
+            result = subprocess.run(["bash", "-e", "-c", script(TAG_STEP)], check=False, env=env, capture_output=True,
                                     text=True, timeout=20)
             return result, calls.read_text().splitlines()
 
