@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.36.0](https://github.com/rknightion/.github/compare/v1.35.4...v1.36.0) (2026-11-28)
+
+
+### Features
+
+* **release:** daily chore releases, fewer release candidates and a lighter RC Trivy gate ([#423](https://github.com/rknightion/.github/issues/423)) ([85c5325](https://github.com/rknightion/.github/commit/85c532517726fbc498278a6671d171ff372ae1c3))
+
 ## [1.35.4](https://github.com/rknightion/.github/compare/v1.35.3...v1.35.4) (2026-11-28)
 
 
