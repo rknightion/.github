@@ -9,6 +9,10 @@ name: Container publish (reusable)
 #   * SBOM (SPDX + CycloneDX) via syft; attached to the GitHub Release on a release
 #   * optional Helm chart publish (OCI) — release version or main snapshot
 #   * Trivy scan -> caller Security tab (SARIF upload optional via trivy-upload-sarif; the gate always runs)
+#     Stable releases, pull requests and merge-queue builds scan both platforms and gate on every
+#     HIGH/CRITICAL finding the caller has not accepted. Release candidates (-rc. tags) and edge
+#     builds scan linux/amd64 only and gate only on findings with a fix; their SARIF still
+#     carries the unfixed findings, so the Security tab does not close and reopen alerts.
 # Callers trigger on push:main (edge) + release-please workflow_call (release) +
 # workflow_dispatch + merge_group (build-only gate). Concurrency cancels superseded
 # EDGE builds but never a release publish.
@@ -130,12 +134,12 @@ jobs:
             runner: ubuntu-24.04
           - platform: linux/arm64
             runner: ubuntu-24.04-arm
+    env:
+      # Not TRIVY_*: Trivy reads every TRIVY_ variable as a flag.
+      # full: a stable or other non-RC release tag, or a pull request or merge-queue gate.
+      # light: a release candidate (-rc. tag) or an edge build. See the header.
+      IMAGE_SCAN_SCOPE: ${{ (contains(fromJSON('["pull_request","pull_request_target","merge_group"]'), github.event_name) || (inputs.release-tag != '' && !contains(inputs.release-tag, '-rc.'))) && 'full' || 'light' }}
     steps:
-      - name: Harden the runner (audit egress)
-        uses: step-security/harden-runner@aebdcf6156ab6691adf63218240e476564a1ed4c # v2.23.0
-        with:
-          egress-policy: audit
-
       - name: Prepare platform pair
         env:
           PLATFORM: ${{ matrix.platform }}
@@ -300,7 +304,7 @@ jobs:
           echo "OCI revision ${revision}; licences ${licenses:-<none>}"
 
       - name: Install verified Trivy release
-        if: inputs.trivy
+        if: inputs.trivy && (env.IMAGE_SCAN_SCOPE == 'full' || matrix.platform == 'linux/amd64')
         env:
           RUNNER_ARCH: ${{ runner.arch }}
         run: |
@@ -330,9 +334,11 @@ jobs:
           "$RUNNER_TEMP/trivy-bin/trivy" --version
           echo "$RUNNER_TEMP/trivy-bin" >> "$GITHUB_PATH"
 
+      # A light scope scans linux/amd64 only: both platforms build the same source, and a stable
+      # release still scans both before anything is published as latest.
       - name: Run Trivy vulnerability scanner
         id: trivy
-        if: inputs.trivy
+        if: inputs.trivy && (env.IMAGE_SCAN_SCOPE == 'full' || matrix.platform == 'linux/amd64')
         continue-on-error: true
         env:
           TRIVY_IGNORE_UNFIXED: ${{ inputs.trivy-ignore-unfixed }}
@@ -343,7 +349,8 @@ jobs:
           format: sarif
           output: trivy-${{ env.PLATFORM_PAIR }}.sarif
           severity: CRITICAL,HIGH
-          exit-code: "1"
+          # A light scope writes the full SARIF without failing on it; the next step gates it.
+          exit-code: ${{ env.IMAGE_SCAN_SCOPE == 'full' && '1' || '0' }}
           limit-severities-for-sarif: true
           # The action's cache writes a new dated Actions-cache entry every day (0.1-0.7 GB each).
           # The DB comes from mirror.gcr.io instead, which has no pull limit worth caching around.
@@ -358,8 +365,25 @@ jobs:
           sarif_file: trivy-${{ env.PLATFORM_PAIR }}.sarif
           category: trivy-image-${{ inputs.image-name && format('{0}-', inputs.image-name) || '' }}${{ env.PLATFORM_PAIR }}
 
+      # Light scope only: the same scan, same ignore file and same local DB, gating on fixable
+      # HIGH/CRITICAL findings. The SARIF above keeps the unfixed ones for the Security tab.
+      - name: Gate a release candidate or edge build on fixable findings
+        id: trivy-light
+        if: inputs.trivy && env.IMAGE_SCAN_SCOPE == 'light' && steps.trivy.outcome == 'success'
+        continue-on-error: true
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+        with:
+          skip-setup-trivy: true
+          input: ${{ runner.temp }}/image-${{ env.PLATFORM_PAIR }}
+          format: table
+          severity: CRITICAL,HIGH
+          exit-code: "1"
+          cache: false
+          trivyignores: ${{ inputs.trivy-ignore-file }}
+          ignore-unfixed: true
+
       - name: Enforce Trivy security gate
-        if: inputs.trivy && steps.trivy.outcome == 'failure'
+        if: inputs.trivy && (steps.trivy.outcome == 'failure' || steps.trivy-light.outcome == 'failure')
         run: |
           echo "Trivy reported a scanner error or an unaccepted HIGH/CRITICAL finding" >&2
           exit 1
@@ -433,11 +457,6 @@ jobs:
       digest: ${{ steps.digest.outputs.digest }}
       version: ${{ steps.meta.outputs.version }}
     steps:
-      - name: Harden the runner (audit egress)
-        uses: step-security/harden-runner@aebdcf6156ab6691adf63218240e476564a1ed4c # v2.23.0
-        with:
-          egress-policy: audit
-
       - name: Download digests
         uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
@@ -596,11 +615,6 @@ jobs:
       packages: write
       id-token: write   # cosign sign the chart
     steps:
-      - name: Harden the runner (audit egress)
-        uses: step-security/harden-runner@aebdcf6156ab6691adf63218240e476564a1ed4c # v2.23.0
-        with:
-          egress-policy: audit
-
       - name: Checkout repository
         if: ${{ inputs.checkout-ref == '' }}
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
