@@ -17,7 +17,8 @@ name: changes (reusable)
 # Never pair this with a workflow-level paths or paths-ignore filter on a required check: a skipped
 # workflow reports nothing, so the required check never arrives.
 #
-# Caller permissions: contents: read. No secrets are used. Check run name: the caller's job name,
+# Caller permissions: contents: read (the compare API, and the contents API for a JSON version
+# file). No secrets are used. Check run name: the caller's job name,
 # " / ", then this job's name "classify".
 
 on:
@@ -37,8 +38,10 @@ on:
         default: "rknightion-renovate[bot]"
       version-files:
         description: >-
-          Path globs (newline separated) of the files release-please bumps besides CHANGELOG.md and
-          .release-please-manifest.json, for example charts/app/Chart.yaml. Empty: only those two.
+          The files release-please bumps besides CHANGELOG.md and .release-please-manifest.json,
+          one a line: a glob alone (only release-please marker lines may change) or a glob, ':'
+          and a JSON path to the version field, for example charts/app/Chart.yaml:$.version.
+          Anything else changing in the file runs everything. Format: docs/changes/README.md.
         required: false
         type: string
         default: ""

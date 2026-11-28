@@ -24,7 +24,7 @@ All are strings.
 | --- | --- |
 | `app` | `'true'` unless one of the three below is `'true'`. Gate application suites on this. |
 | `hub_pins_only` | `'true'` when the pull request was opened by a `renovate-authors` login from a branch of the same repository, every changed file is a modified file under `.github/workflows/`, and every changed line replaces a job-level `uses: rknightion/.github/.github/workflows/<file>@<40-hex sha>` line in place, with the same indent, quoting and reusable file; only the SHA and the trailing comment may differ. A composite action pin (`.github/actions/...`), any other action, an added or removed line, or any other change makes it `'false'`. |
-| `release_only` | `'true'` when the changed files are only `CHANGELOG.md`, `.release-please-manifest.json` and the `version-files` globs, and every changed line of the manifest and the version files differs from the line it replaces only in version numbers, each new version being one the manifest now records. A version file that changes without the manifest makes it `'false'`. A pull request that changes only the root `CHANGELOG.md` is `'true'`. |
+| `release_only` | `'true'` when the changed files are only `CHANGELOG.md`, `.release-please-manifest.json` and `version-files` entries; every changed line of the manifest differs only in version numbers; and in each version file only its designated version fields change, each to a version the manifest now records (see Version files). A version file that changes without the manifest makes it `'false'`. A pull request that changes only the root `CHANGELOG.md` is `'true'`. |
 | `vended_only` | `'true'` when every changed file (and the old name of a renamed one) matches a `vended-paths` glob. Always `'false'` without the input. |
 | `hub_workflows` | JSON list of the reusable workflow file names whose pins move, such as `["binaries.yml","zizmor.yml"]`, when `hub_pins_only`; otherwise `[]`. |
 | `reason` | One line saying why, also written to the job summary. |
@@ -35,7 +35,7 @@ All are strings.
 | --- | --- | --- |
 | `runs-on` | `ubuntu-latest` | Runner label. The runner needs `python3` 3.8 or newer. A caller that cannot use hosted runners passes its self-hosted label. |
 | `renovate-authors` | `rknightion-renovate[bot]` | Pull request author logins, comma or newline separated, whose pull requests can be `hub_pins_only`. |
-| `version-files` | empty | Newline-separated globs of the files release-please bumps besides the changelog and manifest (its configured extra files), such as `charts/app/Chart.yaml`. |
+| `version-files` | empty | One entry a line: the files release-please bumps besides the changelog and manifest, each with the field it bumps. See Version files. |
 | `vended-paths` | empty | Newline-separated globs of the files the vend-sync manifest owns in the repository. |
 
 Globs: `**` spans directories, `*` and `?` stay inside one path segment, and a pattern matches the whole path from
@@ -58,6 +58,30 @@ The files vend-sync writes (`vended/README.md`, "What lands in an enrolled repos
 
 Leave out any of them that a gated job builds or tests, for example `.grafana/Dockerfile` where a gated job builds
 that image.
+
+## Version files
+
+Each `version-files` line is a glob, alone or followed by `:` and a JSON path to the version field, the same shape as
+release-please's `extra-files` (`path` plus `jsonpath`). Only the named fields may change, and only to a version the
+manifest now records. Any other change in the file, a dependency moved to exactly the version being released
+included, makes `release_only` `'false'`.
+
+| Entry | File | What may change |
+| --- | --- | --- |
+| `README.md`, `version.go` | any non-JSON file | Only lines release-please's generic updater owns: a line carrying `x-release-please-version`, or a line between `x-release-please-start-version` and `x-release-please-end` with the start marker inside the same diff hunk. |
+| `charts/app/Chart.yaml:$.version` | `.yaml` or `.yml` | Only the top-level `version: <version>` line (unindented, optionally quoted or commented). Repeat the glob for a second key, such as `:$.appVersion`. A nested path is not supported in YAML. |
+| `package.json:$.version`, `package-lock.json:$.packages[""].version` | `.json` | The file is read through the contents API at the merge base and at the head. The head file must equal the merge-base file with only the named fields set, each a version string. Duplicate keys, a missing field or a read failure make it `'false'`. A JSON file needs a field: a bare JSON glob never passes. |
+
+JSON paths are `$` followed by `.key` or `["key"]` segments: objects only, no array indexes or wildcards. An entry
+the classifier cannot parse fails closed.
+
+```yaml
+      version-files: |
+        charts/app/Chart.yaml:$.version
+        charts/app/Chart.yaml:$.appVersion
+        charts/app/README.md
+        package.json:$.version
+```
 
 ## Fail closed
 
@@ -90,7 +114,7 @@ jobs:
     uses: rknightion/.github/.github/workflows/changes.yml@<sha> # vX.Y.Z
     with:
       version-files: |
-        charts/app/Chart.yaml
+        charts/app/Chart.yaml:$.version
       vended-paths: |
         .agents/skills/**
         # ...the list above
@@ -153,8 +177,8 @@ Rules:
   in `hub_workflows`.
 - The `changes` job takes no `if:`: on a push it runs and answers `app: 'true'`.
 - Keep the required check name: `ci-success` stays the single required check.
-- Callers grant `contents: read` and nothing else. The reusable reads the compare API and checks out this public
-  repository.
+- Callers grant `contents: read` and nothing else. The reusable reads the compare and contents APIs and checks out
+  this public repository.
 
 ## Inputs it classifies on purpose, and the tests that pin them
 
@@ -168,7 +192,9 @@ Rules:
 | An added or removed pin line, a changed indent, a step-level list entry | `app` | `test_an_added_or_removed_pin_line_is_not`, `test_a_pin_moved_to_another_indent_is_not`, `test_a_step_level_list_entry_is_not` |
 | A pin-only diff from a person, another Renovate login or a fork | `app` | `test_another_author_or_a_fork_is_not` |
 | A diff the API omitted or cut short | `app` | `test_a_file_without_a_diff_or_not_modified_is_not`, `test_a_cut_short_diff_is_not` |
-| A dependency bump in a listed version file (`package.json`) inside a release pull request | `app` | `test_dependency_bump_in_a_version_file_is_not` |
+| A dependency bump in a listed version file inside a release pull request, to any version or to exactly the version being released (JSON and YAML) | `app` | `test_dependency_bump_in_a_version_file_is_not`, `test_dependency_bump_to_exactly_the_release_version_is_not`, `test_json_dependency_moved_to_the_release_version_is_not`, `test_nested_yaml_version_moved_to_the_release_version_is_not` |
+| A version line outside the named field or marker block, or a block whose start marker is in another hunk | `app` | `test_only_the_designated_field_counts`, `test_release_please_markers` |
+| A JSON version file that cannot be read, has duplicate keys or lacks the field | `app` | `test_json_that_cannot_be_read_or_is_ambiguous_is_not` |
 | A version file edited beyond its version numbers, or without the manifest | `app` | `test_non_version_change_in_a_version_file_is_not`, `test_version_files_without_the_manifest_are_not` |
 | A rename into a vended path from a path that is not vended | `app` | `test_a_rename_from_outside_the_vended_paths_is_not` |
 | A file name carrying newlines and `app=false` | `app` | `test_a_file_name_cannot_write_another_output` |
