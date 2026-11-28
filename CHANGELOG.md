@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.35.3](https://github.com/rknightion/.github/compare/v1.35.2...v1.35.3) (2026-11-28)
+
+
+### Build & CI
+
+* accept the ubuntu-26.04 runner labels in the hub actionlint config ([#425](https://github.com/rknightion/.github/issues/425)) ([1f1bc4e](https://github.com/rknightion/.github/commit/1f1bc4e64cd9bf80a9b638c2f109c98f6d188cef))
+
 ## [1.35.2](https://github.com/rknightion/.github/compare/v1.35.1...v1.35.2) (2026-11-28)
 
 
