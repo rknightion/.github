@@ -106,6 +106,8 @@ jobs:
         run: ./fleet/pin-drift.py --out "$RUNNER_TEMP/pin-drift.json" --summary "$GITHUB_STEP_SUMMARY"
 
       - name: Upload the pin report
+        # always(): a failed fetch exits 1 after writing the partial report; upload it anyway.
+        if: ${{ always() && hashFiles(format('{0}/pin-drift.json', runner.temp)) != '' }}
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: hub-pin-drift

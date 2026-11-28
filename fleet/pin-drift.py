@@ -165,8 +165,10 @@ def summary(
         lines = [
             lines[0],
             "",
-            f"**INCOMPLETE: {len(failures)} file(s) could not be read, "
-            "so this report may miss stale pins.**",
+            (
+                f"**INCOMPLETE: {len(failures)} file(s) could not be read, "
+                "so this report may miss stale pins.**"
+            ),
         ] + lines[1:]
         lines += ["", "| Repository | File | Status |", "| --- | --- | --- |"]
         lines += [
