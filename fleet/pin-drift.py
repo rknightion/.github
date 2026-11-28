@@ -10,7 +10,12 @@ vended, so a hub fix only reaches a caller through a pin bump.
   ./fleet/pin-drift.py --out pin-drift.json --summary pin-drift.md
 """
 from __future__ import annotations
-import argparse, collections, json, re, subprocess, sys
+import argparse
+import collections
+import json
+import re
+import subprocess
+import sys
 from concurrent.futures import ThreadPoolExecutor
 
 ORG = "rknightion"
@@ -50,7 +55,7 @@ def stale(refs: list[dict], latest: str) -> list[dict]:
 
 def gh(path: str, raw: bool = False):
     cmd = ["gh", "api", path] + (["-H", "Accept: application/vnd.github.raw"] if raw else [])
-    p = subprocess.run(cmd, capture_output=True, text=True)
+    p = subprocess.run(cmd, capture_output=True, text=True, check=False)
     if p.returncode != 0:
         return None
     return p.stdout if raw else json.loads(p.stdout)
@@ -111,12 +116,13 @@ def main() -> int:
     # The hub's own workflows pin themselves; they are not callers.
     rows = [r for r in rows if r["repo"] != HUB]
     old = stale(rows, latest)
-    json.dump({"latest": latest, "references": len(rows), "stale": old},
-              open(a.out, "w"), indent=2)
+    with open(a.out, "w") as fh:
+        json.dump({"latest": latest, "references": len(rows), "stale": old}, fh, indent=2)
     text = summary(latest, rows, old)
     print(text)
     if a.summary:
-        open(a.summary, "a").write(text)
+        with open(a.summary, "a") as fh:
+            fh.write(text)
     return 0
 
 

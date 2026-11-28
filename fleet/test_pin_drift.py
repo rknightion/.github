@@ -1,4 +1,6 @@
-import importlib.util, pathlib, unittest
+import importlib.util
+import pathlib
+import unittest
 
 spec = importlib.util.spec_from_file_location(
     "pin_drift", pathlib.Path(__file__).with_name("pin-drift.py"))
