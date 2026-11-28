@@ -1,5 +1,18 @@
 # Changelog
 
+## [1.35.4](https://github.com/rknightion/.github/compare/v1.35.3...v1.35.4) (2026-11-28)
+
+
+### Build & CI
+
+* **deps:** update dependency ubuntu to v26 ([#129](https://github.com/rknightion/.github/issues/129)) ([c4fa1ac](https://github.com/rknightion/.github/commit/c4fa1acecdc8ffc0047d994e11f5e33f1c7c324c))
+* report hub pin drift weekly and stop asking for just check before every push ([#422](https://github.com/rknightion/.github/issues/422)) ([42d3aad](https://github.com/rknightion/.github/commit/42d3aaddb174cc17a60734e471676e11dc285c2d))
+
+
+### Miscellaneous
+
+* **deps:** update ghcr.io/rknightion/assistant-sandbox-tools:main docker digest to 9845d8c ([#428](https://github.com/rknightion/.github/issues/428)) ([08a808c](https://github.com/rknightion/.github/commit/08a808c35f95c91009926149ff9041b72c61efa1))
+
 ## [1.35.3](https://github.com/rknightion/.github/compare/v1.35.2...v1.35.3) (2026-11-28)
 
 
