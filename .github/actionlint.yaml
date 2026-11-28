@@ -7,6 +7,9 @@ paths:
   .github/workflows/ac-evidence.yml:
     ignore:
       - 'property "workflow_sha" is not defined in object type'
+  .github/workflows/changes.yml:
+    ignore:
+      - 'property "workflow_sha" is not defined in object type'
   .github/workflows/privacy-sweep.yml:
     ignore:
       - 'property "workflow_sha" is not defined in object type'

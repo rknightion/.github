@@ -1,0 +1,16 @@
+[
+ {
+  "filename": ".github/pull_request_template.md",
+  "status": "modified",
+  "additions": 3,
+  "deletions": 1,
+  "patch": "@@ -14,14 +14,16 @@ What you ran or observed. `just check` is the gate.\n \n What you did not run or could not observe. Write \"nothing\" only if that is true.\n \n+<!-- BEGIN vended: rknightion/.github -->\n ## Issue\n \n <!-- Closes #<number> on a line of its own for each issue of this repository this change completes (Closes owner/repo#<number> means the same). Refs #<number> when it only relates to one. A change with no issue says \"Task: none, <reason>\" on a line of its own. -->\n \n ## Acceptance evidence\n \n-<!-- One row per acceptance criterion of every issue this change closes, copied exactly from the issue's \"- [ ] ACn\" list. Evidence class is code, live or browser. In Proof, put repository paths in backticks, and write anything else (a command, a read-back, a run) without them. Delete the example row. Leave the table out only when the change closes no issue. -->\n+<!-- A change that closes an issue needs one line of its own here: \"Evidence: <command and result>\", the command you ran and what it showed. With that line, delete the table below. The table is the longer form, for when each acceptance criterion needs its own proof: one row per acceptance criterion of every issue this change closes, copied exactly from the issue's \"- [ ] ACn\" list. Evidence class is code, live or browser. In Proof, put repository paths in backticks, and write anything else (a command, a read-back, a run) without them. Delete the example row. Leave the table out when the change closes no issue. -->\n \n | Issue | AC | AC text | Evidence class | Proof |\n | --- | --- | --- | --- | --- |\n | #N | AC1 | The acceptance criterion, word for word | code | `path/to/the_test.go` TestWhatItProves |\n+<!-- END vended: rknightion/.github -->"
+ },
+ {
+  "filename": ".vended.json",
+  "status": "modified",
+  "additions": 2,
+  "deletions": 1,
+  "patch": "@@ -28,12 +28,13 @@\n     \".agents/skills/write-tests/SKILL.md\": \"56a08e2276b2aa64e666ad184f768b53d89668b25da21c3d38ec01dd5779955e\",\n     \".github/privacy/identifier-patterns.txt\": \"85cadcfb81ec1dae95543723e6d6eed80fcbd0a4eed4ce2f9ec32acecd42971f\",\n     \".github/privacy/sweep\": \"914d03f4a0d5fa50458532e1b6beb381dda30a965b21694a14f68c8226ec2c3b\",\n+    \".github/pull_request_template.md\": \"a62a73552fceec31a92aa10e69f2bfd02361c54facd6d9a2df463e05a01647d1\",\n     \".grafana/Dockerfile\": \"dd2b228027aa332f7728b6f89a478b98e3520c8dee110b10cf6f413dddc6704d\",\n     \"AGENTS.md\": \"72df61e0f2252a8a41ef0325ecbfc87ce1364a0cb693ae3e17354ac4815a64ea\",\n     \"CONTRIBUTING.md\": \"cad335154f1e9710da3e9527ca5a96811bdd1a27888fe06a627ed30bd9bb0c21\"\n   },\n   \"ref\": \"main\",\n   \"schema\": 1,\n-  \"sha\": \"b767c331ae0743b3322984ac41a1ed0c86f94974\",\n+  \"sha\": \"5efb68717b03719e109eaa2a2769646ff87ce7bd\",\n   \"source\": \"rknightion/.github\"\n }"
+ }
+]
