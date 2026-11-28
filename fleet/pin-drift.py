@@ -10,6 +10,7 @@ vended, so a hub fix only reaches a caller through a pin bump.
   ./fleet/pin-drift.py --out pin-drift.json --summary pin-drift.md
 """
 from __future__ import annotations
+
 import argparse
 import collections
 import json
