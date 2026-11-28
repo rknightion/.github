@@ -1,13 +1,12 @@
 """Run the scope step shells of the lint-class and CodeQL reusables against a fake gh."""
 
-import os
-from pathlib import Path
 import re
 import subprocess
 import tempfile
 import textwrap
 import unittest
-
+from pathlib import Path
+from typing import ClassVar
 
 ROOT = Path(__file__).resolve().parents[1]
 WORKFLOWS = ROOT / ".github/workflows"
@@ -43,7 +42,7 @@ class ScopeCase(unittest.TestCase):
                 gh.write_text(FAKE_GH)
                 gh.chmod(0o755)
             for name in ("bash", "grep", "tr", "cat", "date", "printf"):
-                found = subprocess.run(["which", name], text=True, capture_output=True).stdout.strip()
+                found = subprocess.run(["which", name], text=True, capture_output=True, check=False).stdout.strip()
                 if found and not (bin_dir / name).exists():
                     (bin_dir / name).symlink_to(found)
             (tmp / "listing").write_text(listing or "")
@@ -60,7 +59,7 @@ class ScopeCase(unittest.TestCase):
                 full_env["FAKE_GH_FAIL"] = "1"
             result = subprocess.run(
                 [str(bin_dir / "bash"), "-c", step_script(self.workflow, self.step)],
-                env=full_env, text=True, capture_output=True, timeout=20,
+                env=full_env, text=True, capture_output=True, timeout=20, check=False,
             )
             self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
             log = (tmp / "log").read_text() if (tmp / "log").exists() else ""
@@ -75,10 +74,10 @@ class PullRequestScope:
     """Shared pull_request cases; mixed into one TestCase per workflow."""
 
 
-    base_env = {"EVENT": "pull_request", "PR_NUMBER": "7", "GH_REPO": "o/r"}
+    base_env: ClassVar[dict[str, str]] = {"EVENT": "pull_request", "PR_NUMBER": "7", "GH_REPO": "o/r"}
     skip_files = ()
     run_files = ()
-    extra = {}
+    extra: ClassVar[dict[str, str]] = {}
 
     def pr(self, listing, changed=None, **kwargs):
         count = changed if changed is not None else listing.count("\n")
@@ -148,7 +147,7 @@ class ZizmorScope(PullRequestScope, ScopeCase):
     skip_files = ("README.md", "go.mod", "lib/util.py")
     run_files = (".github/workflows/ci.yml", ".github/actions/x/action.yml", ".github/zizmor.yml",
                  ".github/dependabot.yml", "action.yml")
-    extra = {"SARIF_UPLOAD": "false", "DIAGNOSTIC": "true"}
+    extra: ClassVar[dict[str, str]] = {"SARIF_UPLOAD": "false", "DIAGNOSTIC": "true"}
 
     def test_a_run_that_uploads_sarif_is_never_skipped(self):
         out, _, log = self.run_scope(
