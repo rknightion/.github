@@ -1,0 +1,123 @@
+name: changes (reusable)
+
+# Classify a pull request's changes so a caller can skip its application suites when they cannot be
+# affected: a Renovate pull request that only moves hub reusable workflow pins, a release-please
+# pull request, or a vend-sync pull request. Outputs are the strings 'true' and 'false'. Caller
+# pattern, what each output means and the cases it gets wrong on purpose: docs/changes/README.md.
+#
+# The classifier is NOT read from the caller's repository. It is checked out from this repository at
+# job.workflow_sha, the commit of this workflow the caller named in `uses:`, and nothing from the pull
+# request is checked out: the changed files and their diffs come from the compare API at the event's
+# base and head commits.
+#
+# Fail closed: any event but pull_request, an API error, a pull request of 300 or more files (more
+# than the compare API is sure to list) or any unexpected error gives app=true, so everything runs.
+# A job failure (the checkout, say) leaves the outputs empty: callers' ci-success must then fail.
+#
+# Never pair this with a workflow-level paths or paths-ignore filter on a required check: a skipped
+# workflow reports nothing, so the required check never arrives.
+#
+# Caller permissions: contents: read (the compare API, and the contents API for a JSON version
+# file). No secrets are used. Check run name: the caller's job name,
+# " / ", then this job's name "classify".
+
+on:
+  workflow_call:
+    inputs:
+      runs-on:
+        description: "Runner label. The runner needs python3 (3.8 or newer)."
+        required: false
+        type: string
+        default: "ubuntu-latest"
+      renovate-authors:
+        description: >-
+          Pull request authors (logins, comma or newline separated) whose pull requests can be
+          hub_pins_only. Any other author's pull request never is.
+        required: false
+        type: string
+        default: "rknightion-renovate[bot]"
+      version-files:
+        description: >-
+          The files release-please bumps besides CHANGELOG.md and .release-please-manifest.json,
+          one a line: a glob alone (only release-please marker lines may change) or a glob, ':'
+          and a JSON path to the version field, for example charts/app/Chart.yaml:$.version.
+          Anything else changing in the file runs everything. Format: docs/changes/README.md.
+        required: false
+        type: string
+        default: ""
+      vended-paths:
+        description: >-
+          Path globs (newline separated) of the files the vend-sync manifest owns in this repository.
+          Empty: vended_only is always false.
+        required: false
+        type: string
+        default: ""
+    outputs:
+      app:
+        description: "'true' unless one of the three fast paths applies: the application suites must run."
+        value: ${{ jobs.classify.outputs.app }}
+      hub_pins_only:
+        description: "'true' for a Renovate pull request that only moves hub reusable workflow pins."
+        value: ${{ jobs.classify.outputs.hub_pins_only }}
+      release_only:
+        description: "'true' when only the changelog, the manifest and version files move to the new version."
+        value: ${{ jobs.classify.outputs.release_only }}
+      vended_only:
+        description: "'true' when only vended paths change."
+        value: ${{ jobs.classify.outputs.vended_only }}
+      hub_workflows:
+        description: >-
+          JSON list of the hub reusable workflow file names whose pins move, when hub_pins_only;
+          otherwise []. A job that calls one of them must run.
+        value: ${{ jobs.classify.outputs.hub_workflows }}
+      reason:
+        description: "One line saying why."
+        value: ${{ jobs.classify.outputs.reason }}
+
+permissions: {}
+
+jobs:
+  classify:
+    name: classify
+    runs-on: ${{ inputs.runs-on }}
+    timeout-minutes: 5
+    permissions:
+      contents: read
+    outputs:
+      app: ${{ steps.classify.outputs.app }}
+      hub_pins_only: ${{ steps.classify.outputs.hub_pins_only }}
+      release_only: ${{ steps.classify.outputs.release_only }}
+      vended_only: ${{ steps.classify.outputs.vended_only }}
+      hub_workflows: ${{ steps.classify.outputs.hub_workflows }}
+      reason: ${{ steps.classify.outputs.reason }}
+    steps:
+      - name: Refuse an unpinned classifier
+        env:
+          JOB_WORKFLOW_SHA: ${{ job.workflow_sha }}
+        run: |
+          if ! [[ "$JOB_WORKFLOW_SHA" =~ ^[0-9a-f]{40}$ ]]; then
+            echo "::error title=changes::job.workflow_sha is not a commit, so the pinned classifier cannot be selected"
+            exit 1
+          fi
+
+      # The classifier comes from the commit of this reusable workflow the caller named, never from the
+      # caller's tree.
+      - name: Checkout the classifier at the pinned reusable commit
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          repository: rknightion/.github
+          ref: ${{ job.workflow_sha }}
+          path: changes-classifier
+          persist-credentials: false
+          sparse-checkout: scripts/changes/
+          sparse-checkout-cone-mode: false
+
+      - name: Classify the pull request
+        id: classify
+        env:
+          GH_TOKEN: ${{ github.token }}
+          INPUT_RENOVATE_AUTHORS: ${{ inputs.renovate-authors }}
+          INPUT_VERSION_FILES: ${{ inputs.version-files }}
+          INPUT_VENDED_PATHS: ${{ inputs.vended-paths }}
+        # -I: the classifier runs isolated from PYTHON* variables and the working directory.
+        run: python3 -I changes-classifier/scripts/changes/classify.py < /dev/null

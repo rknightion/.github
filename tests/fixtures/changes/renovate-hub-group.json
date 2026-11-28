@@ -1,0 +1,121 @@
+[
+ {
+  "filename": ".github/workflows/actionlint.yml",
+  "status": "modified",
+  "additions": 1,
+  "deletions": 1,
+  "patch": "@@ -9,4 +9,4 @@ jobs:\n   actionlint:\n     permissions:\n       contents: read\n-    uses: rknightion/.github/.github/workflows/actionlint.yml@3dacb3010d3967dfa9d7619c2d61dc7af14d72dc # v1.34.1\n+    uses: rknightion/.github/.github/workflows/actionlint.yml@a6e7f83c8fd233841120fc14c0412124a445c306 # v1.35.0"
+ },
+ {
+  "filename": ".github/workflows/arm-automerge.yml",
+  "status": "modified",
+  "additions": 1,
+  "deletions": 1,
+  "patch": "@@ -18,4 +18,4 @@ jobs:\n     permissions:\n       contents: write      # enabling auto-merge writes the merge ref\n       pull-requests: write # gh pr merge --auto operates on the PR\n-    uses: rknightion/.github/.github/workflows/arm-automerge.yml@3dacb3010d3967dfa9d7619c2d61dc7af14d72dc # v1.34.1\n+    uses: rknightion/.github/.github/workflows/arm-automerge.yml@a6e7f83c8fd233841120fc14c0412124a445c306 # v1.35.0"
+ },
+ {
+  "filename": ".github/workflows/auto-rc.yml",
+  "status": "modified",
+  "additions": 2,
+  "deletions": 2,
+  "patch": "@@ -45,7 +45,7 @@ jobs:\n       contents: write      # create the RC tag and the GitHub prerelease\n       pull-requests: read  # find the open release-please PR\n       checks: read         # poll ci-success for this commit\n-    uses: rknightion/.github/.github/workflows/auto-rc.yml@3dacb3010d3967dfa9d7619c2d61dc7af14d72dc # v1.34.1\n+    uses: rknightion/.github/.github/workflows/auto-rc.yml@a6e7f83c8fd233841120fc14c0412124a445c306 # v1.35.0\n     with:\n       # Under workflow_run, github.sha is the DEFAULT BRANCH HEAD, not the\n       # commit CI ran on — it races ahead on rapid pushes. head_sha is the\n@@ -79,7 +79,7 @@ jobs:\n       id-token: write     # cosign keyless signing\n       packages: write     # goreleaser reads the registry for existing artifacts\n       attestations: write # SLSA build provenance on the archives\n-    uses: rknightion/.github/.github/workflows/binaries.yml@3dacb3010d3967dfa9d7619c2d61dc7af14d72dc # v1.34.1\n+    uses: rknightion/.github/.github/workflows/binaries.yml@a6e7f83c8fd233841120fc14c0412124a445c306 # v1.35.0\n     with:\n       release-tag: ${{ needs.rc.outputs.tag }}\n       install-cosign: true"
+ },
+ {
+  "filename": ".github/workflows/ci.yml",
+  "status": "modified",
+  "additions": 2,
+  "deletions": 2,
+  "patch": "@@ -132,7 +132,7 @@ jobs:\n     if: github.event_name == 'pull_request'\n     permissions:\n       contents: read\n-    uses: rknightion/.github/.github/workflows/privacy-sweep.yml@3dacb3010d3967dfa9d7619c2d61dc7af14d72dc # v1.34.1\n+    uses: rknightion/.github/.github/workflows/privacy-sweep.yml@a6e7f83c8fd233841120fc14c0412124a445c306 # v1.35.0\n \n   # The Backlog.md board is retired: issues are the queue. A pull request may delete files under\n   # backlog/ or move them out, never add or change one there. Reads the file list from the API, so\n@@ -232,7 +232,7 @@ jobs:\n       contents: read\n       security-events: write\n       actions: read\n-    uses: rknightion/.github/.github/workflows/zizmor.yml@3dacb3010d3967dfa9d7619c2d61dc7af14d72dc # v1.34.1\n+    uses: rknightion/.github/.github/workflows/zizmor.yml@a6e7f83c8fd233841120fc14c0412124a445c306 # v1.35.0\n     with:\n       enforce: true\n "
+ },
+ {
+  "filename": ".github/workflows/cloudflare-api-drift.yml",
+  "status": "modified",
+  "additions": 1,
+  "deletions": 1,
+  "patch": "@@ -28,7 +28,7 @@ jobs:\n           go-version-file: go.mod\n           cache: true\n       - name: Read schema probe token\n-        uses: rknightion/.github/.github/actions/bao-secret@3dacb3010d3967dfa9d7619c2d61dc7af14d72dc # v1.34.1\n+        uses: rknightion/.github/.github/actions/bao-secret@a6e7f83c8fd233841120fc14c0412124a445c306 # v1.35.0\n         with:\n           role: rknightion-cf2otel\n           path: rknightion/cf2otel"
+ },
+ {
+  "filename": ".github/workflows/codeql.yml",
+  "status": "modified",
+  "additions": 1,
+  "deletions": 1,
+  "patch": "@@ -12,7 +12,7 @@ jobs:\n       packages: read # permits analysis of package metadata\n       actions: read # reads workflow metadata for Actions analysis\n       contents: read # checks out and analyzes repository source\n-    uses: rknightion/.github/.github/workflows/codeql.yml@3dacb3010d3967dfa9d7619c2d61dc7af14d72dc # v1.34.1\n+    uses: rknightion/.github/.github/workflows/codeql.yml@a6e7f83c8fd233841120fc14c0412124a445c306 # v1.35.0\n     with:\n       languages: '[{\"language\":\"go\",\"build-mode\":\"autobuild\"},{\"language\":\"actions\",\"build-mode\":\"none\"}]'\n       timeout-minutes: 30"
+ },
+ {
+  "filename": ".github/workflows/dependency-review.yml",
+  "status": "modified",
+  "additions": 1,
+  "deletions": 1,
+  "patch": "@@ -8,4 +8,4 @@ jobs:\n     permissions:\n       contents: read # compares dependency changes in the pull request\n       pull-requests: write # posts the dependency review summary\n-    uses: rknightion/.github/.github/workflows/dependency-review.yml@3dacb3010d3967dfa9d7619c2d61dc7af14d72dc # v1.34.1\n+    uses: rknightion/.github/.github/workflows/dependency-review.yml@a6e7f83c8fd233841120fc14c0412124a445c306 # v1.35.0"
+ },
+ {
+  "filename": ".github/workflows/docker-security.yml",
+  "status": "modified",
+  "additions": 1,
+  "deletions": 1,
+  "patch": "@@ -11,4 +11,4 @@ jobs:\n     permissions:\n       contents: read\n       security-events: write\n-    uses: rknightion/.github/.github/workflows/docker-security.yml@3dacb3010d3967dfa9d7619c2d61dc7af14d72dc # v1.34.1\n+    uses: rknightion/.github/.github/workflows/docker-security.yml@a6e7f83c8fd233841120fc14c0412124a445c306 # v1.35.0"
+ },
+ {
+  "filename": ".github/workflows/ghcr-cleanup.yml",
+  "status": "modified",
+  "additions": 1,
+  "deletions": 1,
+  "patch": "@@ -21,7 +21,7 @@ jobs:\n     permissions:\n       contents: read\n       packages: write # delete package versions\n-    uses: rknightion/.github/.github/workflows/ghcr-cleanup.yml@3dacb3010d3967dfa9d7619c2d61dc7af14d72dc # v1.34.1\n+    uses: rknightion/.github/.github/workflows/ghcr-cleanup.yml@a6e7f83c8fd233841120fc14c0412124a445c306 # v1.35.0\n     with:\n       packages: \"cf2otel,charts/cf2otel\"\n       # Scheduled runs prune for real; a manual dispatch defaults to dry-run."
+ },
+ {
+  "filename": ".github/workflows/grafana-sync.yml",
+  "status": "modified",
+  "additions": 1,
+  "deletions": 1,
+  "patch": "@@ -47,7 +47,7 @@ jobs:\n \n       - name: Mint a scoped GitSync token\n         id: bao\n-        uses: rknightion/.github/.github/actions/broker-token@3dacb3010d3967dfa9d7619c2d61dc7af14d72dc # v1.34.1\n+        uses: rknightion/.github/.github/actions/broker-token@a6e7f83c8fd233841120fc14c0412124a445c306 # v1.35.0\n         with:\n           permission-set: gitsync\n           role: gitsync-cf2otel"
+ },
+ {
+  "filename": ".github/workflows/helm.yml",
+  "status": "modified",
+  "additions": 1,
+  "deletions": 1,
+  "patch": "@@ -15,7 +15,7 @@ jobs:\n   validate:\n     permissions:\n       contents: read\n-    uses: rknightion/.github/.github/workflows/helm-validate.yml@3dacb3010d3967dfa9d7619c2d61dc7af14d72dc # v1.34.1\n+    uses: rknightion/.github/.github/workflows/helm-validate.yml@a6e7f83c8fd233841120fc14c0412124a445c306 # v1.35.0\n     with:\n       chart-path: charts/cf2otel\n       kubernetes-versions: \"1.29.0\""
+ },
+ {
+  "filename": ".github/workflows/pr-metadata.yml",
+  "status": "modified",
+  "additions": 1,
+  "deletions": 1,
+  "patch": "@@ -27,7 +27,7 @@ jobs:\n       contents: read\n       issues: read\n       pull-requests: read\n-    uses: rknightion/.github/.github/workflows/ac-evidence.yml@3dacb3010d3967dfa9d7619c2d61dc7af14d72dc # v1.34.1\n+    uses: rknightion/.github/.github/workflows/ac-evidence.yml@a6e7f83c8fd233841120fc14c0412124a445c306 # v1.35.0\n \n   # The metadata check a ruleset can require. Every job must succeed; a skipped\n   # or cancelled dependency fails it."
+ },
+ {
+  "filename": ".github/workflows/publish.yml",
+  "status": "modified",
+  "additions": 1,
+  "deletions": 1,
+  "patch": "@@ -46,7 +46,7 @@ jobs:\n       id-token: write # obtains keyless signing credentials\n       attestations: write # publishes provenance attestations\n       security-events: write # uploads container scan results\n-    uses: rknightion/.github/.github/workflows/container-publish.yml@3dacb3010d3967dfa9d7619c2d61dc7af14d72dc # v1.34.1\n+    uses: rknightion/.github/.github/workflows/container-publish.yml@a6e7f83c8fd233841120fc14c0412124a445c306 # v1.35.0\n     with:\n       trivy-ignore-unfixed: true\n       release-tag: ${{ inputs.release_tag }}"
+ },
+ {
+  "filename": ".github/workflows/release-assets.yml",
+  "status": "modified",
+  "additions": 1,
+  "deletions": 1,
+  "patch": "@@ -16,7 +16,7 @@ jobs:\n       id-token: write # obtains keyless signing credentials\n       packages: write # supports reusable release tooling package access\n       attestations: write # publishes provenance attestations\n-    uses: rknightion/.github/.github/workflows/binaries.yml@3dacb3010d3967dfa9d7619c2d61dc7af14d72dc # v1.34.1\n+    uses: rknightion/.github/.github/workflows/binaries.yml@a6e7f83c8fd233841120fc14c0412124a445c306 # v1.35.0\n     with:\n       release-tag: ${{ inputs.release_tag }}\n       install-cosign: true"
+ },
+ {
+  "filename": ".github/workflows/release-please.yml",
+  "status": "modified",
+  "additions": 2,
+  "deletions": 2,
+  "patch": "@@ -20,7 +20,7 @@ jobs:\n       tag_name: ${{ steps.release.outputs.tag_name }}\n     steps:\n       - id: bao\n-        uses: rknightion/.github/.github/actions/broker-token@3dacb3010d3967dfa9d7619c2d61dc7af14d72dc # v1.34.1\n+        uses: rknightion/.github/.github/actions/broker-token@a6e7f83c8fd233841120fc14c0412124a445c306 # v1.35.0\n         with:\n           permission-set: release-please-cf2otel\n           role: release-please-cf2otel\n@@ -68,7 +68,7 @@ jobs:\n       id-token: write # obtains keyless signing credentials\n       packages: write # supports reusable release tooling package access\n       attestations: write # publishes provenance attestations\n-    uses: rknightion/.github/.github/workflows/binaries.yml@3dacb3010d3967dfa9d7619c2d61dc7af14d72dc # v1.34.1\n+    uses: rknightion/.github/.github/workflows/binaries.yml@a6e7f83c8fd233841120fc14c0412124a445c306 # v1.35.0\n     with:\n       release-tag: ${{ needs.release-please.outputs.tag_name }}\n       install-cosign: true"
+ },
+ {
+  "filename": ".github/workflows/scorecard.yml",
+  "status": "modified",
+  "additions": 1,
+  "deletions": 1,
+  "patch": "@@ -10,4 +10,4 @@ jobs:\n     permissions:\n       security-events: write\n       id-token: write\n-    uses: rknightion/.github/.github/workflows/scorecard.yml@3dacb3010d3967dfa9d7619c2d61dc7af14d72dc # v1.34.1\n+    uses: rknightion/.github/.github/workflows/scorecard.yml@a6e7f83c8fd233841120fc14c0412124a445c306 # v1.35.0"
+ },
+ {
+  "filename": ".github/workflows/trigger-docs-sync.yml",
+  "status": "modified",
+  "additions": 1,
+  "deletions": 1,
+  "patch": "@@ -21,7 +21,7 @@ jobs:\n       id-token: write\n     steps:\n       - id: bao\n-        uses: rknightion/.github/.github/actions/broker-token@3dacb3010d3967dfa9d7619c2d61dc7af14d72dc # v1.34.1\n+        uses: rknightion/.github/.github/actions/broker-token@a6e7f83c8fd233841120fc14c0412124a445c306 # v1.35.0\n         with:\n           permission-set: docs-sync\n           role: docs-sync-cf2otel"
+ }
+]
