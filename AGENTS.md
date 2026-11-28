@@ -79,8 +79,9 @@ which arms it only if a release PR is open. A `workflow_dispatch` of `self-arm-a
 headings, so a renamed section must change it too (`tests/test_release_cadence.py` checks).
 
 A merge made with `GITHUB_TOKEN` starts no push workflow, so release-please never sees the release
-commit. The arming job dispatches release-please for any merged release PR still labelled
-`autorelease: pending`, which is what tags it.
+commit. `self-arm-automerge` dispatches release-please for a merged release PR still labelled
+`autorelease: pending`, which is what tags it: its `arm` job after arming, and its `tag` job when
+`ci` passes on an armed release PR (it follows `ci` by that `name:`).
 
 For product repositories, `auto-rc` cuts no candidate when everything since the last tag is under
 `.github/` or the Renovate config, and none within `rc-min-interval-minutes` (default 360) of the

@@ -51,9 +51,9 @@ def notes(*sections):
     return body + "\n---\nThis PR was generated with [Release Please](https://github.com/googleapis/release-please)."
 
 
-def script():
+def script(name=STEP):
     lines = WORKFLOW.read_text().splitlines()
-    start = lines.index(STEP)
+    start = lines.index(name)
     start = lines.index("        run: |", start) + 1
     block = []
     for line in lines[start:]:
@@ -169,6 +169,97 @@ class Cadence(unittest.TestCase):
         self.assertIn("startsWith(github.event.pull_request.head.ref, 'release-please--')", text)
         self.assertIn("github.event.pull_request.head.repo.full_name == github.repository", text)
         self.assertRegex(text, r"(?m)^      actions: write ")
+
+
+TAG_STEP = "      - name: Wait for the auto-merge, then dispatch release-please"
+TAG_GH = r'''#!/bin/bash
+set -euo pipefail
+echo "$*" >> "$CALLS"
+jq_filter="."
+args=("$@")
+for ((i = 0; i < ${#args[@]}; i++)); do
+  if [ "${args[i]}" = --jq ]; then jq_filter="${args[i+1]}"; fi
+done
+case "$1 $2" in
+  "pr list") printf '%s' "$FAKE_LIST" | jq -r "$jq_filter" ;;
+  "pr view")
+    n=$(grep -c '^pr view' "$CALLS")
+    jq -c --argjson n "$n" '.[if $n > length then length - 1 else $n - 1 end]' <<< "$FAKE_VIEWS" ;;
+  "workflow run") ;;
+  *) echo "unexpected gh $*" >&2; exit 3 ;;
+esac
+'''
+
+
+class TagAfterAutoMerge(unittest.TestCase):
+    SHA = "a" * 40
+    LIST = json.dumps([{"number": 41, "headRefOid": "b" * 40}, {"number": 42, "headRefOid": "a" * 40}])
+    ARMED = {"state": "OPEN", "autoMergeRequest": {"mergeMethod": "SQUASH"}, "labels": [{"name": "autorelease: pending"}]}
+    WAITING = {"state": "OPEN", "autoMergeRequest": None, "labels": [{"name": "autorelease: pending"}]}
+    MERGED = {"state": "MERGED", "autoMergeRequest": None, "labels": [{"name": "autorelease: pending"}]}
+    TAGGED = {"state": "MERGED", "autoMergeRequest": None, "labels": [{"name": "autorelease: tagged"}]}
+
+    def run_step(self, views, listing=LIST):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            (root / "gh").write_text(TAG_GH)
+            (root / "sleep").write_text('#!/bin/bash\necho "sleep $1" >> "$CALLS"\n')
+            for tool in ("gh", "sleep"):
+                (root / tool).chmod(0o755)
+            calls = root / "calls"
+            calls.touch()
+            env = dict(os.environ, PATH=f"{root}{os.pathsep}{os.environ['PATH']}", CALLS=str(calls), GH_TOKEN="x",
+                       REPO="example/hub", BRANCH="release-please--branches--main", SHA=self.SHA,
+                       FAKE_LIST=listing, FAKE_VIEWS=json.dumps(views))
+            result = subprocess.run(["bash", "-e", "-c", script(TAG_STEP)], env=env, capture_output=True,
+                                    text=True, timeout=20)
+            return result, calls.read_text().splitlines()
+
+    def dispatched(self, calls):
+        return "workflow run release-please.yml --repo example/hub --ref main" in calls
+
+    def test_armed_release_is_tagged_once_it_merges(self):
+        result, calls = self.run_step([self.ARMED, self.ARMED, self.MERGED])
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertTrue(self.dispatched(calls))
+        self.assertEqual([c for c in calls if c.startswith("sleep")], ["sleep 30", "sleep 30"])
+        self.assertTrue(all(c.startswith("pr view 42 ") for c in calls if c.startswith("pr view")))
+
+    def test_unarmed_chore_release_returns_at_once(self):
+        result, calls = self.run_step([self.WAITING])
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertFalse(self.dispatched(calls))
+        self.assertFalse([c for c in calls if c.startswith("sleep")])
+
+    def test_tagged_closed_or_unknown_release_dispatches_nothing(self):
+        for views, listing in (([self.TAGGED], self.LIST), ([{"state": "CLOSED", "labels": []}], self.LIST),
+                               ([self.MERGED], json.dumps([{"number": 41, "headRefOid": "b" * 40}]))):
+            with self.subTest(views=views[0]["state"], listing=listing[:30]):
+                result, calls = self.run_step(views, listing)
+                self.assertEqual(result.returncode, 0, result.stderr)
+                self.assertFalse(self.dispatched(calls))
+
+    def test_armed_release_that_never_merges_stops_with_a_warning(self):
+        result, calls = self.run_step([self.ARMED])
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertFalse(self.dispatched(calls))
+        self.assertEqual(len([c for c in calls if c.startswith("sleep")]), 10)
+        self.assertIn("::warning::#42 did not merge within five minutes", result.stdout)
+
+    def test_tag_job_follows_ci_on_release_branches_only(self):
+        text = WORKFLOW.read_text()
+        self.assertRegex(text, r"(?m)^  workflow_run: .*\n    workflows: \[ci\]\n    types: \[completed\]\n"
+                               r'    branches: \["release-please--\*\*"\]\n')
+        tag = text.split("\n  tag:\n", 1)[1]
+        for guard in ("github.event.workflow_run.conclusion == 'success'",
+                      "github.event.workflow_run.event == 'pull_request'",
+                      "github.event.workflow_run.head_repository.full_name == github.repository",
+                      "startsWith(github.event.workflow_run.head_branch, 'release-please--')"):
+            self.assertIn(guard, tag)
+        self.assertNotIn("actions/checkout", text)
+        ci = (ROOT / ".github/workflows/ci.yml").read_text()
+        self.assertRegex(ci, r"(?m)^name: ci\n")
+
 
 
 if __name__ == "__main__":
